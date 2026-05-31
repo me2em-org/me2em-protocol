@@ -1,0 +1,10 @@
+paths:
+  /handles/register:
+    post:
+      summary: Register a new handle (public key + metadata)
+  /auth/challenge:
+    post:
+      summary: Request challenge for authentication
+  /auth/verify:
+    post:
+      summary: Verify challenge signature and issue session token

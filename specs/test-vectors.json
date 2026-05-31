@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "algorithm": "HKDF-SHA256 + Ed25519",
+  "vectors": [
+    {
+      "description": "Basic derivation: seed + 'work'",
+      "seed_hex": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "handle_name": "work",
+      "expected_handle_id": "Ab3...Xy9",
+      "expected_public_key_hex": "deadbeef..."
+    }
+  ]
+}
