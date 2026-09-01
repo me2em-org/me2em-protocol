@@ -174,6 +174,9 @@ class Handle {
   // Verify a signature using a public key (static method)
   static verify(signature: Uint8Array, data: Uint8Array, publicKey: Uint8Array): Promise<boolean>;
 
+  // Deterministically derive a password/secret for a specific context
+  derivePassword(context: string, length?: number): string;
+
   // Accessors
   getName(): string;
   getMetadata(): HandleMetadata | undefined;
@@ -227,6 +230,21 @@ const sig = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
 const isValid = await Handle.verify(sig, data, publicKey);
 if (!isValid) throw new Error('Invalid signature');
 ```
+
+#### `Handle.derivePassword(context, length?)`
+
+Generates a deterministic, cryptographically strong secret (e.g., a password) for a specific service, without ever exposing the private key.
+
+```typescript
+// Derive a password for a specific service
+const googlePassword = workHandle.derivePassword('google'); 
+// Example output: "xK9mP2qL5wY9zB1cD4eF6g"
+
+// Derive a longer secret (e.g., 32 bytes for an API key)
+const apiKey = workHandle.derivePassword('aws-api', 32);
+```
+
+✅ **Security Benefit**: The `privateKey` remains strictly encapsulated within the `Handle` instance. It is used internally by HKDF-SHA256 and is never returned, logged, or serialized.
 
 ---
 
@@ -354,6 +372,29 @@ const sessionB = { /* custom token logic */ };
 ✅ **Benefit**: Seamless SSO with privacy isolation — apps cannot correlate user activity across services.
 
 ---
+
+### 5. Deterministic Password Manager (Access Key Keeper)
+
+Instead of storing passwords in a database, derive them deterministically from the Handle. The user only needs to remember their root Seed and the service name.
+
+```typescript
+// 1. User restores Identity from Seed (e.g., after entering a PIN)
+const identity = await Identity.fromSeed(userSeed);
+
+// 2. Derive the specific service Handle
+const googleHandle = await identity.deriveHandle('google', {
+  displayName: 'Alice Personal'
+});
+
+// 3. Deterministically generate the password on the fly
+const password = googleHandle.derivePassword('google');
+
+// 4. Auto-fill the login form
+console.log('Login:', 'alice@example.com');
+console.log('Password:', password); // Always the same for this seed + handle + context
+```
+
+✅ **Benefit**: Zero-knowledge password management. No database of passwords is required on the server. If a service forces a password change, the user simply derives a new handle (e.g., `'google-v2'`) or adds a version suffix to the context (e.g., `derivePassword('google', 16, 2)`).
 
 ## 🔐 Cryptographic Details
 
@@ -605,7 +646,7 @@ pnpm -r lint
 ```json
 {
   "name": "@me2em-org/protocol-core",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
