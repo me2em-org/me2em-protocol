@@ -1,8 +1,3 @@
-Отлично! Сейчас создам детальный `packages/core/README.md` — это будет профессиональная документация API для npm-пакета `@me2em/core`.
-
-Замените содержимое файла `packages/core/README.md` на этот код:
-
-```markdown
 # 📦 `@me2em/core` — Core Cryptographic Primitives
 
 > Core primitives for the Me2em authorization protocol: `Identity`, `Handle`, and secure channel derivation with Ed25519 cryptography.
@@ -659,27 +654,3 @@ We welcome contributions! See:
 Apache License 2.0 — see [LICENSE](../../LICENSE) for details.
 
 © 2026 Me2em Organization. Built for privacy, openness, and user sovereignty.
-```
-
----
-
-## ✅ Что сделано
-
-Этот `README.md` теперь:
-
-1. **Профессиональный API-документ** для npm-пакета `@me2em/core`
-2. **Quick Start** с интеграцией BIP39 (как в BeSafeChat)
-3. **Полный API Reference** для `Identity` и `Handle`
-4. **Детальное описание** новых методов:
-   - `derivePassword()` — для Password Manager
-   - `deriveChannelKey()` — для IoT Fleet
-5. **6 Use Cases** с реальными примерами кода:
-   - Password Manager
-   - IoT Fleet with Encrypted Channels
-   - Multi-Device Sync
-   - Break-Glass Recovery
-   - Ephemeral Delegated Access
-6. **Cryptographic Details** — описание алгоритмов деривации
-7. **Security Best Practices** — рекомендации по безопасному использованию
-
-Этот README будет отображаться на странице npm-пакета и станет основным источником документации для разработчиков, использующих `@me2em/core`.
