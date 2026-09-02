@@ -61,4 +61,34 @@ export class Handle {
       .replace(/\//g, '_')
       .replace(/=+$/, '');
   }
+
+  /**
+   * Derives a symmetric 256-bit channel key for secure communication between
+   * the Identity (controller) and this Handle (device/context).
+   * 
+   * Both parties can independently compute this key because:
+   * - The Handle possesses its own private key directly
+   * - The Identity can derive the same private key via `identity.deriveHandle(name)`
+   * 
+   * This enables zero-knowledge encrypted channels without key exchange protocols.
+   * 
+   * @param context - Channel identifier for domain separation (e.g., 'drone-001', 'session-abc').
+   *                  Both parties MUST use the same context to derive the same key.
+   * @returns 32-byte Uint8Array suitable for AES-256-GCM encryption.
+   * 
+   * @example
+   * // On the drone (Handle side):
+   * const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
+   * const encrypted = await encryptAESGCM(telemetry, channelKey);
+   * 
+   * // On the control center (Identity side):
+   * const droneHandle = await centerIdentity.deriveHandle('drone-001');
+   * const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
+   * const decrypted = await decryptAESGCM(encrypted, channelKey);
+   */
+  deriveChannelKey(context: string): Uint8Array {
+    const salt = new TextEncoder().encode(`me2em/channel/${context.toLowerCase().trim()}`);
+    const info = new TextEncoder().encode('me2em/channel/v1');
+    return hkdf(sha256, this.privateKey, salt, info, 32);
+  }
 }
