@@ -177,6 +177,9 @@ class Handle {
   // Deterministically derive a password/secret for a specific context
   derivePassword(context: string, length?: number): string;
 
+  // Derive a symmetric 256-bit channel key for encrypted communication
+  deriveChannelKey(context: string): Uint8Array;
+
   // Accessors
   getName(): string;
   getMetadata(): HandleMetadata | undefined;
@@ -245,6 +248,25 @@ const apiKey = workHandle.derivePassword('aws-api', 32);
 ```
 
 ✅ **Security Benefit**: The `privateKey` remains strictly encapsulated within the `Handle` instance. It is used internally by HKDF-SHA256 and is never returned, logged, or serialized.
+
+#### `Handle.deriveChannelKey(context)`
+
+Derives a symmetric 256-bit key for establishing a secure, encrypted communication channel between the Identity (controller) and this Handle (device/context). Both parties can independently compute this key without any key exchange protocol, because they both have access to the Handle's private key.
+
+```typescript
+// On the device (Handle side):
+const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
+// channelKey is a 32-byte Uint8Array, ready for AES-256-GCM
+
+// On the controller (Identity side):
+const droneHandle = await centerIdentity.deriveHandle('drone-001');
+const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
+// Identical key, derived independently
+```
+
+✅ **Security Benefit**: The `privateKey` remains strictly encapsulated within the `Handle` instance. No key exchange protocol (ECDH, etc.) is needed — both parties derive the same key independently from the shared Handle private key.
+
+⚠️ **Note**: This method returns raw bytes (Uint8Array), unlike `derivePassword` which returns a base64url string. Use the returned bytes directly with AES-256-GCM via Web Crypto API or similar.
 
 ---
 
@@ -396,6 +418,145 @@ console.log('Password:', password); // Always the same for this seed + handle + 
 
 ✅ **Benefit**: Zero-knowledge password management. No database of passwords is required on the server. If a service forces a password change, the user simply derives a new handle (e.g., `'google-v2'`) or adds a version suffix to the context (e.g., `derivePassword('google', 16, 2)`).
 
+### 6. IoT Fleet with Encrypted Channels
+
+Control a fleet of devices (drones, sensors, robots) with zero-knowledge encrypted communication. The control center derives a channel key for each device, and the device independently derives the same key — no key exchange protocol required.
+
+```typescript
+// === CONTROL CENTER (Identity) ===
+const centerIdentity = await Identity.fromSeed(centerSeed);
+
+// Minimal registry: just device names (no public keys stored!)
+const allowedDevices = ['drone-001', 'drone-002', 'sensor-warehouse-a'];
+
+// Receiving telemetry from a drone
+async function receiveTelemetry(message: { name: string, signature: Uint8Array, encrypted: Uint8Array }) {
+  // 1. Check if device is in registry
+  if (!allowedDevices.includes(message.name)) {
+    throw new Error('Unknown device');
+  }
+  
+  // 2. Derive the Handle (deterministic, no DB lookup)
+  const deviceHandle = await centerIdentity.deriveHandle(message.name);
+  
+  // 3. Verify signature (proves device owns the private key)
+  const dataToVerify = concatBytes(
+    new TextEncoder().encode(message.name),
+    message.encrypted
+  );
+  const isValid = await Handle.verify(message.signature, dataToVerify, deviceHandle.getPublicKey());
+  if (!isValid) throw new Error('Invalid signature');
+  
+  // 4. Derive the SAME channel key the device used for encryption
+  const channelKey = deviceHandle.deriveChannelKey('telemetry-v1');
+  
+  // 5. Decrypt the message
+  const telemetry = await decryptAESGCM(message.encrypted, channelKey);
+  return telemetry;
+}
+
+// === DRONE (Handle, provisioned at factory) ===
+// Drone is provisioned with its Handle's private key and name
+async function sendTelemetry(telemetry: object) {
+  const name = 'drone-001';
+  const privateKey = /* loaded from secure enclave */;
+  const droneHandle = new Handle(privateKey, name);
+  
+  // 1. Derive the SAME channel key the center will use for decryption
+  const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
+  
+  // 2. Encrypt telemetry
+  const telemetryBytes = new TextEncoder().encode(JSON.stringify(telemetry));
+  const encrypted = await encryptAESGCM(telemetryBytes, channelKey);
+  
+  // 3. Sign (name + encrypted data)
+  const dataToSign = concatBytes(new TextEncoder().encode(name), encrypted);
+  const signature = await droneHandle.sign(dataToSign);
+  
+  return { name, signature, encrypted };
+}
+```
+
+✅ **Benefits**:
+- **Minimal registry**: Control center stores only device names (strings), not public keys
+- **No key exchange**: Both parties derive the same key independently
+- **Stateless verification**: Signature check proves device authenticity
+- **Isolation**: Compromise of one device doesn't affect others (different Handles → different channel keys)
+
+---
+
+### 7. Stateless Multi-Device Synchronization
+
+A user with the same Identity on multiple devices (phone, laptop, tablet) can derive identical Handles and secrets on each device without any synchronization protocol.
+
+```typescript
+// On the phone:
+const identity = await Identity.fromSeed(userSeed);
+const messengerHandle = await identity.deriveHandle('messenger-main');
+const handleId = messengerHandle.getId();
+// Send handleId to server for registration
+
+// On the laptop (later, no sync needed):
+const identity = await Identity.fromSeed(userSeed); // Same seed
+const messengerHandle = await identity.deriveHandle('messenger-main'); // Same name
+const handleId = messengerHandle.getId(); // Identical handleId!
+// Server recognizes the same user automatically
+```
+
+✅ **Benefit**: Zero-knowledge multi-device support. No QR codes, no server-side key sync, no backup servers. The mathematics guarantees identity across devices.
+
+---
+
+### 8. Break-Glass Recovery and Inheritance
+
+A user's entire digital identity can be recovered from a single seed phrase, even years later, on any device, without contacting any service provider.
+
+```typescript
+// User stores seed phrase in a physical safe (or via Shamir's Secret Sharing with trusted heirs)
+
+// Years later, on a new device:
+const identity = await Identity.fromSeed(recoveredSeed);
+
+// All handles are instantly recoverable:
+const googleHandle = await identity.deriveHandle('google');
+const bankHandle = await identity.deriveHandle('bank');
+const messengerHandle = await identity.deriveHandle('messenger-main');
+
+// All passwords are instantly recoverable:
+const googlePassword = googleHandle.derivePassword('google');
+const bankPassword = bankHandle.derivePassword('bank');
+
+// All channel keys are instantly recoverable:
+const messengerChannelKey = messengerHandle.deriveChannelKey('session-2026');
+```
+
+✅ **Benefit**: True self-sovereignty. No company can lock you out of your identity. Recovery is a mathematical certainty, not a customer support ticket.
+
+---
+
+### 9. Ephemeral Delegated Access
+
+Grant time-limited access to a contractor or temporary service by deriving a Handle with a time-bound name.
+
+```typescript
+// Grant access to contractor until 2026-12-31
+const contractorHandle = await identity.deriveHandle('contractor-acme-2026-12-31', {
+  displayName: 'ACME Corp Contractor',
+  role: 'auditor',
+  expiresAt: '2026-12-31T23:59:59Z'
+});
+
+// Share the Handle ID with the contractor's system
+// Contractor uses this Handle for authenticated access
+
+// After expiration:
+// - Server rejects requests (checks expiresAt metadata)
+// - User simply stops using this Handle
+// - No cleanup needed — the Handle is just a name in the derivation tree
+```
+
+✅ **Benefit**: Clean delegation without polluting the permanent identity. Expired Handles become inert cryptographic artifacts.
+
 ## 🔐 Cryptographic Details
 
 ### Key Derivation Algorithm
@@ -417,6 +578,25 @@ HandleId = Base64Url(HandlePublicKey)
 - 🔁 **Deterministic**: Same inputs → same output across all implementations
 - 🔒 **One-way**: Cannot derive Identity key from Handle key
 - 🧩 **Isolated**: Each Handle uses independent Ed25519 keypair
+
+### Channel Key Derivation
+
+Channel keys are derived using **HKDF-SHA256** with the Handle's private key as input key material:
+
+```
+ChannelKey = HKDF-SHA256(
+  inputKeyMaterial = HandlePrivateKey,
+  salt = "me2em/channel/" + lowercase(context),
+  info = "me2em/channel/v1",
+  length = 32
+)
+```
+
+**Properties**:
+- 🔁 **Deterministic**: Same Handle + same context → same 32-byte key
+- 🔐 **Encapsulated**: Private key never leaves the Handle instance
+- 🧩 **Domain-separated**: Different contexts produce different keys (e.g., `'telemetry-v1'` vs `'command-v1'`)
+- ⚡ **No key exchange**: Both parties derive the key independently, no ECDH needed
 
 ### Signature Scheme
 
@@ -646,7 +826,7 @@ pnpm -r lint
 ```json
 {
   "name": "@me2em-org/protocol-core",
-  "version": "0.2.0-alpha.1",
+  "version": "0.3.0-alpha.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
