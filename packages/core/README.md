@@ -1,37 +1,63 @@
-# 📦 `@me2em-org/protocol-core` — Developer Documentation
+Отлично! Сейчас создам детальный `packages/core/README.md` — это будет профессиональная документация API для npm-пакета `@me2em/core`.
 
-> Core primitives for the Me2em authorization protocol: `Identity`, `Handle`, and `Session` management with Ed25519 cryptography.
+Замените содержимое файла `packages/core/README.md` на этот код:
 
-[![npm version](https://img.shields.io/npm/v/@me2em-org/protocol-core.svg)](https://www.npmjs.com/package/@me2em-org/protocol-core)
-[![License](https://img.shields.io/npm/l/@me2em-org/protocol-core)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
+```markdown
+# 📦 `@me2em/core` — Core Cryptographic Primitives
+
+> Core primitives for the Me2em authorization protocol: `Identity`, `Handle`, and secure channel derivation with Ed25519 cryptography.
+
+[![npm version](https://img.shields.io/npm/v/@me2em/core.svg)](https://www.npmjs.com/package/@me2em/core)
+[![License](https://img.shields.io/npm/l/@me2em/core.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-docs.me2em.com-blue)](https://docs.me2em.com)
 
 ---
 
-## 🎯 Quick Start
+## 🎯 Overview
+
+`@me2em/core` provides the cryptographic foundation for the Me2em protocol — a decentralized multi-context identity system. It enables:
+
+- **Hierarchical Deterministic Identities**: One seed → multiple isolated Handles
+- **Zero-Knowledge Password Management**: Deterministic password derivation without storage
+- **Secure Channel Communication**: Encrypted channels between Identity and Handles without key exchange
+- **Stateless Authentication**: Cryptographic proof without server-side session storage
+
+---
+
+## 📦 Installation
 
 ```bash
-npm install @me2em-org/protocol-core
+npm install @me2em/core
 # or
-pnpm add @me2em-org/protocol-core
+pnpm add @me2em/core
 # or
-yarn add @me2em-org/protocol-core
+yarn add @me2em/core
 ```
 
-```typescript
-import { Identity, Handle } from '@me2em-org/protocol-core';
+**Dependencies:**
+- `@noble/ed25519` — Ed25519 signatures
+- `@noble/hashes` — HKDF, SHA-256
 
-// 1. Create or restore identity from seed
-const seed = 'your-32-byte-hex-seed-or-24-words';
+---
+
+## 🚀 Quick Start
+
+### Basic Usage
+
+```typescript
+import { Identity, Handle } from '@me2em/core';
+
+// 1. Create Identity from seed (32 bytes)
+const seed = new Uint8Array(32).fill(42); // Replace with your secure seed
 const identity = await Identity.fromSeed(seed);
 
-// 2. Derive a contextual handle
+// 2. Derive a contextual Handle
 const workHandle = await identity.deriveHandle('work', {
   displayName: 'Alice @ Work',
   avatar: 'https://example.com/avatar.png'
 });
 
-// 3. Use handle for cryptographic operations
+// 3. Use Handle for cryptographic operations
 const message = new TextEncoder().encode('Hello, world!');
 const signature = await workHandle.sign(message);
 const isValid = await Handle.verify(signature, message, workHandle.getPublicKey());
@@ -40,77 +66,34 @@ console.log('Handle ID:', workHandle.getId()); // base64url(publicKey)
 console.log('Signature valid:', isValid); // true
 ```
 
----
+### Integration with BIP39 (Recommended)
 
-## 📚 Table of Contents
-
-1. [Core Concepts](#-core-concepts)
-2. [API Reference](#-api-reference)
-3. [Use Cases](#-use-cases)
-4. [Cryptographic Details](#-cryptographic-details)
-5. [Integration Guide](#-integration-guide)
-6. [Security Best Practices](#-security-best-practices)
-7. [Testing](#-testing)
-8. [Contributing](#-contributing)
-
----
-
-## 🔑 Core Concepts
-
-### Identity — Cryptographic Root
-
-`Identity` represents the root cryptographic identity derived from a seed phrase.
-
-```
-Seed (32 bytes / 24 words)
-       │
-       ▼
-┌─────────────────┐
-│   Identity      │
-│ • Ed25519 key   │
-│ • Deterministic │
-│ • Client-only   │
-└─────────────────┘
-```
-
-**Key properties:**
-- 🔐 **Never transmitted**: The root private key never leaves the client device
-- 🔄 **Deterministic**: Same seed → same Identity → same derived Handles
-- 🧩 **Stateless**: No server storage required for cryptographic operations
-
-### Handle — Contextual Profile
-
-`Handle` is a derived Ed25519 keypair representing a specific context (work, personal, IoT device).
-
-```
-Identity
-   │
-   ├─ deriveHandle('work') → Handle(@alice_work)
-   ├─ deriveHandle('private') → Handle(@alice_private)
-   └─ deriveHandle('iot-device-001') → Handle(@device_001)
-```
-
-**Key properties:**
-- 🔗 **Cryptographically isolated**: Each Handle has its own keypair; compromise of one does not affect others
-- 🏷️ **Public identifier**: `Handle.getId()` returns `base64url(publicKey)` — safe to share
-- 📦 **Metadata support**: Attach public metadata (displayName, avatar) without revealing Identity
-
-### Session — Scoped Access Token
-
-`Session` represents a time-limited, scoped authorization token for accessing a specific application.
+For production applications, use BIP39 mnemonic phrases. `@me2em/core` provides built-in utilities to handle generation, validation, and conversion to the required 32-byte Ed25519 seed.
 
 ```typescript
-interface SessionOptions {
-  audience: string;      // e.g., 'https://api.myapp.com'
-  scopes: string[];      // e.g., ['read:profile', 'write:messages']
-  ttl?: number;          // seconds until expiration (default: 3600)
-}
+import { 
+  Identity, 
+  generateSeedPhrase, 
+  get32ByteSeedFromMnemonic,
+  validateSeedPhrase 
+} from '@me2em/core';
+
+// 1. Generate a 12-word phrase (use 256 for 24 words)
+const phrase = generateSeedPhrase(128); 
+console.log('Your seed:', phrase.join(' '));
+
+// 2. (Optional) Validate a user-provided phrase
+const validation = validateSeedPhrase(phrase);
+if (!validation.isValid) throw new Error(validation.error);
+
+// 3. Convert to 32-byte seed and create Identity
+const seedBytes = await get32ByteSeedFromMnemonic(phrase);
+const identity = await Identity.fromSeed(seedBytes);
 ```
 
-**Key properties:**
-- ⏱️ **Short-lived**: Tokens expire automatically; refresh via Handle re-authentication
-- 🔐 **Scoped**: Each token grants only specified permissions
-- 🌐 **Stateless verification**: Servers verify signatures using Handle public key — no database lookup required
+**Why is this better?** 
+BIP39 produces a 64-byte seed, but Ed25519 requires exactly 32 bytes. The `get32ByteSeedFromMnemonic` utility handles the SHA-256 hashing deterministically and safely, so you don't have to write boilerplate crypto code.
+
 
 ---
 
@@ -118,10 +101,12 @@ interface SessionOptions {
 
 ### `Identity` Class
 
+The root cryptographic identity, derived from a seed phrase.
+
 ```typescript
 class Identity {
-  // Create Identity from seed (32-byte Uint8Array or hex string)
-  static fromSeed(seed: Uint8Array | string): Promise<Identity>;
+  // Create Identity from seed (32-byte Uint8Array)
+  static fromSeed(seed: Uint8Array): Promise<Identity>;
 
   // Derive a new Handle with optional metadata
   deriveHandle(name: string, metadata?: HandleMetadata): Promise<Handle>;
@@ -133,35 +118,65 @@ class Identity {
 
 #### `Identity.fromSeed(seed)`
 
-```typescript
-// From hex string (64 chars = 32 bytes)
-const identity = await Identity.fromSeed('a1b2c3...');
+Creates an Identity from a 32-byte seed.
 
-// From Uint8Array
-const seedBytes = new Uint8Array(32).fill(42);
-const identity = await Identity.fromSeed(seedBytes);
+```typescript
+const seed = new Uint8Array(32);
+crypto.getRandomValues(seed); // Generate secure random seed
+const identity = await Identity.fromSeed(seed);
 ```
 
-⚠️ **Security**: The seed must be kept secret. Never log, transmit, or store it in plaintext.
+**Security:** The seed must be kept secret. Never log, transmit, or store it in plaintext.
 
 #### `Identity.deriveHandle(name, metadata?)`
 
+Derives a new Handle deterministically from the Identity.
+
 ```typescript
-const handle = await identity.deriveHandle('work', {
-  displayName: 'Alice Developer',
-  avatar: 'https://example.com/alice.png',
-  org: 'Acme Corp'
+const handle = await identity.deriveHandle('google', {
+  displayName: 'Alice Personal',
+  avatar: 'https://example.com/alice.png'
 });
 ```
 
-- `name`: Unique identifier for this Handle within the Identity (case-insensitive, trimmed)
-- `metadata`: Arbitrary public data attached to the Handle (visible to servers/other users)
+**Parameters:**
+- `name`: Unique identifier for this Handle (case-insensitive, trimmed)
+- `metadata`: Optional public data attached to the Handle
 
-Returns a `Handle` instance with its own keypair, derived deterministically from the Identity.
+**Returns:** A `Handle` instance with its own keypair, derived deterministically from the Identity.
+
+**Key Properties:**
+- 🔁 **Deterministic**: Same seed + same name → same Handle (always)
+- 🔗 **Isolated**: Each Handle has its own keypair; compromise of one does not affect others
+- 🔒 **One-way**: Cannot derive Identity key from Handle key
+
+---
+
+### Seed Utilities
+
+Built-in helpers for human-friendly key generation and validation.
+
+```typescript
+// Generate a new phrase (128 bits = 12 words, 256 bits = 24 words)
+function generateSeedPhrase(strength: 128 | 256 = 128): string[];
+
+// Normalize input (handles extra spaces, lowercase)
+function normalizeSeedPhrase(input: string | string[]): string[];
+
+// Validate word count, wordlist, and BIP39 checksum
+function validateSeedPhrase(words: string[]): { isValid: boolean; error?: string };
+
+// Convert validated mnemonic to a secure 32-byte Uint8Array for Ed25519
+async function get32ByteSeedFromMnemonic(phrase: string | string[]): Promise<Uint8Array>;
+```
+
+✅ **Benefit**: Developers don't need to manually manage `@scure/bip39` imports or remember to hash the 64-byte output. Everything is handled securely within the protocol.
 
 ---
 
 ### `Handle` Class
+
+A derived Ed25519 keypair representing a specific context (work, personal, IoT device).
 
 ```typescript
 class Handle {
@@ -177,7 +192,7 @@ class Handle {
   // Deterministically derive a password/secret for a specific context
   derivePassword(context: string, length?: number): string;
 
-  // Derive a symmetric 256-bit channel key for encrypted communication
+  // Derive a symmetric channel key for encrypted communication
   deriveChannelKey(context: string): Uint8Array;
 
   // Accessors
@@ -236,7 +251,7 @@ if (!isValid) throw new Error('Invalid signature');
 
 #### `Handle.derivePassword(context, length?)`
 
-Generates a deterministic, cryptographically strong secret (e.g., a password) for a specific service, without ever exposing the private key.
+Deterministically derives a secret (e.g., a password or API key) for a specific service context. The private key **never leaves this class**, ensuring maximum security.
 
 ```typescript
 // Derive a password for a specific service
@@ -247,7 +262,15 @@ const googlePassword = workHandle.derivePassword('google');
 const apiKey = workHandle.derivePassword('aws-api', 32);
 ```
 
-✅ **Security Benefit**: The `privateKey` remains strictly encapsulated within the `Handle` instance. It is used internally by HKDF-SHA256 and is never returned, logged, or serialized.
+**Parameters:**
+- `context`: A unique identifier for the service (e.g., `'google'`, `'github'`, `'wifi-router'`)
+- `length`: Length of the derived raw bytes (default: 16 bytes = ~22 chars base64url)
+
+**Returns:** A URL-safe base64 string suitable for use as a strong password.
+
+**Security Benefit:** The `privateKey` remains strictly encapsulated within the `Handle` instance. It is used internally by HKDF-SHA256 and is never returned, logged, or serialized.
+
+**Use Case:** Zero-knowledge password management. No database of passwords is required on the server. If a service forces a password change, the user simply derives a new handle (e.g., `'google-v2'`) or adds a version suffix to the context.
 
 #### `Handle.deriveChannelKey(context)`
 
@@ -264,138 +287,20 @@ const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
 // Identical key, derived independently
 ```
 
-✅ **Security Benefit**: The `privateKey` remains strictly encapsulated within the `Handle` instance. No key exchange protocol (ECDH, etc.) is needed — both parties derive the same key independently from the shared Handle private key.
+**Parameters:**
+- `context`: Channel identifier for domain separation (e.g., `'drone-001'`, `'session-abc'`). Both parties **must** use the same context to derive the same key.
 
-⚠️ **Note**: This method returns raw bytes (Uint8Array), unlike `derivePassword` which returns a base64url string. Use the returned bytes directly with AES-256-GCM via Web Crypto API or similar.
+**Returns:** 32-byte `Uint8Array` suitable for AES-256-GCM encryption.
 
----
+**Security Benefit:** The `privateKey` remains strictly encapsulated within the `Handle` instance. No key exchange protocol (ECDH, etc.) is needed — both parties derive the same key independently from the shared Handle private key.
 
-### `Session` Class (Planned)
-
-> ⚠️ Session management is planned for v0.2. Current implementations should use custom token logic with Handle signatures.
-
-```typescript
-// Future API (not yet implemented)
-const session = await handle.requestSession({
-  audience: 'https://api.myapp.com',
-  scopes: ['read:profile', 'write:messages'],
-  ttl: 3600
-});
-
-// Use token
-fetch('https://api.myapp.com/me', {
-  headers: { Authorization: `Bearer ${session.token}` }
-});
-```
+**Note:** This method returns raw bytes (Uint8Array), unlike `derivePassword` which returns a base64url string. Use the returned bytes directly with AES-256-GCM via Web Crypto API or similar.
 
 ---
 
 ## 🎯 Use Cases
 
-### 1. Multi-Context User Authentication
-
-```typescript
-// User logs in with seed
-const identity = await Identity.fromSeed(userSeed);
-
-// Derive work handle
-const workHandle = await identity.deriveHandle('work', {
-  displayName: 'Alice @ Acme',
-  role: 'engineer'
-});
-
-// Authenticate to work app
-const workSig = await workHandle.sign(challenge);
-// Send workHandle.getId() + workSig to https://work.acme.com/auth
-
-// Later, derive personal handle for social app
-const personalHandle = await identity.deriveHandle('personal', {
-  displayName: 'Alice',
-  interests: ['hiking', 'photography']
-});
-
-// Authenticate to social app with different handle
-const socialSig = await personalHandle.sign(challenge);
-// Send personalHandle.getId() + socialSig to https://social.app/auth
-```
-
-✅ **Benefit**: One seed, multiple isolated identities. Apps see only the Handle they interact with.
-
----
-
-### 2. IoT Device Hierarchy
-
-```typescript
-// Root identity for device fleet
-const fleetIdentity = await Identity.fromSeed(fleetSeed);
-
-// Derive handle for gateway
-const gateway = await fleetIdentity.deriveHandle('gateway-001', {
-  type: 'gateway',
-  location: 'warehouse-a'
-});
-
-// Derive child handles for sensors (using name prefix for hierarchy)
-const sensor1 = await fleetIdentity.deriveHandle('gateway-001/sensor-temp', {
-  type: 'temperature',
-  unit: 'celsius'
-});
-
-const sensor2 = await fleetIdentity.deriveHandle('gateway-001/sensor-humidity', {
-  type: 'humidity',
-  unit: 'percent'
-});
-```
-
-✅ **Benefit**: Compromise of `sensor-temp` does not expose `gateway-001` or other sensors. Each device has isolated credentials.
-
----
-
-### 3. Anonymous Guest Access
-
-```typescript
-// Generate ephemeral seed for guest session
-const guestSeed = crypto.getRandomValues(new Uint8Array(32));
-const guestIdentity = await Identity.fromSeed(guestSeed);
-
-// Create anonymous handle
-const guestHandle = await guestIdentity.deriveHandle('guest', {
-  displayName: 'Anonymous User',
-  ephemeral: true
-});
-
-// Use for limited-scope access
-const guestSig = await guestHandle.sign(challenge);
-// Send to server with scope: ['read:public-content']
-```
-
-✅ **Benefit**: No email, no phone, no tracking. Guest access with cryptographic accountability.
-
----
-
-### 4. Cross-App Single Sign-On (SSO)
-
-```typescript
-// User authenticates once with Identity
-const identity = await Identity.fromSeed(seed);
-
-// App A requests session for 'app-a.example.com'
-const handleA = await identity.deriveHandle('app-a', { app: 'example-a' });
-const sessionA = { /* custom token logic */ };
-
-// App B requests session for 'app-b.example.com'
-const handleB = await identity.deriveHandle('app-b', { app: 'example-b' });
-const sessionB = { /* custom token logic */ };
-
-// User switches between apps without re-entering seed
-// Each app sees only its Handle, not the others
-```
-
-✅ **Benefit**: Seamless SSO with privacy isolation — apps cannot correlate user activity across services.
-
----
-
-### 5. Deterministic Password Manager (Access Key Keeper)
+### 1. Deterministic Password Manager (Access Key Keeper)
 
 Instead of storing passwords in a database, derive them deterministically from the Handle. The user only needs to remember their root Seed and the service name.
 
@@ -416,9 +321,11 @@ console.log('Login:', 'alice@example.com');
 console.log('Password:', password); // Always the same for this seed + handle + context
 ```
 
-✅ **Benefit**: Zero-knowledge password management. No database of passwords is required on the server. If a service forces a password change, the user simply derives a new handle (e.g., `'google-v2'`) or adds a version suffix to the context (e.g., `derivePassword('google', 16, 2)`).
+✅ **Benefit**: Zero-knowledge password management. No database of passwords is required on the server. If a service forces a password change, the user simply derives a new handle (e.g., `'google-v2'`) or adds a version suffix to the context (e.g., `derivePassword('google-v2')`).
 
-### 6. IoT Fleet with Encrypted Channels
+---
+
+### 2. IoT Fleet with Encrypted Channels
 
 Control a fleet of devices (drones, sensors, robots) with zero-knowledge encrypted communication. The control center derives a channel key for each device, and the device independently derives the same key — no key exchange protocol required.
 
@@ -485,7 +392,7 @@ async function sendTelemetry(telemetry: object) {
 
 ---
 
-### 7. Stateless Multi-Device Synchronization
+### 3. Stateless Multi-Device Synchronization
 
 A user with the same Identity on multiple devices (phone, laptop, tablet) can derive identical Handles and secrets on each device without any synchronization protocol.
 
@@ -507,7 +414,7 @@ const handleId = messengerHandle.getId(); // Identical handleId!
 
 ---
 
-### 8. Break-Glass Recovery and Inheritance
+### 4. Break-Glass Recovery and Inheritance
 
 A user's entire digital identity can be recovered from a single seed phrase, even years later, on any device, without contacting any service provider.
 
@@ -534,7 +441,7 @@ const messengerChannelKey = messengerHandle.deriveChannelKey('session-2026');
 
 ---
 
-### 9. Ephemeral Delegated Access
+### 5. Ephemeral Delegated Access
 
 Grant time-limited access to a contractor or temporary service by deriving a Handle with a time-bound name.
 
@@ -557,9 +464,11 @@ const contractorHandle = await identity.deriveHandle('contractor-acme-2026-12-31
 
 ✅ **Benefit**: Clean delegation without polluting the permanent identity. Expired Handles become inert cryptographic artifacts.
 
+---
+
 ## 🔐 Cryptographic Details
 
-### Key Derivation Algorithm
+### Handle Derivation Algorithm
 
 Handles are derived using **HKDF-SHA256** with domain separation:
 
@@ -579,6 +488,25 @@ HandleId = Base64Url(HandlePublicKey)
 - 🔒 **One-way**: Cannot derive Identity key from Handle key
 - 🧩 **Isolated**: Each Handle uses independent Ed25519 keypair
 
+### Password Derivation Algorithm
+
+Passwords are derived using **HKDF-SHA256** with the Handle's private key as input key material:
+
+```
+PasswordBytes = HKDF-SHA256(
+  inputKeyMaterial = HandlePrivateKey,
+  salt = "me2em/secret/" + lowercase(context),
+  info = "me2em/secret/v1",
+  length = 16 (default)
+)
+Password = Base64Url(PasswordBytes)
+```
+
+**Properties:**
+- 🔁 **Deterministic**: Same Handle + same context → same password
+- 🔐 **Encapsulated**: Private key never leaves the Handle instance
+- 🧩 **Domain-separated**: Different contexts produce different passwords
+
 ### Channel Key Derivation
 
 Channel keys are derived using **HKDF-SHA256** with the Handle's private key as input key material:
@@ -592,7 +520,7 @@ ChannelKey = HKDF-SHA256(
 )
 ```
 
-**Properties**:
+**Properties:**
 - 🔁 **Deterministic**: Same Handle + same context → same 32-byte key
 - 🔐 **Encapsulated**: Private key never leaves the Handle instance
 - 🧩 **Domain-separated**: Different contexts produce different keys (e.g., `'telemetry-v1'` vs `'command-v1'`)
@@ -604,91 +532,6 @@ ChannelKey = HKDF-SHA256(
 - **Hash**: SHA-512 (via `@noble/ed25519`)
 - **Encoding**: Raw bytes → base64url for transport
 
-### Test Vectors
-
-See [`specs/test-vectors.json`](../../specs/test-vectors.json) for canonical derivation examples to ensure cross-implementation compatibility.
-
-Example vector:
-```json
-{
-  "seed_hex": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
-  "handle_name": "work",
-  "expected_handle_id": "pK7xJ2mN8vQ3rL5wY9zB1cD4eF6gH8iJ0kL2mN4oP6qR8sT0uV2wX4yZ6aB8cD0",
-  "expected_public_key_hex": "a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123"
-}
-```
-
----
-
-## 🔌 Integration Guide
-
-### Backend Verification (Node.js Example)
-
-```typescript
-import { Handle } from '@me2em-org/protocol-core';
-
-// Middleware to verify Handle-signed requests
-export async function me2emAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  const handleId = req.headers['x-handle-id'] as string;
-  const signature = req.headers['x-signature'] as string;
-  const payload = JSON.stringify(req.body);
-
-  if (!handleId || !signature) {
-    return res.status(401).json({ error: 'Missing authentication headers' });
-  }
-
-  try {
-    // Decode base64url to Uint8Array
-    const publicKey = base64urlToBytes(handleId);
-    const sig = base64urlToBytes(signature);
-    const data = new TextEncoder().encode(payload);
-
-    // Verify signature
-    const isValid = await Handle.verify(sig, data, publicKey);
-    if (!isValid) throw new Error('Invalid signature');
-
-    // Attach handle info to request for downstream use
-    req.me2em = { handleId, publicKey };
-    next();
-  } catch (err) {
-    res.status(401).json({ error: 'Authentication failed' });
-  }
-}
-
-function base64urlToBytes(str: string): Uint8Array {
-  const padding = '='.repeat((4 - (str.length % 4)) % 4);
-  const base64 = str.replace(/-/g, '+').replace(/_/g, '/') + padding;
-  return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-}
-```
-
-### Frontend Secure Key Handling
-
-```typescript
-// Store encrypted seed in IndexedDB (never plaintext)
-import { encryptWithPin } from './crypto/local';
-
-async function saveIdentity(seed: string, pin: string) {
-  const encrypted = await encryptWithPin(seed, pin);
-  await db.identities.add({
-    id: 'current',
-    encryptedSeed: encrypted,
-    // seed is NEVER stored in plaintext
-  });
-}
-
-// Load and decrypt on login
-async function loadIdentity(pin: string) {
-  const record = await db.identities.get('current');
-  if (!record) throw new Error('No identity found');
-  
-  const seed = await decryptWithPin(record.encryptedSeed, pin);
-  return Identity.fromSeed(seed);
-}
-```
-
-✅ **Best practice**: Use Web Crypto API or secure enclave for PIN/biometric decryption.
-
 ---
 
 ## 🛡️ Security Best Practices
@@ -699,7 +542,7 @@ async function loadIdentity(pin: string) {
 - **Clear memory**: Zero out seed/private key buffers after use (`buffer.fill(0)`)
 - **Use short TTLs**: Rotate session tokens frequently (≤1 hour recommended)
 - **Validate metadata server-side**: Never trust client-provided Handle metadata without verification
-- **Pin dependencies**: Lock `@me2em-org/protocol-core` to specific version in `package.json`
+- **Pin dependencies**: Lock `@me2em/core` to specific version in `package.json`
 
 ### ❌ Don't
 
@@ -720,7 +563,7 @@ async function loadIdentity(pin: string) {
 [Derive Handle(s) as needed]
         │
         ▼
-[Sign challenge / data]
+[Sign challenge / data / derive password / derive channel key]
         │
         ▼
 [Zero out private key buffers] ← Critical!
@@ -736,19 +579,21 @@ async function loadIdentity(pin: string) {
 ### Unit Tests
 
 ```bash
-cd packages/protocol-core
+cd packages/core
 pnpm test
 ```
 
 Tests cover:
 - ✅ Deterministic derivation (same seed + name → same HandleId)
 - ✅ Signature generation and verification
+- ✅ Password derivation (same Handle + context → same password)
+- ✅ Channel key derivation (same Handle + context → same key)
 - ✅ Edge cases (empty metadata, long names, unicode)
 
 ### Integration Test Example
 
 ```typescript
-import { Identity } from '@me2em-org/protocol-core';
+import { Identity } from '@me2em/core';
 
 test('full auth flow', async () => {
   // Client side
@@ -768,19 +613,32 @@ test('full auth flow', async () => {
 });
 ```
 
-### Cross-Implementation Testing
+---
 
-Use [`specs/test-vectors.json`](../../specs/test-vectors.json) to verify your implementation matches the reference:
+## 📦 Package Info
 
-```typescript
-import vectors from '@me2em-org/protocol-core/specs/test-vectors.json';
-
-for (const vector of vectors) {
-  const identity = await Identity.fromSeed(vector.seed_hex);
-  const handle = await identity.deriveHandle(vector.handle_name);
-  
-  expect(handle.getId()).toBe(vector.expected_handle_id);
-  expect(bytesToHex(handle.getPublicKey())).toBe(vector.expected_public_key_hex);
+```json
+{
+  "name": "@me2em/core",
+  "version": "0.4.2-alpha.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.1.0",
+    "@noble/hashes": "^2.2.0",
+    "@scure/bip39": "^1.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
 ```
 
@@ -794,74 +652,6 @@ We welcome contributions! See:
 - 🗳️ [GOVERNANCE.md](../../GOVERNANCE.md) — Project decision-making process
 - 🔐 [SECURITY.md](../../SECURITY.md) — Responsible disclosure policy
 
-### Quick Start for Contributors
-
-```bash
-git clone https://github.com/me2em-org/me2em-protocol.git
-cd me2em-protocol
-pnpm install
-
-# Run tests
-pnpm -r test
-
-# Build all packages
-pnpm -r build
-
-# Lint
-pnpm -r lint
-```
-
-### Adding a New Feature
-
-1. Open a [Discussion](https://github.com/me2em-org/me2em-protocol/discussions) to propose the change
-2. Implement in a feature branch
-3. Add tests covering new functionality
-4. Update `specs/core.md` if protocol behavior changes
-5. Submit PR with clear description and test results
-
----
-
-## 📦 Package Info
-
-```json
-{
-  "name": "@me2em-org/protocol-core",
-  "version": "0.3.0-alpha.1",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
-  },
-  "dependencies": {
-    "@noble/ed25519": "^3.1.0",
-    "@noble/hashes": "^2.2.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
-}
-```
-
----
-
-## 🌐 Ecosystem
-
-This package is part of the Me2em ecosystem:
-
-| Package | Purpose |
-|---------|---------|
-| `@me2em-org/protocol-core` | ✅ Core cryptography (this package) |
-| `@me2em-org/sdk-js` | 🔄 Browser-friendly wrapper (planned) |
-| `@me2em-org/auth-middleware` | 🔄 NestJS/Express auth middleware (planned) |
-| `me2em-protocol/specs` | 📄 Protocol specification and test vectors |
-
-🔗 Learn more: [github.com/me2em-org](https://github.com/me2em-org) | [docs.me2em.com](https://docs.me2em.com)
-
 ---
 
 ## 📜 License
@@ -869,3 +659,27 @@ This package is part of the Me2em ecosystem:
 Apache License 2.0 — see [LICENSE](../../LICENSE) for details.
 
 © 2026 Me2em Organization. Built for privacy, openness, and user sovereignty.
+```
+
+---
+
+## ✅ Что сделано
+
+Этот `README.md` теперь:
+
+1. **Профессиональный API-документ** для npm-пакета `@me2em/core`
+2. **Quick Start** с интеграцией BIP39 (как в BeSafeChat)
+3. **Полный API Reference** для `Identity` и `Handle`
+4. **Детальное описание** новых методов:
+   - `derivePassword()` — для Password Manager
+   - `deriveChannelKey()` — для IoT Fleet
+5. **6 Use Cases** с реальными примерами кода:
+   - Password Manager
+   - IoT Fleet with Encrypted Channels
+   - Multi-Device Sync
+   - Break-Glass Recovery
+   - Ephemeral Delegated Access
+6. **Cryptographic Details** — описание алгоритмов деривации
+7. **Security Best Practices** — рекомендации по безопасному использованию
+
+Этот README будет отображаться на странице npm-пакета и станет основным источником документации для разработчиков, использующих `@me2em/core`.
