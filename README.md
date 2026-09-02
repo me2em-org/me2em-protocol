@@ -1,9 +1,9 @@
-# 📦 `@me2em-org/protocol-core` — Developer Documentation
+# 📦 `@me2em/core` — Developer Documentation
 
 > Core primitives for the Me2em authorization protocol: `Identity`, `Handle`, and `Session` management with Ed25519 cryptography.
 
-[![npm version](https://img.shields.io/npm/v/@me2em-org/protocol-core.svg)](https://www.npmjs.com/package/@me2em-org/protocol-core)
-[![License](https://img.shields.io/npm/l/@me2em-org/protocol-core)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/@me2em/core.svg)](https://www.npmjs.com/package/@me2em/core)
+[![License](https://img.shields.io/npm/l/@me2em/core)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-docs.me2em.com-blue)](https://docs.me2em.com)
 
 ---
@@ -11,15 +11,15 @@
 ## 🎯 Quick Start
 
 ```bash
-npm install @me2em-org/protocol-core
+npm install @me2em/core
 # or
-pnpm add @me2em-org/protocol-core
+pnpm add @me2em/core
 # or
-yarn add @me2em-org/protocol-core
+yarn add @me2em/core
 ```
 
 ```typescript
-import { Identity, Handle } from '@me2em-org/protocol-core';
+import { Identity, Handle } from '@me2em/core';
 
 // 1. Create or restore identity from seed
 const seed = 'your-32-byte-hex-seed-or-24-words';
@@ -625,7 +625,7 @@ Example vector:
 ### Backend Verification (Node.js Example)
 
 ```typescript
-import { Handle } from '@me2em-org/protocol-core';
+import { Handle } from '@me2em/core';
 
 // Middleware to verify Handle-signed requests
 export async function me2emAuthMiddleware(req: Request, res: Response, next: NextFunction) {
@@ -699,7 +699,7 @@ async function loadIdentity(pin: string) {
 - **Clear memory**: Zero out seed/private key buffers after use (`buffer.fill(0)`)
 - **Use short TTLs**: Rotate session tokens frequently (≤1 hour recommended)
 - **Validate metadata server-side**: Never trust client-provided Handle metadata without verification
-- **Pin dependencies**: Lock `@me2em-org/protocol-core` to specific version in `package.json`
+- **Pin dependencies**: Lock `@me2em/core` to specific version in `package.json`
 
 ### ❌ Don't
 
@@ -748,7 +748,7 @@ Tests cover:
 ### Integration Test Example
 
 ```typescript
-import { Identity } from '@me2em-org/protocol-core';
+import { Identity } from '@me2em/core';
 
 test('full auth flow', async () => {
   // Client side
@@ -773,7 +773,7 @@ test('full auth flow', async () => {
 Use [`specs/test-vectors.json`](../../specs/test-vectors.json) to verify your implementation matches the reference:
 
 ```typescript
-import vectors from '@me2em-org/protocol-core/specs/test-vectors.json';
+import vectors from '@me2em/core/specs/test-vectors.json';
 
 for (const vector of vectors) {
   const identity = await Identity.fromSeed(vector.seed_hex);
@@ -825,7 +825,7 @@ pnpm -r lint
 
 ```json
 {
-  "name": "@me2em-org/protocol-core",
+  "name": "@me2em/core",
   "version": "0.3.0-alpha.1",
   "type": "module",
   "main": "./dist/index.js",
@@ -853,12 +853,11 @@ pnpm -r lint
 
 This package is part of the Me2em ecosystem:
 
-| Package | Purpose |
-|---------|---------|
-| `@me2em-org/protocol-core` | ✅ Core cryptography (this package) |
-| `@me2em-org/sdk-js` | 🔄 Browser-friendly wrapper (planned) |
-| `@me2em-org/auth-middleware` | 🔄 NestJS/Express auth middleware (planned) |
-| `me2em-protocol/specs` | 📄 Protocol specification and test vectors |
+@me2em/core              ← криптография (Identity, Handle, derivePassword, deriveChannelKey)
+@me2em/sdk               ← browser wrapper (IndexedDB, PIN, biometric, session management)
+@me2em/react             ← UI компоненты (SeedDisplay, SeedVerification, HandleManager)
+@me2em/auth-middleware   ← NestJS/Express middleware для Handle.verify()
+@me2em/server            ← (опционально) готовый NestJS backend из Phase 1
 
 🔗 Learn more: [github.com/me2em-org](https://github.com/me2em-org) | [docs.me2em.com](https://docs.me2em.com)
 
