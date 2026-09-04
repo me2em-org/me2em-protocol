@@ -1,6 +1,6 @@
 export { Identity } from './identity.js';
 export { Handle, type HandleMetadata } from './handle.js';
-export { Session, type SessionOptions, type SessionToken } from './session.js';
+export { Session, type SessionOptions, type SessionToken, type SessionPayload, type SessionData } from './session.js';
 export * as crypto from './crypto/index.js';
 
 /**

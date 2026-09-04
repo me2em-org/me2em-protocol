@@ -529,6 +529,100 @@ ChannelKey = HKDF-SHA256(
 
 ---
 
+## 🛡️ Root Identity Security Best Practices
+
+The Root Identity is the cryptographic foundation of the entire Me2em system. Compromise of the Root Identity private key allows an attacker to derive **all** Handles retroactively, impersonate the user across every context, and decrypt all session tokens.
+
+### Hardware Security Module (HSM) Requirement
+
+The `IdentityPrivateKey` **must never leave** a Hardware Security Module (HSM), Trusted Platform Module (TPM), or secure enclave. Storing the root seed in plaintext in IndexedDB, localStorage, or a file on disk is a critical security vulnerability.
+
+- **Recommended**: Use Web Crypto API with platform-bound keys, or integrate with a dedicated HSM provider.
+- **Acceptable**: Encrypt the seed with a user-entered PIN using AES-256-GCM before persisting.
+- **Never**: Log, transmit, or cache the root seed in any form.
+
+### Multi-Sig and Secret Sharing
+
+For high-value identities (e.g., organizational root identities), use one of these approaches:
+
+- **Multi-Sig**: Require multiple independent root keys to sign critical operations. No single key can compromise the system alone.
+- **Shamir's Secret Sharing (SSS)**: Split the root seed into N shares, requiring K shares to reconstruct. Distribute shares among trusted parties or secure locations.
+
+### Compromise Impact
+
+| Component | If Compromised |
+|---|---|
+| Root Identity | **Total compromise**: All derived Handles, all passwords, all channel keys, all session tokens can be forged retroactively |
+| Individual Handle | **Contained**: Only affects that specific context; other Handles remain secure |
+| Session Token | **Time-limited**: Only affects the window before expiration; does not expose long-term keys |
+
+---
+
+## 💬 Best Practices for Group Chat PFS (Forward Secrecy)
+
+The `deriveChannelKey` method provides a **static** room key — anyone who derives the same key can decrypt all past and future messages in the room. For applications requiring **Perfect Forward Secrecy (PFS)**, implement an application-level ratchet.
+
+### HKDF Chain (Ratchet) Pattern
+
+#### Step 1: Initialization
+
+Derive the root key for the room using `deriveChannelKey`:
+
+```typescript
+const rootKey = roomHandle.deriveChannelKey('room-abc-123');
+let chainKey = rootKey;
+```
+
+#### Step 2: Ratcheting
+
+For each message $N$, derive the message key and update the chain key:
+
+```typescript
+function deriveMessageKey(chainKey: Uint8Array): { msgKey: Uint8Array, nextChainKey: Uint8Array } {
+  const msgKey = hkdf(sha256, chainKey, new Uint8Array(0), new TextEncoder().encode('msg-key'), 32);
+  const nextChainKey = hkdf(sha256, chainKey, new Uint8Array(0), new TextEncoder().encode('next-chain-key'), 32);
+  return { msgKey, nextChainKey };
+}
+
+// For message N:
+const { msgKey, nextChainKey } = deriveMessageKey(chainKey);
+// Encrypt message with msgKey using AES-256-GCM
+chainKey = nextChainKey;
+```
+
+#### Step 3: Decryption
+
+The recipient performs the same derivation sequentially:
+
+```typescript
+// Recipient starts with the same rootKey and iterates through N messages
+let chainKey = rootKey;
+for (let i = 0; i < messageIndex; i++) {
+  const result = deriveMessageKey(chainKey);
+  chainKey = result.nextChainKey;
+}
+const { msgKey } = deriveMessageKey(chainKey);
+// Decrypt the message with msgKey
+```
+
+### Revocation Strategy
+
+When a user is removed from a group:
+
+1. **Rotate the RootKey**: The remaining members call `deriveChannelKey` with an updated context (e.g., `'room-abc-123-v2'`) to get a new root key.
+2. **Distribute the New Key**: The new root key is distributed to all remaining members via the existing ratchet chain.
+3. **Old Messages**: Messages encrypted with old chain keys remain decryptable by the removed user — this is the trade-off of application-level PFS. For stronger guarantees, use a full Double Ratchet (as in Signal) that incorporates ECDH between every pair of participants.
+
+### Summary
+
+| Pattern | Forward Secrecy | Implementation Complexity |
+|---|---|---|
+| Static `deriveChannelKey` | ❌ No | Low |
+| HKDF Chain Ratchet | ✅ Per-message | Medium |
+| Double Ratchet (Signal-style) | ✅ Per-message + ECDH | High |
+
+---
+
 ## 🛡️ Security Best Practices
 
 ### ✅ Do

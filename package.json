@@ -1,6 +1,6 @@
 {
   "name": "me2em-protocol-monorepo",
-  "version": "0.4.4-alpha.2",
+  "version": "0.5.0-alpha.1",
   "private": false,
   "scripts": {
     "build": "pnpm -r build",

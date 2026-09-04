@@ -1,6 +1,7 @@
 import { ed } from './crypto/init.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js';
 
 export interface HandleMetadata {
   displayName?: string;
@@ -126,5 +127,41 @@ export class Handle {
     const salt = new TextEncoder().encode(`me2em/channel/${context.toLowerCase().trim()}`);
     const info = new TextEncoder().encode('me2em/channel/v1');
     return hkdf(sha256, this.privateKey, salt, info, 32);
+  }
+
+  /**
+   * Derives a shared secret using ECDH (X25519) for P2P key exchange.
+   * 
+   * Converts the Ed25519 keypair to X25519 for Diffie-Hellman key agreement,
+   * then applies HKDF-SHA256 to produce a clean 32-byte channel key.
+   * 
+   * @param otherPublicKey - The Ed25519 public key of the other party (32 bytes).
+   * @returns A Promise resolving to a 32-byte shared secret suitable for AES-256-GCM.
+   * @example
+   * ```typescript
+   * // Alice and Bob both have Ed25519 keypairs from Handles
+   * const aliceShared = await aliceHandle.deriveSharedSecret(bobHandle.getPublicKey());
+   * const bobShared = await bobHandle.deriveSharedSecret(aliceHandle.getPublicKey());
+   * // aliceShared === bobShared
+   * ```
+   */
+  async deriveSharedSecret(otherPublicKey: Uint8Array): Promise<Uint8Array> {
+    const myPrivBytes = this.privateKey;
+    const otherPubBytes = otherPublicKey;
+
+    if (myPrivBytes.length !== 32) {
+      throw new Error('Handle private key must be 32 bytes');
+    }
+    if (otherPubBytes.length !== 32) {
+      throw new Error('Public key must be 32 bytes');
+    }
+
+    const x25519Priv = ed25519.utils.toMontgomerySecret(myPrivBytes);
+    const x25519Pub = ed25519.utils.toMontgomery(otherPubBytes);
+
+    const rawSharedSecret = x25519.getSharedSecret(x25519Priv, x25519Pub);
+
+    const info = new TextEncoder().encode('me2em/p2p-channel/v1');
+    return hkdf(sha256, rawSharedSecret, new Uint8Array(0), info, 32);
   }
 }
