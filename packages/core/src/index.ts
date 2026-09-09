@@ -1,6 +1,7 @@
 export { Identity } from './identity.js';
 export { Handle, type HandleMetadata } from './handle.js';
-export { Session, type SessionOptions, type SessionToken, type SessionPayload, type SessionData } from './session.js';
+export { SubHandle, type SubHandleMetadata } from './subhandle.js';
+export { Session, type SessionOptions, type SessionPayload, type RevocationChecker } from './session.js';
 export * as crypto from './crypto/index.js';
 
 /**
@@ -14,8 +15,10 @@ export * as crypto from './crypto/index.js';
  * 
  * ## Key Features
  * - **Hierarchical Identities**: Derive multiple isolated {@link Handle}s from a single seed.
+ * - **SubHandle Leaf Nodes**: Hierarchical access control with MAX_DEPTH = 2.
  * - **Stateless Auth**: Cryptographic proof without server-side session storage via {@link Session}.
  * - **Zero-Knowledge Secrets**: Deterministic password derivation without storage.
+ * - **Revocation Support**: Optional {@link RevocationChecker} interface for session invalidation.
  * 
  * @example Basic usage
  * ```typescript
