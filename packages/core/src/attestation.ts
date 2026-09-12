@@ -11,9 +11,27 @@ export const ATTESTATION_TYPE = 'me2em/attestation/v1';
 export const ATTESTATION_MAX_PAYLOAD = 2048;
 
 export interface AttestationGrant {
+  /**
+   * Audiences the subject may create sessions for.
+   * `undefined` = unrestricted; `[]` = deny all (fail-closed).
+   */
   audiences?: string[];
+  /**
+   * Exact scope strings the subject may request. Wildcards are NOT
+   * supported here — only `subNamePatterns` supports wildcards.
+   */
   scopes: string[];
+  /**
+   * Maximum session TTL (seconds) the subject may create. Must be a
+   * finite positive number.
+   */
   maxSessionTtl: number;
+  /**
+   * Permitted child (SubHandle) names. Only meaningful on
+   * Identity→Handle attestations. Each pattern is either an exact name
+   * or ends with a single trailing `*` (prefix match); a lone `*`
+   * matches everything. Patterns like `a*b` are rejected at issue time.
+   */
   subNamePatterns?: string[];
 }
 
@@ -89,6 +107,39 @@ function parseToken(token: string): ParseResult {
   return { payloadBytes, signatureBytes, payload };
 }
 
+/**
+ * A parent-signed statement binding a derived child key to a name and a
+ * grant. Chains of attestations (`Identity → Handle → SubHandle`) allow
+ * any third party to verify sessions offline using only the root public
+ * key, with grant constraints enforced at verification time.
+ *
+ * Tokens have the form `base64url(payload).base64url(signature)` and are
+ * deterministic: the same inputs (including `jti` and `now`) always
+ * produce byte-identical tokens.
+ *
+   * @example
+   * ```ts
+   * import { ed25519 } from '@noble/curves/ed25519.js';
+   *
+   * // Parent (signer) and child (subject) keys — use a CSPRNG in practice:
+   * const signerPriv = ed25519.utils.randomPrivateKey();
+   * const signerPub = ed25519.getPublicKey(signerPriv);
+   * const childPub = ed25519.getPublicKey(ed25519.utils.randomPrivateKey());
+   *
+   * const A = await Attestation.issue(signerPriv, childPub, 'station-001', {
+   *   audiences: ['ev-app.com'],
+   *   scopes: ['charge:start', 'charge:stop'],
+   *   maxSessionTtl: 7200,
+   *   subNamePatterns: ['connector-*'],
+   * });
+   *
+   * const ok = await Attestation.verifySignature(A.token, signerPub); // true
+   * const payload = Attestation.decode(A.token); // structure only — no sig, no time
+   * 
+ * ```
+ *
+ * @category Core Primitives
+ */
 export class Attestation {
   private readonly _payload: AttestationPayload;
   private readonly _token: string;
@@ -110,6 +161,16 @@ export class Attestation {
     return this._payload.jti;
   }
 
+  /**
+   * Parses a token and validates its structure WITHOUT checking the
+   * signature or any timestamps. Use {@link verifySignature} for the
+   * signature; expiration is checked by `Session.verifyAttested`.
+   *
+   * @throws {AttestationError} `MALFORMED`/`FORMAT` on any structural
+   *   problem: wrong shape, invalid Base64URL, size over
+   *   {@link ATTESTATION_MAX_PAYLOAD}, non-JSON payload, wrong `typ`,
+   *   missing/ill-typed fields, or a non-positive/NaN `maxSessionTtl`.
+   */
   static decode(token: string): AttestationPayload {
     const { payload } = parseToken(token);
 
@@ -165,11 +226,32 @@ export class Attestation {
     return payload;
   }
 
+  /**
+   * Verifies the token signature against a public key.
+   *
+   * @returns `false` for a bad signature or a wrong key. May reject
+   *   (throw `AttestationError` `MALFORMED`) for structurally invalid
+   *   tokens. Note: noble may throw on malformed signature lengths —
+   *   callers in `Session.verifyAttested` wrap this in try/catch;
+   *   making this method total (never throw) is tracked in the backlog.
+   */
   static async verifySignature(token: string, signerPublicKey: Uint8Array): Promise<boolean> {
     const { signatureBytes, payloadBytes } = parseToken(token);
     return ed.verify(signatureBytes, payloadBytes, signerPublicKey);
   }
 
+  /**
+   * Wildcard name matching used for `subNamePatterns`.
+   * A pattern matches if it equals `name`, or ends with `*` and `name`
+   * starts with the pattern's prefix. A lone `*` matches everything.
+   *
+   * @example
+   * ```ts
+   * Attestation.matchNamePattern('connector-1', ['connector-*']); // true
+   * Attestation.matchNamePattern('meter-1',    ['connector-*']); // false
+   * Attestation.matchNamePattern('anything',   ['*']);           // true
+   * ```
+   */
   static matchNamePattern(name: string, patterns: string[]): boolean {
     for (const pattern of patterns) {
       if (pattern === '*') return true;
@@ -182,6 +264,34 @@ export class Attestation {
     return false;
   }
 
+  /**
+   * Creates and signs a new attestation.
+   *
+   * The subject name is canonicalized (NFKC → lowercase → trim) before
+   * signing; the subject public key must be exactly 32 bytes. Serialization is
+   * deterministic: fields are emitted in a fixed order and
+   * `undefined` grant fields are omitted from the JSON entirely
+   * (distinguishable from `[]`).
+   *
+   * @param signerPrivateKey - 32-byte Ed25519 private key of the parent.
+   * @param subjectPublicKey - 32-byte Ed25519 public key being attested.
+   * @param subjectName - Child name; canonicalized before signing.
+   * @param grant - Constraints enforced by verifiers (Mode 2).
+   * @param opts - Lifetime control: `ttlSeconds` (default one year),
+   *   `expiresAt` (overrides `ttlSeconds`), `jti` (default random UUID),
+   *   `now` (fixed clock for deterministic tests).
+   * @returns The attestation with `payload`, `token` and `jti` accessors.
+   * @throws {AttestationError} `MALFORMED`/`FORMAT` if the grant is
+   *   structurally invalid (bad scopes/TTL/audiences or a wildcard
+   *   not at the end of a `subNamePatterns` entry).
+   * @throws {Error} If `subjectPublicKey` is not 32 bytes.
+   *
+   * @example
+   * ```ts
+   * const att = await Attestation.issue(rootPriv, childPub, 'Station-1',
+   *   { scopes: ['read'], maxSessionTtl: 3600 }, { ttlSeconds: 600 });
+   * ```
+   */
   static async issue(
     signerPrivateKey: Uint8Array,
     subjectPublicKey: Uint8Array,

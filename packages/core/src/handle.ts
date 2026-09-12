@@ -128,7 +128,7 @@ export class Handle {
    */
   validateSessionOptions(_options: {
     audience: string; scopes: string[]; ttl: number;
-  }): void { /* Handle без ограничений */ }
+  }): void { /* Handle has no constraints */ }
 
   /**
    * Derives a {@link SubHandle} from this Handle.
@@ -173,11 +173,30 @@ export class Handle {
   }
 
   /**
-   * Issues an attestation for a derived SubHandle, binding its
-   * derived key to the name and grant. Autonomous: requires only
-   * this Handle's own key, no Identity and no network.
-   */
-  async attestSubHandle(
+    * Issues an attestation for a derived SubHandle, binding its
+    * derived key to the name and grant. Autonomous: requires only
+    * this Handle's own key, no Identity and no network.
+    *
+    * The child key is derived internally, so the attestation's
+    * `subjectId` always equals the key produced by
+    * `identity.deriveSubHandle(this.name, subName)`.
+    *
+    * Note: this method does not check this Handle's own grant — it may
+    * not have one (Mode 1). Nesting is enforced by verifiers in
+    * `Session.verifyAttested` (a child grant exceeding the parent's is
+    * rejected with `SCOPE_EXCEEDED`/`TTL_EXCEEDED` at level ROOT).
+    *
+    * @example
+    * ```ts
+    * const B = await station.attestSubHandle('connector-ccs', {
+    *   audiences: ['ev-app.com'],
+    *   scopes: ['charge:start', 'charge:stop'],
+    *   maxSessionTtl: 7200,
+    * }, { ttlSeconds: 1800 });
+    * // Ship [A.token, B.token] together with the session token.
+    * ```
+    */
+   async attestSubHandle(
     subName: string,
     grant: AttestationGrant,
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }

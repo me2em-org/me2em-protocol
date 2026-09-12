@@ -1,293 +1,353 @@
 # Me2em Protocol: Advanced Use Cases & Scenarios
 
-This document provides production-ready examples of the Me2em protocol in action. It demonstrates the final architecture:
-- **MAX_DEPTH = 2** (`Identity` → `Handle` → `SubHandle`)
-- **Two entry points**: `Handle.deriveSubHandle()` (autonomous) and `Identity.deriveSubHandle()` (atomic verification)
-- **Strict encapsulation**: Private keys never leave the `Handle` instance.
-- **Flexible access control**: TTL + optional `RevocationChecker` interface.
+Production-ready examples for `@me2em/core` 0.6.0.
+
+The library supports **two verification modes** (full definition in the
+[README](./README.md#verification-modes)):
+
+- **Mode 1 — `Session.verifyStateless`.** The verifier holds the
+  `Identity` — the private root key. For infrastructure you fully
+  control. SubHandle constraints are enforced at session *creation* only.
+- **Mode 2 — `Session.verifyAttested`.** The verifier holds only the root
+  **public** key plus an attestation chain. For external audiences.
+  Grant constraints are **enforced at verification**, and revoking an
+  attestation `jti` disables the whole branch — current and future
+  sessions.
+
+Every scenario below shows where each mode fits.
+
+Shared architecture: `MAX_DEPTH = 2`, two derivation entry points
+(`Handle.deriveSubHandle` autonomous / `Identity.deriveSubHandle`
+atomic), strict key encapsulation, TTL + optional `RevocationChecker`.
 
 ---
 
-## Сценарий 1: EV Station (Зарядная станция)
+## Scenario 1: EV Charging Station
 
-### Иерархия
 ```text
-Identity: EV-Network-Main (корневой ключ владельца сети)
-  └─ Handle: Station-001 (конкретная станция, автономное устройство)
-       ├─ SubHandle: Connector-1 (Type 2, 22kW)
-       ├─ SubHandle: Connector-2 (CCS, 50kW)
-       └─ SubHandle: Meter-001 (счётчик энергии)
+Identity: EV-Network-Main (network owner — root private key lives ONLY here)
+  └─ Handle: station-001  ◀── A = attestHandle (issued once, at provisioning)
+       │   (autonomous device, offline)
+       ├─ SubHandle: connector-ccs   ◀── B = attestSubHandle (derived locally)
+       └─ SubHandle: meter-001       ◀── B = attestSubHandle (derived locally)
 ```
 
-### Шаг 1: Создание иерархии (на сервере владельца)
+### 1.1 Provisioning (online, once per station)
+
 ```typescript
 import { Identity } from '@me2em/core';
-import type { SubHandleMetadata } from '@me2em/core';
 
-// Владелец сети создаёт Identity из seed-фразы
-const seed = await get32ByteSeedFromMnemonic('abandon abandon ... art');
-const networkIdentity = await Identity.fromSeed(seed);
+const networkIdentity = await Identity.fromSeed(await loadSeedFromVault());
 
-// Создаёт Handle для конкретной станции
-const stationHandle = await networkIdentity.deriveHandle('station-001', {
-  displayName: 'Station Berlin #001',
-  gps: { lat: 52.5200, lng: 13.4050 },
-  power: '50kW'
-});
+const grantA = {
+  audiences: ['ev-charging-app.com', 'fleet-management.com'],
+  scopes: ['charge:start', 'charge:stop', 'charge:status'],
+  maxSessionTtl: 7200,
+  subNamePatterns: ['connector-*', 'meter-*'],
+};
+const A = await networkIdentity.attestHandle('station-001', grantA);
 
-// Создаёт SubHandle для разъёма CCS
-const connectorCCS = await stationHandle.deriveSubHandle('connector-ccs', {
-  allowedAudiences: ['ev-charging-app.com', 'fleet-management.com'],
-  allowedScopes: ['charge:start', 'charge:stop', 'charge:status'],
-  maxSessionTtl: 7200, // 2 часа максимум
-  displayName: 'CCS Connector 50kW'
-} as SubHandleMetadata);
+// Ship to the device: the Handle private key + A.token.
+// A is a PUBLIC artifact — a signed statement, not a secret.
 ```
 
-### Шаг 2: Автономная работа станции (`Handle.deriveSubHandle`)
-Станция работает без связи с сервером. Когда подключается новый разъём, она **локально** создаёт SubHandle:
+### 1.2 Autonomous operation (offline)
+
+The station adds a connector with **two local operations** — derivation
+plus a self-issued child attestation. No Identity, no network:
 
 ```typescript
 class ChargingStation {
-  private stationHandle: Handle;
-  
-  constructor(stationHandle: Handle) {
-    this.stationHandle = stationHandle;
-  }
-  
-  async addConnector(connectorId: string, type: string): Promise<SubHandle> {
-    const metadata: SubHandleMetadata = {
+  constructor(private stationHandle: Handle, private attestationA: string) {}
+
+  async addConnector(connectorId: string, type: string) {
+    const connector = await this.stationHandle.deriveSubHandle(connectorId, {
       allowedAudiences: ['ev-charging-app.com'],
       allowedScopes: ['charge:start', 'charge:stop', 'charge:status'],
       maxSessionTtl: 7200,
       displayName: `${type} Connector`,
-      expiresAt: Math.floor(Date.now() / 1000) + 365 * 24 * 3600 // 1 год
-    };
-    
-    // ✅ Автономная деривация БЕЗ Identity, БЕЗ сети
-    const connector = await this.stationHandle.deriveSubHandle(connectorId, metadata);
-    return connector;
+    });
+    const B = await this.stationHandle.attestSubHandle(connectorId, {
+      audiences: ['ev-charging-app.com'],
+      scopes: ['charge:start', 'charge:stop', 'charge:status'],
+      maxSessionTtl: 7200,
+    }, { ttlSeconds: 365 * 24 * 3600 }); // device trust window
+    return { connector, B };
   }
-  
-  async createChargingSession(connector: SubHandle, clientId: string): Promise<Session> {
-    return await Session.create(connector, {
+
+  async createChargingSession(connector: SubHandle, clientId: string) {
+    return Session.create(connector, {
       audience: 'ev-charging-app.com',
       scopes: ['charge:start', 'charge:status'],
       ttl: 3600,
-      sessionId: `session_${clientId}_${Date.now()}`
+      sessionId: `session_${clientId}_${Date.now()}`,
     });
   }
 }
 ```
 
-### Шаг 3: Stateless-верификация (на сервере приложения)
-Приложение получает токен и верифицирует его **атомарно** через `Identity.deriveSubHandle`:
+### 1.3 External verification (Mode 2 — ev-charging-app.com)
+
+The app is an **independent organization**; it never receives the
+network's private root:
 
 ```typescript
-async function authorizeCharging(token: string, revocationChecker: RevocationChecker): Promise<void> {
-  const verifiedSession = await Session.verifyStateless(
-    token,
-    networkIdentity,
-    'ev-charging-app.com',
-    revocationChecker
-  );
-  
-  console.log(`Authorized: ${verifiedSession.handleName}`);
-  console.log(`Path: ${verifiedSession.path?.join('/')}`); // "station-001/connector-ccs"
-  
-  await startCharging(verifiedSession.path![1]);
+async function authorizeCharging(token: string, chain: string[]) {
+  try {
+    const s = await Session.verifyAttested(
+      token, EV_NETWORK_ROOT_PUBLIC_KEY, chain, 'ev-charging-app.com',
+      revocationChecker,
+    );
+    await startCharging(s.path![1]); // e.g. 'connector-ccs'
+  } catch (e) {
+    if (e instanceof AttestationError) {
+      // route by e.code / e.level — see README error table
+    }
+    throw new Error('Unauthorized');
+  }
 }
 ```
 
+A compromised station is **contained by its grant**: it can only attest
+`connector-*`/`meter-*` names, only `charge:*` scopes, only sessions
+≤ 7200s. Revoking the whole station = revoking `A.jti` — one flag that
+every verifier honors.
+
+### 1.4 Internal verification (Mode 1 — fleet-management.com, if you own it)
+
+```typescript
+const verified = await Session.verifyStateless(
+  token, networkIdentity, 'fleet-management.com', revocationChecker,
+);
+```
+
+Use Mode 1 only where the verifier is trusted with the root key.
+
 ---
 
-## Сценарий 2: Drone Fleet (Флот дронов)
+## Scenario 2: Drone Fleet — selling access (Mode 2 flagship)
 
-### Иерархия
+Without attestations this scenario is **not implementable safely**: the
+buyer would need the operator's private root, or would receive an
+unlimited, eternal capability. With Mode 2 the buyer receives a signed,
+time-boxed, scope-boxed receipt — verifiable independently.
+
 ```text
-Identity: Drone-Fleet-Ops (оператор флота)
-  └─ Handle: Drone-Alpha (конкретный дрон)
-       ├─ SubHandle: Camera-Module (камера)
-       ├─ SubHandle: Telemetry-Channel (канал телеметрии)
-       └─ SubHandle: Payload-Bay (грузовой отсек)
+Identity: Drone-Fleet-Ops (operator)
+  └─ Handle: drone-alpha  ◀── A = attestHandle (at deploy):
+       │                      camera clients: ['client-photography.com'],
+       │                      scopes camera:*, maxSessionTtl 3600
+       ├─ SubHandle: camera-module   (internal)
+       ├─ SubHandle: telemetry       (internal, Mode 1)
+       └─ SubHandle: camera-client-xyz ◀── B = attestSubHandle (in the field)
 ```
 
-### Шаг 1: Создание иерархии
+### 2.1 Deploy (once per drone)
+
 ```typescript
-const fleetIdentity = await Identity.fromSeed(fleetSeed);
-
-const droneAlpha = await fleetIdentity.deriveHandle('drone-alpha', {
-  displayName: 'DJI Matrice Alpha',
-  serial: 'DRN-2024-001'
-});
-
-const cameraModule = await droneAlpha.deriveSubHandle('camera-module', {
-  allowedAudiences: ['client-photography.com'],
-  allowedScopes: ['camera:capture', 'camera:stream', 'camera:download'],
+const A = await fleetIdentity.attestHandle('drone-alpha', {
+  audiences: ['client-photography.com'],
+  scopes: ['camera:capture', 'camera:stream', 'camera:download'],
   maxSessionTtl: 3600,
-  displayName: 'Zenmuse H20T Camera'
-} as SubHandleMetadata);
+  subNamePatterns: ['camera-*', 'sensor-*'],
+});
+// Ship droneHandle + A.token to the drone.
 ```
 
-### Шаг 2: Автономная работа дрона и продажа доступа
-Дрон работает в поле без связи с сервером. При подключении нового сенсора — локальная деривация:
+### 2.2 The sale (drone, in the field, offline)
+
+A client buys 30 minutes of camera access. The drone issues the session
+itself and hands over the **session token plus the attestation chain** —
+the client never receives any private key. The signed, time-boxed,
+scope-boxed token *is* the purchasable artifact:
 
 ```typescript
-class AutonomousDrone {
-  private droneHandle: Handle;
-  constructor(droneHandle: Handle) { this.droneHandle = droneHandle; }
-  
-  async attachSensor(sensorId: string, capabilities: string[]): Promise<SubHandle> {
-    return await this.droneHandle.deriveSubHandle(sensorId, {
-      allowedAudiences: ['fleet-control.internal'],
-      allowedScopes: capabilities,
-      maxSessionTtl: 7200,
-      expiresAt: Math.floor(Date.now() / 1000) + 30 * 24 * 3600
-    });
-  }
-  
-  async sellCameraAccess(camera: SubHandle, clientId: string, durationSec: number): Promise<Session> {
-    return await Session.create(camera, {
-      audience: 'client-photography.com',
-      scopes: ['camera:capture', 'camera:download'],
-      ttl: Math.min(durationSec, 3600),
-      sessionId: `photo_session_${clientId}_${Date.now()}`
-    });
-  }
+async function sellCameraAccess(clientId: string) {
+  const subName = `camera-client-${clientId}`;
+  const sub = await droneHandle.deriveSubHandle(subName);
+  const B = await droneHandle.attestSubHandle(subName, {
+    audiences: ['client-photography.com'],
+    scopes: ['camera:capture', 'camera:download'],
+    maxSessionTtl: 1800,
+  }, { ttlSeconds: 1800 });                 // the attestation dies with the deal
+
+  const session = await Session.create(sub, {
+    audience: 'client-photography.com',
+    scopes: ['camera:capture', 'camera:download'],
+    ttl: 1800,
+  });
+
+  // Hand to the client over QR/NFC at purchase:
+  return { token: session.token, chain: [A.token, B.token] };
 }
 ```
 
-### Шаг 3: Временный доступ с `expiresAt`
-```typescript
-// Клиент покупает доступ к камере на 24 часа
-const temporaryAccess = await droneAlpha.deriveSubHandle('temp-client-xyz', {
-  allowedAudiences: ['client-photography.com'],
-  allowedScopes: ['camera:capture'],
-  maxSessionTtl: 3600,
-  expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600 // SubHandle живёт 24 часа
-} as SubHandleMetadata);
+### 2.3 Client-side verification
 
-// Через 24 часа validateSessionOptions() автоматически выбросит ошибку: "SubHandle has expired"
+```typescript
+const s = await Session.verifyAttested(
+  token, FLEET_ROOT_PUBLIC_KEY, chain, 'client-photography.com',
+);
+// s.scopes === ['camera:capture', 'camera:download'], TTL ≤ 1800s —
+// cryptographically pinned to what was purchased.
+```
+
+The deal is auditable: the purchased scope and duration are **signed
+statements**. The client cannot extend them (`TTL_EXCEEDED`,
+`SESSION_OUTLIVES_ATTESTATION`) — renewal requires contacting the drone
+again, which is a feature, not a limitation. The operator can revoke
+mid-flight by revoking `B.jti`.
+
+### 2.4 Internal telemetry stays Mode 1
+
+```typescript
+const telemetry = await droneHandle.deriveSubHandle('telemetry', {
+  allowedAudiences: ['fleet-control.internal'],
+  allowedScopes: ['telemetry:read', 'telemetry:stream'],
+  maxSessionTtl: 86400,
+});
+// fleet-control verifies with verifyStateless(fleetIdentity) — it is
+// part of the trusted perimeter.
 ```
 
 ---
 
-## Сценарий 3: Corporate Messenger (Корпоративный мессенджер)
+## Scenario 3: Corporate Messenger
 
-### Иерархия
 ```text
-Identity: Corp-Messenger-Root (корпоративный аккаунт компании)
-  └─ Handle: Department-Engineering (инженерный отдел)
-       ├─ SubHandle: Worker-Alice (Алиса, senior dev)
-       ├─ SubHandle: Worker-Bob (Боб, junior dev)
-       └─ SubHandle: Worker-Charlie (Чарли, tech lead)
+Identity: Corp-Messenger-Root (corporation)
+  └─ Handle: department-engineering  ◀── A = attestHandle:
+       │   (HR machine — NO root key)   worker-*/contractor-*,
+       │                                scopes ⊆ messaging, maxTtl 28800
+       ├─ SubHandle: worker-alice ◀── B = attestSubHandle (HR, offline)
+       └─ SubHandle: contractor-x ◀── B with a two-week TTL
 ```
 
-### Шаг 1: Создание иерархии
+### 3.1 Setup
+
 ```typescript
-const corpIdentity = await Identity.fromSeed(corpSeed);
-
-const engineeringDept = await corpIdentity.deriveHandle('department-engineering', {
-  displayName: 'Engineering Department',
-  headcount: 42
-});
-
-const workerAlice = await engineeringDept.deriveSubHandle('worker-alice', {
-  allowedAudiences: ['corp-messenger.internal', 'jira.internal'],
-  allowedScopes: ['message:send', 'message:receive', 'channel:engineering'],
-  maxSessionTtl: 28800, // 8 часов (рабочий день)
-  displayName: 'Alice Smith',
-  role: 'Senior Developer',
-  expiresAt: Math.floor(Date.now() / 1000) + 365 * 24 * 3600
-} as SubHandleMetadata);
+const grantA = {
+  audiences: ['corp-messenger.internal', 'jira.internal'],
+  scopes: ['message:send', 'message:receive', 'channel:engineering'],
+  maxSessionTtl: 28800, // one workday
+  subNamePatterns: ['worker-*', 'contractor-*'],
+};
+const A = await corpIdentity.attestHandle('department-engineering', grantA);
+// Ship deptHandle + A.token to the HR system.
 ```
 
-### Шаг 2: HR создаёт нового сотрудника (автономно)
-HR-система работает автономно, без связи с корпоративным Identity:
+### 3.2 HR hires — autonomously, without the root
 
 ```typescript
-class HRSystem {
-  private deptHandle: Handle;
-  constructor(deptHandle: Handle) { this.deptHandle = deptHandle; }
-  
-  async hireEmployee(employeeId: string, name: string, role: string): Promise<SubHandle> {
-    const scopes = role === 'Manager' 
-      ? ['message:send', 'message:receive', 'channel:management', 'channel:engineering']
-      : ['message:send', 'message:receive', 'channel:engineering'];
-    
-    return await this.deptHandle.deriveSubHandle(employeeId, {
-      allowedAudiences: ['corp-messenger.internal', 'jira.internal'],
-      allowedScopes: scopes,
-      maxSessionTtl: 28800,
-      displayName: name,
-      role: role,
-      expiresAt: Math.floor(Date.now() / 1000) + 365 * 24 * 3600
-    });
-  }
+async function hireEmployee(employeeId: string, name: string, role: string) {
+  const scopes = role === 'Manager'
+    ? ['message:send', 'message:receive', 'channel:engineering', 'channel:team-lead']
+    : ['message:send', 'message:receive', 'channel:engineering'];
+
+  const worker = await deptHandle.deriveSubHandle(employeeId, {
+    allowedAudiences: ['corp-messenger.internal', 'jira.internal'],
+    allowedScopes: scopes,
+    maxSessionTtl: 28800,
+    displayName: name,
+    role,
+  });
+  const B = await deptHandle.attestSubHandle(employeeId, {
+    audiences: ['corp-messenger.internal', 'jira.internal'],
+    scopes,
+    maxSessionTtl: 28800,
+  }, { ttlSeconds: 365 * 24 * 3600 });
+  return { worker, B };
 }
 ```
 
-### Шаг 3: Мгновенный отзыв (revocation)
-```typescript
-// Сотрудник украл данные — мгновенный отзыв всех его сессий
-await revocationService.revokeHandle(workerAlice.getId());
+Note: even a compromised HR machine **cannot escalate** —
+`channel:management` is outside `grantA.scopes`, so such a child
+attestation is rejected by every verifier (`SCOPE_EXCEEDED` at level
+`ROOT`). Privileges above the department grant require a separate
+handle attested **directly by the root**.
 
-// Теперь все сессии worker-alice отклоняются при верификации, даже если TTL не истёк
+### 3.3 Multi-service verification
+
+Messenger **and** Jira verify independently with the same public root:
+
+```typescript
+// corp-messenger.internal:
+const s = await Session.verifyAttested(
+  token, CORP_ROOT_PUB, [A.token, B.token], 'corp-messenger.internal',
+  revocationChecker,
+);
+// jira.internal — identical call, different audience; both honor the
+// same revocation store.
+```
+
+### 3.4 Firing an employee (the correct way)
+
+Revoke the worker's **attestation** `jti` — one operation, effective in
+every service that checks revocations:
+
+```typescript
+await revocationService.revokeAttestation(B.jti);
+// All existing AND future sessions of worker-alice are rejected
+// (REVOKED at level HANDLE_ATTESTATION), regardless of session TTL.
+```
+
+> ⚠️ Mode 1 has no protocol-level handle revocation — the
+> `RevocationChecker` interface only receives session `jti`. If you must
+> stay in Mode 1, the only workaround is a **jti naming convention**
+> (`${handleId}:${uuid}`) plus a store that parses it — brittle and easy
+> to get wrong. Mode 2 makes branch revocation a first-class primitive.
+
+### 3.5 Contractors
+
+```typescript
+const B = await deptHandle.attestSubHandle('contractor-external-xyz', {
+  audiences: ['corp-messenger.internal'],
+  scopes: ['message:send', 'message:receive', 'channel:project-alpha'],
+  maxSessionTtl: 28800,
+}, { ttlSeconds: 14 * 24 * 3600 }); // access self-expires in 2 weeks —
+                                    // no HR action needed on the end date
 ```
 
 ---
 
-## Сравнительная таблица сценариев
+## Comparison
 
-| Аспект | EV Station | Drone Fleet | Corporate Messenger |
-|--------|-----------|-------------|---------------------|
-| **Identity** | Владелец сети | Оператор флота | Корпорация |
-| **Handle** | Станция (устройство) | Дрон (устройство) | Отдел (группа) |
-| **SubHandle** | Разъём / счётчик | Камера / телеметрия | Сотрудник |
-| **Автономность** | ✅ Станция без сервера | ✅ Дрон в поле | ⚠️ HR без Identity |
-| **TTL сессии** | 1-4 часа | 1-24 часа | 8 часов (рабочий день) |
-| **expiresAt** | 1 год (оборудование) | 30 дней (сенсоры) | 1 год (сотрудники) |
-| **Revocation** | Массовый отзыв станции | Отзыв дрона | Увольнение сотрудника |
-| **Точка входа** | `station.deriveSubHandle()` | `drone.deriveSubHandle()` | `dept.deriveSubHandle()` |
+| Aspect | EV Station | Drone Fleet | Corporate Messenger |
+|---|---|---|---|
+| Identity | network owner | fleet operator | corporation |
+| Handle | station (device) | drone (device) | department (group) |
+| SubHandle | connector / meter | camera / sensor | employee / contractor |
+| Autonomous ops | ✅ offline attest B | ✅ offline attest B (the sale) | ✅ HR without root |
+| External verifiers | ✅ Mode 2 | ✅ Mode 2 (the sale itself) | ✅ Mode 2 (messenger + Jira) |
+| Internal verifiers | Mode 1 optional | Mode 1 (telemetry) | Mode 1 optional |
+| Revocation granularity | station = A.jti; connector = B.jti | deal = B.jti | employee = B.jti |
+| Session TTL | 1–2 h | ≤ 1 h (deal ≤ 30 min) | 8 h workday |
 
----
+## Cryptographic consistency
 
-## Ключевые инсайты
-
-### ✅ Что работает одинаково во всех сценариях
-1. **Автономность IoT**: `Handle` деривирует `SubHandle` локально, без `Identity`.
-2. **Stateless верификация**: `Identity` деривирует `SubHandle` атомарно за один вызов.
-3. **Ограничения**: `allowedAudiences`, `allowedScopes`, `maxSessionTtl`, `expiresAt`.
-4. **Путь в токене**: `hPath: ["station-001", "connector-ccs"]`.
-5. **Опциональный revocation**: приложение само решает, как хранить список отзыва (Redis, PostgreSQL, in-memory).
-
-### 🔑 Криптографическая консистентность
 ```typescript
-// Способ 1: через Handle (автономно, на устройстве)
-const connector = await stationHandle.deriveSubHandle('connector-ccs');
-// connector.getPublicKey() === X
-
-// Способ 2: через Identity (атомарно, на сервере)
-const connector = await networkIdentity.deriveSubHandle('station-001', 'connector-ccs');
-// connector.getPublicKey() === X (ТОТ ЖЕ КЛЮЧ!)
+// Autonomous (on the device):
+const viaHandle = await stationHandle.deriveSubHandle('connector-ccs');
+// Atomic (on any verifier):
+const viaIdentity = await identity.deriveSubHandle('station-001', 'connector-ccs');
+// viaHandle.getPublicKey() === viaIdentity.getPublicKey() — guaranteed:
+// both entry points use DERIVATION_PATHS.subhandle('station-001', 'connector-ccs').
 ```
-**Гарантия протокола:** `DERIVATION_PATHS.subhandle('station-001', 'connector-ccs')` используется в обоих методах → идентичные info-строки → идентичные ключи.
 
-### 📊 Производительность
-| Операция | EV Station | Drone Fleet | Messenger |
-|----------|-----------|-------------|-----------|
-| Деривация SubHandle | ~0.5 мс | ~0.5 мс | ~0.5 мс |
-| Верификация сессии | ~1.5 мс | ~1.5 мс | ~1.5 мс |
-| Проверка revocation | ~0.1 мс | ~0.1 мс | ~0.1 мс |
-| **Итого** | **~2 мс** | **~2 мс** | **~2 мс** |
+## Performance (indicative)
+
+Measured on a modern laptop with @noble — treat as order-of-magnitude:
+derivation ~0.5 ms, session verification ~1.5 ms, revocation lookup
+~0.1 ms. Benchmark against your own runtime for SLOs.
 
 ---
 
-## 🏗️ Инфраструктура: Пример реализации RevocationChecker (Redis)
+## 🏗️ Infrastructure: production `RevocationChecker` (Redis)
 
-Протокол Me2em намеренно не навязывает конкретное хранилище для отзыва доступа, предоставляя интерфейс `RevocationChecker`. Ниже приведён пример production-ready реализации на базе **Redis** (с использованием библиотеки `ioredis`), который поддерживает как отзыв отдельных сессий, так и массовый отзыв всех сессий конкретного Handle (например, при увольнении сотрудника или компрометации устройства).
-
-### 1. Реализация сервиса
+The protocol deliberately does not prescribe a revocation backend. Below
+is a production-ready Redis implementation covering **both** artifact
+types: session `jti` **and** attestation `jti` (Mode 2 branch
+revocation).
 
 ```typescript
 import Redis from 'ioredis';
@@ -295,125 +355,67 @@ import { RevocationChecker } from '@me2em/core';
 
 export class RedisRevocationService implements RevocationChecker {
   private readonly redis: Redis;
-  private readonly SESSIONS_SET_KEY = 'me2em:revoked:sessions';
-  private readonly HANDLES_SET_KEY = 'me2em:revoked:handles';
+  // Single namespace: attestation jti and session jti are both UUIDs.
+  // If you need to distinguish them, use two keys and wrap the checker
+  // per call site.
+  private readonly REVOKED_KEY = 'me2em:revoked';
 
   constructor(redisUrl: string) {
     this.redis = new Redis(redisUrl);
   }
 
-  /**
-   * Реализация интерфейса RevocationChecker.
-   * Проверяет, отозвана ли конкретная сессия (по jti) ИЛИ её родительский Handle.
-   */
-  async isRevoked(sessionId: string): Promise<boolean> {
-    // Проверяем, не отозвана ли сама сессия
-    const isSessionRevoked = await this.redis.sismember(this.SESSIONS_SET_KEY, sessionId);
-    if (isSessionRevoked === 1) return true;
-
-    // 💡 Pro Tip: Если ваш jti (sessionId) имеет формат "handleId:uuid", 
-    // можно извлечь handleId и проверить, не отозван ли весь Handle целиком.
-    // const handleId = sessionId.split(':')[0];
-    // const isHandleRevoked = await this.redis.sismember(this.HANDLES_SET_KEY, handleId);
-    // if (isHandleRevoked === 1) return true;
-
-    return false;
+  /** Called by verifyStateless / verifyAttested for every level's jti. */
+  async isRevoked(jti: string): Promise<boolean> {
+    return (await this.redis.sismember(this.REVOKED_KEY, jti)) === 1;
   }
 
-  /**
-   * Отзывает конкретную сессию.
-   * @param sessionId - Уникальный идентификатор сессии (jti).
-   * @param ttlSeconds - (Опционально) Время жизни записи об отзыве. 
-   * Полезно, чтобы не засорять Redis навсегда (после естественного истечения TTL сессии).
-   */
-  async revokeSession(sessionId: string, ttlSeconds?: number): Promise<void> {
-    await this.redis.sadd(this.SESSIONS_SET_KEY, sessionId);
-    
-    if (ttlSeconds) {
-      // Примечание: Redis не поддерживает TTL для отдельных элементов Set.
-      // Для автоматической очистки в production рекомендуется использовать 
-      // отдельный ключ с TTL или периодический cron-скрипт для очистки устаревших jti.
-      // Альтернатива: использовать Redis Hash или отдельные ключи `me2em:revoked:session:${sessionId}` с EXPIRE.
-    }
+  /** Revoke a single session. */
+  async revokeSession(jti: string): Promise<void> {
+    await this.redis.sadd(this.REVOKED_KEY, jti);
   }
 
-  /**
-   * Массовый отзыв: блокирует все текущие и будущие сессии для конкретного Handle.
-   * @param handleId - Идентификатор Handle (например, ID уволенного сотрудника).
-   */
-  async revokeHandle(handleId: string): Promise<void> {
-    await this.redis.sadd(this.HANDLES_SET_KEY, handleId);
-    // Здесь также можно добавить логику поиска и отзыва всех активных jti, 
-    // привязанных к этому handleId, если требуется строгая немедленная инвалидация 
-    // без изменения формата jti.
+  /** Mode 2: revoke an entire branch (a handle or a subhandle) by
+   *  revoking its ATTESTATION jti. Every verifier that consults this
+   *  store rejects all current and future sessions under it. */
+  async revokeAttestation(attestationJti: string): Promise<void> {
+    await this.redis.sadd(this.REVOKED_KEY, attestationJti);
   }
 }
 ```
 
-### 2. Интеграция с верификацией сессии
-
-Теперь передайте экземпляр этого сервиса в метод `Session.verifyStateless` на стороне вашего API:
+Integration:
 
 ```typescript
-import { Session, Identity } from '@me2em/core';
-import { RedisRevocationService } from './redis-revocation.js';
-
 const revocationService = new RedisRevocationService(process.env.REDIS_URL!);
-const companyIdentity = await Identity.fromSeed(companySeed);
 
-async function authorizeRequest(req: Request) {
+async function authorizeRequest(req: Request, chain: string[]) {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) throw new Error('No token provided');
 
-  try {
-    // Передаем revocationService четвертым аргументом
-    const verifiedSession = await Session.verifyStateless(
-      token,
-      companyIdentity,
-      'my-app.internal',
-      revocationService // ← Интеграция с Redis
-    );
-
-    console.log(`✅ Доступ разрешен: ${verifiedSession.handleName}`);
-    return verifiedSession;
-  } catch (error) {
-    console.error(`❌ Доступ запрещен: ${error.message}`);
-    throw new Error('Unauthorized');
-  }
+  const verified = await Session.verifyAttested(
+    token, CORP_ROOT_PUB, chain, 'corp-messenger.internal', revocationService,
+  );
+  return verified; // handleName, scopes, path
 }
 ```
 
-### 3. Сценарий использования: Увольнение сотрудника
-
-```typescript
-// 1. HR-система инициирует увольнение
-const employeeHandleId = 'worker-alice-id-xyz';
-
-// 2. Мгновенно блокируем все её текущие и будущие сессии
-await revocationService.revokeHandle(employeeHandleId);
-
-// 3. При следующей попытке Алисы отправить сообщение или получить доступ,
-// метод isRevoked() вернет true (если реализован Pro Tip с парсингом jti), 
-// или вы можете явно отозвать её активный jti, если он известен:
-// await revocationService.revokeSession(activeSessionId);
-```
-
-### ⚡ Рекомендации по производительности
-- **O(1) сложность:** Операция `SISMEMBER` в Redis выполняется за константное время, что добавляет всего **~0.1–0.2 мс** к времени верификации токена.
-- **Память:** Один `jti` (UUID v4) занимает ~36 байт. 1 миллион отозванных сессий потребует менее **50 МБ** оперативной памяти Redis.
-- **Очистка:** Для долгоживущих систем настройте фоновую задачу (cron), которая удаляет из `me2em:revoked:sessions` записи, чей `exp` (из payload токена) уже истёк, чтобы предотвратить неограниченный рост множества.
+**Operations notes:**
+- `SISMEMBER` is O(1): ~0.1–0.2 ms added per verification level.
+- One revoked UUID ≈ 36 bytes; 1M entries < 50 MB.
+- Sessions expire naturally, but revocation entries do not: run a cron
+  that removes entries whose token `exp` has passed, or store per-key
+  `SET ... EXPIRE (exp - now + skew)` instead of a shared SET.
 
 ---
 
-## Резюме
+## Summary
 
-Три сценария демонстрируют **универсальность протокола**:
-1. **EV Station** — IoT с автономной работой устройств.
-2. **Drone Fleet** — IoT с продажей доступа к ресурсам.
-3. **Corporate Messenger** — Enterprise с управлением сотрудниками.
+| # | Scenario | What it demonstrates |
+|---|---|---|
+| 1 | EV Station | Fully offline device operation; external org verification; grant-bounded compromise; station-wide revocation |
+| 2 | Drone Fleet | **Selling access**: signed, time-boxed receipts verifiable by the buyer; Mode 1 for internal telemetry |
+| 3 | Corporate Messenger | Autonomous HR without the root; no privilege escalation past the department grant; cross-service revocation; contractor self-expiry |
 
-**Общая архитектура:**
-- ✅ `MAX_DEPTH = 2` (достаточно для всех сценариев).
-- ✅ Две точки входа (автономность + атомарная верификация).
-- ✅ Инкапсуляция (приватный ключ не покидает `Handle`).
-- ✅ Гибкость (TTL + опциональный revocation).
+Shared guarantees: `MAX_DEPTH = 2`, two derivation entry points with
+identical keys, encapsulated private keys, TTL + optional revocation —
+and, in Mode 2, **enforceable delegation without ever sharing the root**.
