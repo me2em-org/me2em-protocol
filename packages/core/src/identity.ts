@@ -5,6 +5,16 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { Handle, type HandleMetadata } from './handle.js';
 import { SubHandle, type SubHandleMetadata } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
+import { normalizeName } from './canonical-name.js';
+
+function parseHexSeed(hex: string): Uint8Array {
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error('Seed string must be 64 hex characters');
+  }
+  const out = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
 
 /**
  * Represents the root cryptographic identity derived from a seed phrase.
@@ -46,7 +56,7 @@ export class Identity {
    */
   static async fromSeed(seed: Uint8Array | string): Promise<Identity> {
     const seedBytes = typeof seed === 'string'
-      ? Uint8Array.from(Buffer.from(seed, 'hex'))
+      ? parseHexSeed(seed)
       : seed;
 
     if (seedBytes.length !== 32) {
@@ -82,6 +92,7 @@ export class Identity {
    * ```
    */
   async deriveHandle(name: string, metadata?: HandleMetadata): Promise<Handle> {
+    name = normalizeName(name);
     const info = new TextEncoder().encode(DERIVATION_PATHS.handle(name));
     const handleKey = hkdf(
       sha256,
@@ -126,6 +137,9 @@ export class Identity {
     subName: string,
     metadata?: SubHandleMetadata
   ): Promise<SubHandle> {
+    handleName = normalizeName(handleName);
+    const subNameNorm = normalizeName(subName);
+
     // Step 1: derive the intermediate Handle key (never exposed)
     const handleInfo = new TextEncoder().encode(DERIVATION_PATHS.handle(handleName));
     const handleKey = hkdf(
@@ -138,7 +152,7 @@ export class Identity {
 
     // Step 2: derive the SubHandle key from the Handle key
     const subInfo = new TextEncoder().encode(
-      DERIVATION_PATHS.subhandle(handleName, subName)
+      DERIVATION_PATHS.subhandle(handleName, subNameNorm)
     );
     const subKey = hkdf(
       sha256,
@@ -148,8 +162,8 @@ export class Identity {
       32
     );
 
-    const path = [handleName.toLowerCase().trim(), subName.toLowerCase().trim()];
-    return new SubHandle(subKey, subName, path, metadata);
+    const path = [handleName, subNameNorm];
+    return new SubHandle(subKey, subNameNorm, path, metadata);
   }
 
   /**

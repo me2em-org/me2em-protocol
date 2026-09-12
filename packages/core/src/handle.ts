@@ -3,6 +3,7 @@ import { ed } from './crypto/init.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';
+import { normalizeName } from './canonical-name.js';
 import type { SubHandleMetadata, SubHandle } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 
@@ -115,6 +116,19 @@ export class Handle {
     return this.publicKey;
   }
 
+  /** @returns The derivation path, or undefined for Handle (only SubHandle has a path). */
+  getPath(): string[] | undefined {
+    return undefined;
+  }
+
+  /**
+   * Validates session options against this Handle's constraints.
+   * Handle has no constraints.
+   */
+  validateSessionOptions(_options: {
+    audience: string; scopes: string[]; ttl: number;
+  }): void { /* Handle без ограничений */ }
+
   /**
    * Derives a {@link SubHandle} from this Handle.
    *
@@ -140,8 +154,9 @@ export class Handle {
    * ```
    */
   async deriveSubHandle(name: string, metadata?: SubHandleMetadata): Promise<SubHandle> {
+    const normalizedName = normalizeName(name);
     const info = new TextEncoder().encode(
-      DERIVATION_PATHS.subhandle(this._name, name)
+      DERIVATION_PATHS.subhandle(this._name, normalizedName)
     );
     // The private key is used internally and never leaves this class.
     const subKey = hkdf(
@@ -151,9 +166,9 @@ export class Handle {
       info,
       32
     );
-    const path = [this._name.toLowerCase().trim(), name.toLowerCase().trim()];
-    const SubHandle = (await import('./subhandle.js')).SubHandle;
-    return new SubHandle(subKey, name, path, metadata);
+    const path = [this._name, normalizedName];
+    const { SubHandle: SubHandleClass } = await import('./subhandle.js');
+    return new SubHandleClass(subKey, normalizedName, path, metadata);
   }
 
   /**

@@ -2,6 +2,7 @@
 import { Handle } from './handle.js';
 import { SubHandle } from './subhandle.js';
 import { Identity } from './identity.js';
+import { base64urlEncode, base64urlDecode } from './util.js';
 
 const MAX_PAYLOAD_SIZE = 4096;
 const CLOCK_SKEW_SECONDS = 30;
@@ -48,6 +49,8 @@ export interface SessionPayload {
   scp: string[];
   /** Expiration timestamp (Unix seconds). */
   exp: number;
+  /** Issued-at timestamp (Unix seconds). */
+  iat: number;
   /**
    * Unique session identifier, used for revocation.
    * Always present (generated automatically if not provided).
@@ -183,10 +186,7 @@ export class Session {
     handle: Handle | SubHandle,
     options: SessionOptions
   ): Promise<Session> {
-    // If this is a SubHandle, validate constraints before signing
-    if (handle instanceof SubHandle) {
-      handle.validateSessionOptions(options);
-    }
+    handle.validateSessionOptions(options);
 
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = now + options.ttl;
@@ -198,12 +198,14 @@ export class Session {
       aud: options.audience,
       scp: options.scopes,
       exp: expiresAt,
+      iat: now,
       jti: sessionId,
     };
 
     // Include derivation path for SubHandle sessions
-    if (handle instanceof SubHandle) {
-      payload.hPath = handle.getPath();
+    const hPath = handle.getPath();
+    if (hPath) {
+      payload.hPath = hPath;
     }
 
     const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
@@ -312,12 +314,15 @@ export class Session {
     // Expiration check (with clock skew tolerance)
     const now = Math.floor(Date.now() / 1000);
     const maxExpiry = payload.exp + CLOCK_SKEW_SECONDS;
-    const minExpiry = payload.exp - FUTURE_WINDOW_SECONDS;
     if (now > maxExpiry) {
       throw new Error('Token expired');
     }
-    if (now < minExpiry) {
-      throw new Error('Token is future-dated beyond allowed clock skew');
+    if (typeof payload.iat === 'number') {
+      if (now < payload.iat - CLOCK_SKEW_SECONDS) {
+        throw new Error('Token is future-dated');
+      }
+    } else if (now < payload.exp - FUTURE_WINDOW_SECONDS) {
+      throw new Error('Token is future-dated');
     }
 
     // Revocation check (if checker provided)
@@ -329,7 +334,7 @@ export class Session {
     }
 
     // Reconstruct Handle or SubHandle
-    let handle: Handle | SubHandle;
+    let handle: Handle;
 
     if (payload.hPath && payload.hPath.length === 2) {
       // SubHandle session — atomic reconstruction via Identity
@@ -353,6 +358,10 @@ export class Session {
       );
     }
 
+    if (handle.getId() !== payload.hId) {
+      throw new Error('hId mismatch');
+    }
+
     return new Session(
       payload.hId,
       payload.hNm,
@@ -366,36 +375,4 @@ export class Session {
   }
 }
 
-/**
- * Encodes a Uint8Array to a URL-safe Base64 string (no padding).
- * @internal
- */
-function base64urlEncode(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
 
-/**
- * Decodes a URL-safe Base64 string to a Uint8Array.
- * @internal
- */
-function base64urlDecode(input: string): Uint8Array {
-  let base64 = input
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  while (base64.length % 4 !== 0) {
-    base64 += '=';
-  }
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}

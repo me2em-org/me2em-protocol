@@ -5,6 +5,7 @@
 // It inherits from Handle for polymorphism in Session handling.
 
 import { Handle, type HandleMetadata } from './handle.js';
+import { normalizeName } from './canonical-name.js';
 
 /**
  * Metadata for a {@link SubHandle}, extending {@link HandleMetadata} with
@@ -90,6 +91,11 @@ export class SubHandle extends Handle {
       );
     }
 
+    const normalizedName = normalizeName(name);
+    if (path[1] !== normalizedName) {
+      throw new Error(`path[1] must equal normalized name: path[1]=${JSON.stringify(path[1])}, name=${JSON.stringify(normalizedName)}`);
+    }
+
     this._path = path;
     this._subMetadata = subMetadata ?? {};
   }
@@ -138,11 +144,8 @@ export class SubHandle extends Handle {
    * SubHandle is a leaf node (depth = 2) and cannot derive children.
    * Overrides the inherited `Handle.deriveSubHandle` to throw an error.
    */
-  override async deriveSubHandle(_name: string, _metadata?: SubHandleMetadata): Promise<SubHandle> {
-    throw new Error(
-      `Cannot derive child: maximum depth (${2}) reached ` +
-      `or this SubHandle is marked as leaf`
-    );
+  override async deriveSubHandle(): Promise<never> {
+    throw new Error('Cannot derive child: maximum depth (2) reached or this SubHandle is marked as leaf');
   }
 
   /**
