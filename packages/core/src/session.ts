@@ -447,7 +447,12 @@ export class Session {
     const A = Attestation.decode(attestationChain[0]);
 
     // Step 6: Verify A signature against root
-    const sigOkA = await Attestation.verifySignature(attestationChain[0], rootPublicKey);
+    let sigOkA = false;
+    try {
+      sigOkA = await Attestation.verifySignature(attestationChain[0], rootPublicKey);
+    } catch {
+      sigOkA = false;
+    }
     if (!sigOkA) {
       throw new AttestationError('BAD_SIGNATURE', 'ROOT', 'Root attestation signature is invalid');
     }
@@ -469,10 +474,12 @@ export class Session {
     }
 
     let G: AttestationPayload['grant'];
+    let bPayload: AttestationPayload | undefined;
 
     if (isSubSession) {
       // Step 9: SubHandle chain
       const B = Attestation.decode(attestationChain[1]);
+      bPayload = B;
 
       const signerPubABytes = (() => {
         try { return base64urlDecode(A.subjectId); } catch { return null; }
@@ -481,7 +488,12 @@ export class Session {
         throw new AttestationError('MALFORMED', 'FORMAT', 'Cannot decode root attestation subjectId');
       }
 
-      const sigOkB = await Attestation.verifySignature(attestationChain[1], signerPubABytes);
+      let sigOkB = false;
+      try {
+        sigOkB = await Attestation.verifySignature(attestationChain[1], signerPubABytes);
+      } catch {
+        sigOkB = false;
+      }
       if (!sigOkB) {
         throw new AttestationError('BAD_SIGNATURE', 'HANDLE_ATTESTATION', 'Handle attestation signature is invalid');
       }
@@ -525,7 +537,7 @@ export class Session {
       const forbidden = B.grant.scopes.filter(s => !A.grant.scopes.includes(s));
       if (forbidden.length > 0) {
         throw new AttestationError('SCOPE_EXCEEDED', 'ROOT',
-          `Handle attination scopes not subset of root: ${forbidden.join(', ')}`);
+          `Handle attestation scopes not subset of root: ${forbidden.join(', ')}`);
       }
       if (B.grant.maxSessionTtl > A.grant.maxSessionTtl) {
         throw new AttestationError('TTL_EXCEEDED', 'ROOT',
@@ -565,7 +577,7 @@ export class Session {
 
     // Step 11: Session does not outlive attestation
     const earliestAttestationExp = isSubSession
-      ? Math.min(A.exp, Attestation.decode(attestationChain[1]).exp)
+      ? Math.min(A.exp, bPayload!.exp)
       : A.exp;
     if (payload.exp > earliestAttestationExp + CLOCK_SKEW_SECONDS) {
       throw new AttestationError('SESSION_OUTLIVES_ATTESTATION', 'SESSION',
@@ -579,7 +591,12 @@ export class Session {
     if (!sessionPub) {
       throw new AttestationError('BAD_SIGNATURE', 'SESSION', 'Cannot decode session hId');
     }
-    const sigOk = await Attestation.verifySignature(token, sessionPub);
+    let sigOk = false;
+    try {
+      sigOk = await Handle.verify(signatureBytes, payloadBytes, sessionPub);
+    } catch {
+      sigOk = false;
+    }
     if (!sigOk) {
       throw new AttestationError('BAD_SIGNATURE', 'SESSION', 'Session signature is invalid');
     }

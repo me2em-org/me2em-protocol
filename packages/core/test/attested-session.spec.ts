@@ -437,3 +437,45 @@ describe('verifyAttested: negative cases', () => {
     expect(verifiedS.handleName).toBe('connector-ccs');
   });
 });
+
+describe('verifyAttested: signature robustness', () => {
+  it('short signature in session token → BAD_SIGNATURE/SESSION, not raw error', async () => {
+    const { A, B, session } = await makeSubSession();
+    const parts = session.token.split('.');
+    const shortSig = base64urlEncode(crypto.getRandomValues(new Uint8Array(10)));
+    const shortSigToken = `${parts[0]}.${shortSig}`;
+    await expectCode(
+      Session.verifyAttested(shortSigToken, rootPub, [A.token, B.token], 'app.com'),
+      'BAD_SIGNATURE', 'SESSION'
+    );
+  });
+
+  it('short signature in root attestation → BAD_SIGNATURE/ROOT', async () => {
+    const { A, session } = await makeHandleSession();
+    const parts = A.token.split('.');
+    const shortSig = base64urlEncode(crypto.getRandomValues(new Uint8Array(10)));
+    await expectCode(
+      Session.verifyAttested(session.token, rootPub,
+        [`${parts[0]}.${shortSig}`], 'app.com'),
+      'BAD_SIGNATURE', 'ROOT'
+    );
+  });
+
+  it('large session payload (~2500 bytes) verifies OK (4096 limit, not 2048)', async () => {
+    const handle = await identity.deriveHandle('station-001');
+    const A = await identity.attestHandle('station-001', grantA);
+    const session = await Session.create(handle, {
+      audience: 'app.com',
+      scopes: ['charge:start'],
+      ttl: 3600,
+      sessionId: 'x'.repeat(2000),
+    });
+    const raw = base64urlDecode(session.token.split('.')[0]);
+    expect(raw.length).toBeGreaterThan(2048);
+    expect(raw.length).toBeLessThanOrEqual(4096);
+    const verified = await Session.verifyAttested(
+      session.token, rootPub, [A.token], 'app.com'
+    );
+    expect(verified.handleName).toBe('station-001');
+  });
+});
