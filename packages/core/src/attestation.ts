@@ -93,7 +93,7 @@ export class Attestation {
   private readonly _payload: AttestationPayload;
   private readonly _token: string;
 
-  constructor(payload: AttestationPayload, token: string) {
+  private constructor(payload: AttestationPayload, token: string) {
     this._payload = payload;
     this._token = token;
   }

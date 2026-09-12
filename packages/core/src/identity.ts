@@ -6,6 +6,7 @@ import { Handle, type HandleMetadata } from './handle.js';
 import { SubHandle, type SubHandleMetadata } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { normalizeName } from './canonical-name.js';
+import { Attestation, type AttestationGrant } from './attestation.js';
 
 function parseHexSeed(hex: string): Uint8Array {
   if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
@@ -164,6 +165,27 @@ export class Identity {
 
     const path = [handleName, subNameNorm];
     return new SubHandle(subKey, subNameNorm, path, metadata);
+  }
+
+  /**
+   * Issues an attestation binding a derived Handle key to its name
+   * and grant. The subject public key is always derived internally —
+   * it is impossible to attest a foreign key.
+   */
+  async attestHandle(
+    name: string,
+    grant: AttestationGrant,
+    opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
+  ): Promise<Attestation> {
+    const normalized = normalizeName(name);
+    const handle = await this.deriveHandle(normalized);
+    return Attestation.issue(
+      this.privateKey,
+      handle.getPublicKey(),
+      normalized,
+      grant,
+      opts ?? {}
+    );
   }
 
   /**

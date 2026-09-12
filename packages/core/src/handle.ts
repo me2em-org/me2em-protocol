@@ -6,6 +6,7 @@ import { ed25519, x25519 } from '@noble/curves/ed25519.js';
 import { normalizeName } from './canonical-name.js';
 import type { SubHandleMetadata, SubHandle } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
+import { Attestation, type AttestationGrant } from './attestation.js';
 
 /**
  * Metadata associated with a {@link Handle}.
@@ -169,6 +170,27 @@ export class Handle {
     const path = [this._name, normalizedName];
     const { SubHandle: SubHandleClass } = await import('./subhandle.js');
     return new SubHandleClass(subKey, normalizedName, path, metadata);
+  }
+
+  /**
+   * Issues an attestation for a derived SubHandle, binding its
+   * derived key to the name and grant. Autonomous: requires only
+   * this Handle's own key, no Identity and no network.
+   */
+  async attestSubHandle(
+    subName: string,
+    grant: AttestationGrant,
+    opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
+  ): Promise<Attestation> {
+    const normalized = normalizeName(subName);
+    const sub = await this.deriveSubHandle(normalized);
+    return Attestation.issue(
+      this.privateKey,
+      sub.getPublicKey(),
+      normalized,
+      grant,
+      opts ?? {}
+    );
   }
 
   /**
