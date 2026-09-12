@@ -126,7 +126,6 @@ describe('Session.verifyStateless', () => {
     const handle = await identity.deriveHandle('future-test');
     const farFuture = Math.floor(Date.now() / 1000) + 100000;
     
-    // FIX: Added jti to manual payload
     const payload = JSON.stringify({
       hId: handle.getId(),
       hNm: handle.getName(),
@@ -179,7 +178,6 @@ describe('Session.verifyStateless', () => {
   });
 
   it('should reject malformed JSON payload', async () => {
-    // FIX: Corrected regex from ///g to /\//g
     const badPayload = btoa('not valid json{{{')
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const badSignature = btoa(String.fromCharCode(...new Uint8Array(64)))
@@ -208,7 +206,6 @@ describe('Session.verifyStateless', () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('size-test');
     
-    // FIX: Added jti to manual payload
     const oversizedPayload = JSON.stringify({
       hId: handle.getId(),
       hNm: handle.getName(),
