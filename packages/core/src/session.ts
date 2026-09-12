@@ -6,8 +6,6 @@ import { base64urlEncode, base64urlDecode } from './util.js';
 
 const MAX_PAYLOAD_SIZE = 4096;
 const CLOCK_SKEW_SECONDS = 30;
-const FUTURE_WINDOW_SECONDS = 3600;
-
 /**
  * Options for creating a new {@link Session}.
  *
@@ -299,10 +297,11 @@ export class Session {
       !payload.aud ||
       !Array.isArray(payload.scp) ||
       typeof payload.exp !== 'number' ||
+      typeof payload.iat !== 'number' ||
       typeof payload.jti !== 'string'
     ) {
       throw new Error(
-        'Invalid token format: missing required fields (hId, hNm, aud, scp, exp, jti)'
+        'Invalid token format: missing required fields (hId, hNm, aud, scp, exp, iat, jti)'
       );
     }
 
@@ -317,11 +316,7 @@ export class Session {
     if (now > maxExpiry) {
       throw new Error('Token expired');
     }
-    if (typeof payload.iat === 'number') {
-      if (now < payload.iat - CLOCK_SKEW_SECONDS) {
-        throw new Error('Token is future-dated');
-      }
-    } else if (now < payload.exp - FUTURE_WINDOW_SECONDS) {
+    if (now < payload.iat - CLOCK_SKEW_SECONDS) {
       throw new Error('Token is future-dated');
     }
 

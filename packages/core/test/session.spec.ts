@@ -133,6 +133,7 @@ describe('Session.verifyStateless', () => {
       aud: 'app',
       scp: ['read'],
       exp: farFuture,
+      iat: farFuture,
       jti: 'mock-jti-future',
     });
     

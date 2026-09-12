@@ -8,13 +8,6 @@
 // protocol version.
 
 import { normalizeName } from '../canonical-name.js';
-function assertCanonical(name: string): string {
-  const canonical = normalizeName(name);
-  if (name !== canonical) {
-    throw new Error(`Name must be pre-normalized, got: ${JSON.stringify(name)}`);
-  }
-  return canonical;
-}
 
 /**
  * Deterministic derivation paths for the Me2em protocol.
