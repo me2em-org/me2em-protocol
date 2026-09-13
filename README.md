@@ -145,7 +145,7 @@ console.log('Path:', session.path); // ['work', 'connector-1']
 
 | Package | Status | Description |
 |---------|--------|-------------|
-| [`@me2em/core`](./packages/core) | ✅ **Stable (v0.5.0-alpha.1)** | Core cryptographic primitives: `Identity`, `Handle`, `SubHandle`, `Session` |
+| [`@me2em/core`](./packages/core) | ✅ **Stable (v0.6.0-alpha.1)** | Core cryptographic primitives: `Identity`, `Handle`, `SubHandle`, `Session` |
 | `@me2em/sdk` | 🚧 Planned | Browser wrapper: IndexedDB, PIN, biometric, session management |
 | `@me2em/react` | 🚧 Planned | React components: `SeedDisplay`, `HandleManager`, etc. |
 | `@me2em/auth-middleware` | 🚧 Planned | NestJS/Express middleware for `Handle.verify()` |

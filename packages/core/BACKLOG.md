@@ -96,3 +96,4 @@ development, not part of the shipped API contract.
   allows only 128|256. Align doc and type.
 - **BL-18 · open ·** Replace `bPayload!` non-null assertion in
   `verifyAttested` step 11 with an explicit branch that throws.
+- **BL-19 · open ·** Decide the fate of the public crypto namespace.DONE: ed25519 wrappers now own their docs (real functions, 0 typedocwarnings). OPEN: keep/drop the namespace in the barrel — decide before1.0. Options: (a) keep and own, (b) @internal + excludeInternal,(c) drop re-exports. Internal code does not use them.
