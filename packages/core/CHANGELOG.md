@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.0-alpha.1
+
+### Added
+- BIP39 passphrase support: `get32ByteSeedFromMnemonic(words, passphrase)`.
+  Enables the split-trust pattern (mnemonic in one place, passphrase
+  in another). Passphrase is NFKC-normalized, case-sensitive, and
+  NOT recoverable.
+
+### Changed
+- `SubHandle.getMetadata()` no longer exposes constraint fields
+  (`allowedAudiences`, `allowedScopes`, `maxSessionTtl`, `expiresAt`).
+  Use `getSubMetadata()` for constraints. (Minor: fields were
+  leaking into a layer documented as serializable.)
+
+### Fixed
+- Cosmetic consistency: docblock indentation, test suite titles,
+  helper documentation, mixed-language comments.
+
 ## 0.6.0-alpha.1
 
 ### BREAKING
