@@ -168,30 +168,30 @@ export class Identity {
   }
 
   /**
-    * Issues an attestation binding a derived Handle key to its name
-    * and grant. The subject public key is always derived internally —
-    * it is impossible to attest a foreign key, and the resulting
-    * `subjectId` always matches the handle reconstructed via
-    * {@link Identity.deriveSubHandle}.
-    *
-    * @param grant - Constraints verifiers will enforce for this handle
-    *   and (via `subNamePatterns`) for the SubHandles it may attest.
-    * @returns An attestation signed by the Identity root key. Store it
-    *   with the Handle — it is a public artifact, not a secret.
-    * @throws {Error} If the name is not canonicalizable.
-    * @throws {AttestationError} If the grant is invalid.
-    *
-    * @example
-    * ```ts
-    * const A = await identity.attestHandle('station-001', {
-    *   audiences: ['ev-app.com'],
-    *   scopes: ['charge:start', 'charge:stop', 'charge:status'],
-    *   maxSessionTtl: 7200,
-    *   subNamePatterns: ['connector-*', 'meter-*'],
-    * });
-    * ```
-    */
-   async attestHandle(
+   * Issues an attestation binding a derived Handle key to its name
+   * and grant. The subject public key is always derived internally —
+   * it is impossible to attest a foreign key, and the resulting
+   * `subjectId` always matches the handle reconstructed via
+   * {@link Identity.deriveSubHandle}.
+   *
+   * @param grant - Constraints verifiers will enforce for this handle
+   *   and (via `subNamePatterns`) for the SubHandles it may attest.
+   * @returns An attestation signed by the Identity root key. Store it
+   *   with the Handle — it is a public artifact, not a secret.
+   * @throws {Error} If the name is not canonicalizable.
+   * @throws {AttestationError} If the grant is invalid.
+   *
+   * @example
+   * ```ts
+   * const A = await identity.attestHandle('station-001', {
+   *   audiences: ['ev-app.com'],
+   *   scopes: ['charge:start', 'charge:stop', 'charge:status'],
+   *   maxSessionTtl: 7200,
+   *   subNamePatterns: ['connector-*', 'meter-*'],
+   * });
+   * ```
+   */
+  async attestHandle(
     name: string,
     grant: AttestationGrant,
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }

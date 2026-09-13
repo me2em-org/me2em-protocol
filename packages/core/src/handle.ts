@@ -173,30 +173,30 @@ export class Handle {
   }
 
   /**
-    * Issues an attestation for a derived SubHandle, binding its
-    * derived key to the name and grant. Autonomous: requires only
-    * this Handle's own key, no Identity and no network.
-    *
-    * The child key is derived internally, so the attestation's
-    * `subjectId` always equals the key produced by
-    * `identity.deriveSubHandle(this.name, subName)`.
-    *
-    * Note: this method does not check this Handle's own grant — it may
-    * not have one (Mode 1). Nesting is enforced by verifiers in
-    * `Session.verifyAttested` (a child grant exceeding the parent's is
-    * rejected with `SCOPE_EXCEEDED`/`TTL_EXCEEDED` at level ROOT).
-    *
-    * @example
-    * ```ts
-    * const B = await station.attestSubHandle('connector-ccs', {
-    *   audiences: ['ev-app.com'],
-    *   scopes: ['charge:start', 'charge:stop'],
-    *   maxSessionTtl: 7200,
-    * }, { ttlSeconds: 1800 });
-    * // Ship [A.token, B.token] together with the session token.
-    * ```
-    */
-   async attestSubHandle(
+   * Issues an attestation for a derived SubHandle, binding its
+   * derived key to the name and grant. Autonomous: requires only
+   * this Handle's own key, no Identity and no network.
+   *
+   * The child key is derived internally, so the attestation's
+   * `subjectId` always equals the key produced by
+   * `identity.deriveSubHandle(this.name, subName)`.
+   *
+   * Note: this method does not check this Handle's own grant — it may
+   * not have one (Mode 1). Nesting is enforced by verifiers in
+   * `Session.verifyAttested` (a child grant exceeding the parent's is
+   * rejected with `SCOPE_EXCEEDED`/`TTL_EXCEEDED` at level ROOT).
+   *
+   * @example
+   * ```ts
+   * const B = await station.attestSubHandle('connector-ccs', {
+   *   audiences: ['ev-app.com'],
+   *   scopes: ['charge:start', 'charge:stop'],
+   *   maxSessionTtl: 7200,
+   * }, { ttlSeconds: 1800 });
+   * // Ship [A.token, B.token] together with the session token.
+   * ```
+   */
+  async attestSubHandle(
     subName: string,
     grant: AttestationGrant,
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
@@ -253,14 +253,9 @@ export class Handle {
    *
    * @example
    * ```ts
-   * // On the drone (Handle side):
+   * // AES-GCM helpers are application-side; the protocol provides
+   * // only the key:
    * const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
-   * const encrypted = await encryptAESGCM(telemetry, channelKey);
-   *
-   * // On the control center (Identity side):
-   * const droneHandle = await centerIdentity.deriveHandle('drone-001');
-   * const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
-   * const decrypted = await decryptAESGCM(encrypted, channelKey);
    * ```
    */
   deriveChannelKey(context: string): Uint8Array {

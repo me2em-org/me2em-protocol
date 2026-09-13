@@ -82,9 +82,10 @@ const seedBytes = await get32ByteSeedFromMnemonic(phrase);
 const identity = await Identity.fromSeed(seedBytes);
 ```
 
-> ⚠️ Passphrases (BIP39 "25th word") are not yet supported — see
-> [BACKLOG](./BACKLOG.md) (BL-04). Importing a phrase that was
-> created with a passphrase will silently derive a *different* identity.
+> ⚠️ Passphrases (BIP39 "25th word") ARE supported:
+> `get32ByteSeedFromMnemonic(words, passphrase)`. The passphrase is
+> case-sensitive, not recoverable, and silently derives a different
+> identity if mistyped. Store it with the same care as the words.
 
 ## 🔗 Attestations (verifiable delegation)
 

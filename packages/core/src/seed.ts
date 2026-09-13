@@ -3,7 +3,14 @@ import { generateMnemonic, mnemonicToSeed, validateMnemonic } from '@scure/bip39
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { sha256 } from './crypto/hkdf.js';
 
-export type SeedStrength = 128 | 256; // 128 bits = 12 words, 256 bits = 24 words
+/**
+ * Seed strength in bits. 128 bits → 12 words, 256 bits → 24 words.
+ * Intermediate strengths (160/192/224 → 15/18/21 words) are valid
+ * BIP39 strengths but intentionally NOT exposed by this API; extend
+ * the union deliberately if ever needed (BREAKING for exhaustiveness
+ * checks).
+ */
+export type SeedStrength = 128 | 256;
 
 /**
  * Utilities for BIP39 mnemonic seed phrase generation and validation.
@@ -19,9 +26,6 @@ export type SeedStrength = 128 | 256; // 128 bits = 12 words, 256 bits = 24 word
  *
  * @param strength - The entropy strength in bits.
  *   - 128 bits = 12 words (standard security)
- *   - 160 bits = 15 words
- *   - 192 bits = 18 words
- *   - 224 bits = 21 words
  *   - 256 bits = 24 words (maximum security)
  * @returns A space-separated mnemonic string split into an array of words.
  *
@@ -102,16 +106,25 @@ export function validateSeedPhrase(words: string[]): { isValid: boolean; error?:
  * deterministic 32-byte seed, as required by Ed25519.
  *
  * @param seedPhrase - The BIP39 mnemonic phrase (string or array of words).
+ * @param passphrase - Optional BIP39 passphrase ("25th word").
+ *   Normalized via NFKC before use. An empty string (default)
+ *   matches phrases without a passphrase. WARNING: the passphrase
+ *   is NOT recoverable — a different passphrase silently derives a
+ *   completely different seed with no error indication. Store it
+ *   as carefully as the mnemonic itself.
  * @returns A Promise resolving to a 32-byte Uint8Array seed.
  *
  * @example
  * ```ts
  * const seed = await get32ByteSeedFromMnemonic('abandon abandon ... art');
  * // Uint8Array(32) [123, 45, 67, ...]
+ *
+ * const seedWithPassphrase = await get32ByteSeedFromMnemonic(words, 'my secret 25th word');
  * ```
  */
 export async function get32ByteSeedFromMnemonic(
-  seedPhrase: string | string[]
+  seedPhrase: string | string[],
+  passphrase: string = ''
 ): Promise<Uint8Array> {
   const words = normalizeSeedPhrase(seedPhrase);
   const validation = validateSeedPhrase(words);
@@ -119,7 +132,7 @@ export async function get32ByteSeedFromMnemonic(
     throw new Error(`Invalid seed phrase: ${validation.error}`);
   }
   const mnemonic = words.join(' ');
-  const seed64 = await mnemonicToSeed(mnemonic);
+  const seed64 = await mnemonicToSeed(mnemonic, passphrase.normalize('NFKC'));
   // Hash the 64-byte seed to get a deterministic 32-byte seed for Ed25519
   return sha256(seed64);
 }

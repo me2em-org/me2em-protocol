@@ -396,48 +396,48 @@ export class Session {
   }
 
   /**
-    * Verifies a session token together with its attestation chain
-    * (Mode 2 - using an attestation chain) — for verifiers that hold only the root PUBLIC key.
-    *
-    * The chain contains serialized attestations, root first:
-    * - handle sessions: `[attestHandle_token]` (length 1)
-    * - subhandle sessions: `[attestHandle_token, attestSubHandle_token]`
-    *   (length 2)
-    *
-    * Enforced, in order: token structure and required fields (including
-    * `iat`); audience; session time (±30 s skew); chain shape; parent
-    * signature against `rootPublicKey`; parent validity and revocation;
-    * for subhandle sessions — child signature against the parent's
-    * `subjectId`, child validity/revocation, name/path agreement,
-    * wildcard permitting, `hId == child.subjectId`, and grant nesting
-    * (child scopes ⊆ parent scopes, child maxTtl ≤ parent maxTtl);
-    * session vs the effective grant (scopes, audiences, TTL); session
-    * expiry against the earliest attestation expiry; session signature
-    * against `hId`; session revocation — last.
-    *
-    * @param attestationChain - Attestation tokens, root first; length
-    *   must match the session kind (1 for Handle, 2 for SubHandle).
-    * @param revocationChecker - Optional; consulted for attestation
-    *   `jti` values (each chain level) and the session `jti`.
-    * @returns The verified session.
-    * @throws {AttestationError} With `code` and `level` identifying the
-    *   failed layer — integrate on these fields, not on message text.
-    *
-    * @example
-    * ```ts
-    * const A = await identity.attestHandle('station-001', grantA);
-    * const sub = await station.deriveSubHandle('connector-ccs');
-    * const B = await station.attestSubHandle('connector-ccs', grantB);
-    * const session = await Session.create(sub, {
-    *   audience: 'ev-app.com', scopes: ['charge:start'], ttl: 1800,
-    * });
-    * const verified = await Session.verifyAttested(
-    *   session.token, identity.getPublicKey(), [A.token, B.token],
-    *   'ev-app.com',
-    * );
-    * ```
-    */
-   static async verifyAttested(
+   * Verifies a session token together with its attestation chain
+   * (Mode 2 - using an attestation chain) — for verifiers that hold only the root PUBLIC key.
+   *
+   * The chain contains serialized attestations, root first:
+   * - handle sessions: `[attestHandle_token]` (length 1)
+   * - subhandle sessions: `[attestHandle_token, attestSubHandle_token]`
+   *   (length 2)
+   *
+   * Enforced, in order: token structure and required fields (including
+   * `iat`); audience; session time (±30 s skew); chain shape; parent
+   * signature against `rootPublicKey`; parent validity and revocation;
+   * for subhandle sessions — child signature against the parent's
+   * `subjectId`, child validity/revocation, name/path agreement,
+   * wildcard permitting, `hId == child.subjectId`, and grant nesting
+   * (child scopes ⊆ parent scopes, child maxTtl ≤ parent maxTtl);
+   * session vs the effective grant (scopes, audiences, TTL); session
+   * expiry against the earliest attestation expiry; session signature
+   * against `hId`; session revocation — last.
+   *
+   * @param attestationChain - Attestation tokens, root first; length
+   *   must match the session kind (1 for Handle, 2 for SubHandle).
+   * @param revocationChecker - Optional; consulted for attestation
+   *   `jti` values (each chain level) and the session `jti`.
+   * @returns The verified session.
+   * @throws {AttestationError} With `code` and `level` identifying the
+   *   failed layer — integrate on these fields, not on message text.
+   *
+   * @example
+   * ```ts
+   * const A = await identity.attestHandle('station-001', grantA);
+   * const sub = await station.deriveSubHandle('connector-ccs');
+   * const B = await station.attestSubHandle('connector-ccs', grantB);
+   * const session = await Session.create(sub, {
+   *   audience: 'ev-app.com', scopes: ['charge:start'], ttl: 1800,
+   * });
+   * const verified = await Session.verifyAttested(
+   *   session.token, identity.getPublicKey(), [A.token, B.token],
+   *   'ev-app.com',
+   * );
+   * ```
+   */
+  static async verifyAttested(
     token: string,
     rootPublicKey: Uint8Array,
     attestationChain: string[],
