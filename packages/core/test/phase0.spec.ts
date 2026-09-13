@@ -5,7 +5,7 @@ import { normalizeName } from '../src/canonical-name.js';
 
 const testSeed = new Uint8Array(32).fill(42);
 
-describe('Phase 0: normalizeName', () => {
+describe('normalizeName', () => {
   it('should lowercase and trim: "Station-001" → "station-001"', () => {
     expect(normalizeName('Station-001')).toBe('station-001');
     expect(normalizeName('station-001')).toBe('station-001');
@@ -34,7 +34,7 @@ describe('Phase 0: normalizeName', () => {
   });
 });
 
-describe('Phase 0: normalizeName in deriveHandle', () => {
+describe('deriveHandle canonicalizes names', () => {
   it('deriveHandle("Station-001") and deriveHandle("station-001") give SAME getPublicKey()', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const h1 = await identity.deriveHandle('Station-001');
@@ -44,7 +44,7 @@ describe('Phase 0: normalizeName in deriveHandle', () => {
   });
 });
 
-describe('Phase 0: identity.deriveSubHandle === handle.deriveSubHandle', () => {
+describe('derivation entry points agree on keys', () => {
   it('identity.deriveSubHandle("S","X") === handle.deriveSubHandle("x") same pubkey', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('S');
@@ -55,7 +55,7 @@ describe('Phase 0: identity.deriveSubHandle === handle.deriveSubHandle', () => {
   });
 });
 
-describe('Phase 0: SubHandle is leaf', () => {
+describe('SubHandle is a leaf', () => {
   it('subhandle.deriveSubHandle("anything") throws', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const sub = await identity.deriveSubHandle('station', 'connector');
@@ -63,7 +63,7 @@ describe('Phase 0: SubHandle is leaf', () => {
   });
 });
 
-describe('Phase 0: Session.create with ttl=86400 verifies immediately', () => {
+describe('long-lived sessions verify immediately', () => {
   it('verifyStateless passes right away (not rejected as future-dated)', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('phase0-session');
@@ -82,7 +82,7 @@ describe('Phase 0: Session.create with ttl=86400 verifies immediately', () => {
   });
 });
 
-describe('Phase 0: Tampering payload → Invalid signature', () => {
+describe('tampered payload rejected', () => {
   it('tampered payload is rejected with signature error', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('tamper-phase0');
@@ -123,7 +123,7 @@ describe('Phase 0: Tampering payload → Invalid signature', () => {
   });
 });
 
-describe('Phase 0 amendment: iat is required', () => {
+describe('iat is required', () => {
   it('token without iat field is rejected', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('iat-test');
