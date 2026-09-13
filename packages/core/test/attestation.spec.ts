@@ -1,4 +1,4 @@
-// test/attestation.test.ts
+// Attestation unit tests
 import { describe, it, expect } from 'vitest';
 import {
   Attestation,
@@ -11,6 +11,10 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 
 const testSeed = new Uint8Array(32).fill(42);
 
+/**
+ * For async throwers: rejections of async functions (including
+ * sync-thrown errors inside their async bodies).
+ */
 async function expectAttestationError(
   promise: Promise<unknown>, code: string, level: string
 ) {
@@ -22,6 +26,11 @@ async function expectAttestationError(
   }
 }
 
+/**
+ * For SYNC throwers only (e.g. Attestation.decode). Async functions
+ * never throw synchronously — their rejections require
+ * expectAttestationError.
+ */
 function expectAttestationErrorSync(
   fn: () => unknown, code: string, level: string
 ) {

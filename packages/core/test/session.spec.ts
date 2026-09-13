@@ -1,4 +1,4 @@
-// tests/session.spec.ts
+// Session unit tests
 import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session, type RevocationChecker } from '../src/index.js';
 
