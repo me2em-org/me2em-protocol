@@ -18,16 +18,16 @@ import { normalizeName } from './canonical-name.js';
  */
 export interface SubHandleMetadata extends HandleMetadata {
   /**
-   * Restricts the set of audiences this SubHandle may create sessions for.
-   * If empty or undefined, any audience is allowed.
-   */
-  allowedAudiences?: string[];
+    * Restricts the set of audiences this SubHandle may create sessions for.
+    * `undefined` = unrestricted; `[]` = deny all.
+    */
+   allowedAudiences?: string[];
 
-  /**
-   * Restricts the set of scopes this SubHandle may request in sessions.
-   * If empty or undefined, any scope is allowed.
-   */
-  allowedScopes?: string[];
+   /**
+    * Restricts the set of scopes this SubHandle may request in sessions.
+    * `undefined` = unrestricted; `[]` = deny all.
+    */
+   allowedScopes?: string[];
 
   /**
    * Maximum allowed TTL (in seconds) for sessions created by this SubHandle.
@@ -183,21 +183,24 @@ export class SubHandle extends Handle {
     scopes: string[];
     ttl: number;
   }): void {
-    // Audience check
-    if (this._subMetadata.allowedAudiences?.length) {
+    // Audience check: undefined = unrestricted, [] = deny all
+    if (this._subMetadata.allowedAudiences !== undefined) {
       if (!this._subMetadata.allowedAudiences.includes(options.audience)) {
         throw new Error(
           `Audience "${options.audience}" not allowed for this SubHandle. ` +
-          `Allowed: ${this._subMetadata.allowedAudiences.join(', ')}`
+          `Allowed: ${this._subMetadata.allowedAudiences.length === 0
+            ? '(none — empty list denies all)'
+            : this._subMetadata.allowedAudiences.join(', ')}`
         );
       }
     }
 
-    // Scopes check
-    if (this._subMetadata.allowedScopes?.length) {
+    // Scopes check: undefined = unrestricted, [] = deny all
+    if (this._subMetadata.allowedScopes !== undefined) {
       const forbidden = options.scopes.filter(
         s => !this._subMetadata.allowedScopes!.includes(s)
       );
+      // An empty allow-list denies every requested scope.
       if (forbidden.length > 0) {
         throw new Error(
           `Scopes not allowed for this SubHandle: ${forbidden.join(', ')}`
