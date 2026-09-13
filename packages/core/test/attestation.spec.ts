@@ -323,6 +323,14 @@ describe('Attestation: verifySignature', () => {
     expect(valid).toBe(false);
   });
 
+  it('structurally invalid token still throws MALFORMED (not swallowed to false)', async () => {
+    const signerPub = ed25519.getPublicKey(new Uint8Array(32));
+    await expectAttestationError(
+      Attestation.verifySignature('no-dot-here', signerPub),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
   it('tampered payload → false', async () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     const signerPub = ed25519.getPublicKey(signerKey);

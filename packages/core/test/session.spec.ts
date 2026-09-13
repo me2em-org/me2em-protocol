@@ -301,16 +301,18 @@ describe('Session.isExpired', () => {
     expect(session.isExpired()).toBe(false);
   });
 
-  it('should return true for expired session', async () => {
-    const identity = await Identity.fromSeed(testSeed);
-    const handle = await identity.deriveHandle('expired-now');
-    const session = await Session.create(handle, {
-      audience: 'app',
-      scopes: ['read'],
-      ttl: 1,
-    });
-    // Wait for session to expire
-    await new Promise(r => setTimeout(r, 1100));
+  it('should return true for expired session', () => {
+    const past = Math.floor(Date.now() / 1000) - 10;
+    const session = new Session(
+      'mock-hId',
+      'expired-now',
+      'app',
+      ['read'],
+      past,
+      'mock-token',
+      undefined,
+      'mock-jti'
+    );
     expect(session.isExpired()).toBe(true);
   });
 });
