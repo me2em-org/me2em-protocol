@@ -300,7 +300,21 @@ export class Handle {
     const x25519Pub = ed25519.utils.toMontgomery(otherPubBytes);
     const rawSharedSecret = x25519.getSharedSecret(x25519Priv, x25519Pub);
 
-    const info = new TextEncoder().encode('me2em/p2p-channel/v1');
-    return hkdf(sha256, rawSharedSecret, new Uint8Array(0), info, 32);
+    // Canonical, order-independent binding of both peers' public keys.
+    const myPub = this.getPublicKey();
+    const peers = [myPub, otherPubBytes].sort((a, b) => {
+      for (let i = 0; i < 32; i++) {
+        if (a[i] !== b[i]) return a[i] - b[i];
+      }
+      return 0;
+    });
+    const bound = new Uint8Array(64);
+    bound.set(peers[0], 0);
+    bound.set(peers[1], 32);
+
+    const info = new TextEncoder().encode(
+      DERIVATION_PATHS.p2pChannelV2
+    );
+    return hkdf(sha256, rawSharedSecret, bound, info, 32);
   }
 }

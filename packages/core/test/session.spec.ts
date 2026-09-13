@@ -527,6 +527,23 @@ describe('Handle.deriveSharedSecret', () => {
     await expect(handle.deriveSharedSecret(new Uint8Array(16))).rejects.toThrow(/32 bytes/);
     await expect(handle.deriveSharedSecret(new Uint8Array(64))).rejects.toThrow(/32 bytes/);
   });
+
+  it('binds peer keys: A↔B secret differs from A↔C (unknown key-share protection)', async () => {
+    const identityA = await Identity.fromSeed(testSeed);
+    const identityB = await Identity.fromSeed(new Uint8Array(32).fill(99));
+    const identityC = await Identity.fromSeed(new Uint8Array(32).fill(55));
+
+    const handleA = await identityA.deriveHandle('uks-test');
+    const handleB = await identityB.deriveHandle('uks-peer-b');
+    const handleC = await identityC.deriveHandle('uks-peer-c');
+
+    const ab = await handleA.deriveSharedSecret(handleB.getPublicKey());
+    const ac = await handleA.deriveSharedSecret(handleC.getPublicKey());
+    const ba = await handleB.deriveSharedSecret(handleA.getPublicKey());
+
+    expect(ab).not.toEqual(ac);   // different peer → different secret
+    expect(ab).toEqual(ba);       // symmetric: order-independent
+  });
 });
 
 // Вспомогательная функция (локальная для тестов)

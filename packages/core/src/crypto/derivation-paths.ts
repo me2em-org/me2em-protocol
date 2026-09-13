@@ -45,4 +45,12 @@ export const DERIVATION_PATHS = {
    */
   subhandle: (handleName: string, subName: string): string =>
     `me2em/subhandle/v1/${normalizeName(handleName)}/${normalizeName(subName)}`,
+
+  /**
+   * Versioned info string for peer-to-peer channel key derivation.
+   * v2 binds both peers' public keys into the derivation, preventing
+   * unknown key-share attacks. The peer keys are appended in sorted
+   * order so both parties derive the identical string.
+   */
+  p2pChannelV2: 'me2em/p2p-channel/v2',
 } as const;
