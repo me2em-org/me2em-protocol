@@ -190,6 +190,15 @@ export class Session {
     handle: Handle | SubHandle,
     options: SessionOptions
   ): Promise<Session> {
+    if (
+      typeof options.ttl !== 'number' ||
+      !Number.isInteger(options.ttl) ||
+      options.ttl <= 0
+    ) {
+      throw new Error(
+        `ttl must be a positive integer (seconds), got: ${String(options.ttl)}`
+      );
+    }
     handle.validateSessionOptions(options);
 
     const now = Math.floor(Date.now() / 1000);

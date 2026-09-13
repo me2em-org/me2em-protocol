@@ -56,6 +56,22 @@ describe('Session.create', () => {
     expect(b64urlRegex.test(signature)).toBe(true);
   });
 
+  it.each([
+    ['NaN', NaN],
+    ['zero', 0],
+    ['negative', -100],
+    ['fractional', 1.5],
+    ['Infinity', Infinity],
+  ])('rejects ttl = %s', async (_name, badTtl) => {
+    const identity = await Identity.fromSeed(testSeed);
+    const handle = await identity.deriveHandle('ttl-validate');
+    await expect(
+      Session.create(handle, {
+        audience: 'app', scopes: ['read'], ttl: badTtl as number,
+      })
+    ).rejects.toThrow(/positive integer/);
+  });
+
   it('should set correct expiration based on TTL', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('carol');
@@ -110,14 +126,28 @@ describe('Session.verifyStateless', () => {
   it('should reject expired tokens', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('expired-test');
-    const session = await Session.create(handle, {
-      audience: 'app',
-      scopes: ['read'],
-      ttl: -100,
+    const farPast = Math.floor(Date.now() / 1000) - 100000;
+
+    const payload = JSON.stringify({
+      hId: handle.getId(),
+      hNm: handle.getName(),
+      aud: 'app',
+      scp: ['read'],
+      exp: farPast,
+      iat: farPast,
+      jti: 'mock-jti-expired',
     });
 
+    const payloadBytes = new TextEncoder().encode(payload);
+    const signature = await handle.sign(payloadBytes);
+    const payloadB64 = btoa(String.fromCharCode(...payloadBytes))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const signatureB64 = btoa(String.fromCharCode(...signature))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const token = `${payloadB64}.${signatureB64}`;
+
     await expect(
-      Session.verifyStateless(session.token, identity, 'app')
+      Session.verifyStateless(token, identity, 'app')
     ).rejects.toThrow(/expired/i);
   });
 
@@ -277,8 +307,10 @@ describe('Session.isExpired', () => {
     const session = await Session.create(handle, {
       audience: 'app',
       scopes: ['read'],
-      ttl: -100,
+      ttl: 1,
     });
+    // Wait for session to expire
+    await new Promise(r => setTimeout(r, 1100));
     expect(session.isExpired()).toBe(true);
   });
 });
