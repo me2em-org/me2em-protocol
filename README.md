@@ -12,25 +12,30 @@
 
 ## 🎯 What is Me2em?
 
-Me2em is a **cryptographic identity protocol** that solves three fundamental problems in modern authorization:
+Me2em is a **cryptographic identity protocol** that solves four fundamental problems in modern authorization:
 
 | Problem | Me2em Solution |
 |---------|----------------|
 | **Context collision** — one profile for everything (work, personal, IoT) | Multiple isolated `Handle`s per `Identity`, each with its own keypair |
-| **IoT scalability** — managing thousands of devices | Hierarchical derivation: `Identity` → `Handle` → `SubHandle` (MAX_DEPTH = 2) |
+| **IoT scalability** — managing thousands of devices | Hierarchical derivation: `Identity` → `Handle` → `SubHandle` (MAX_DEPTH = 2), fully offline |
+| **Delegatable trust** — granting scoped, time-boxed access to partners, clients, employees | **Attestation chains**: parent-signed grants, verifiable by third parties with the root *public* key only |
 | **Privacy & trust** — requiring email/phone for registration | Anonymous, key-based authentication via seed phrases |
 
 ### Core Architecture
 
 ```
-Identity (Root — from seed phrase)
+Identity (Root — from seed phrase, private key stays in the vault)
   │
   ├─ Handle: @alice_work        ──→  Session → "work-app.com"
   ├─ Handle: @alice_private     ──→  Session → "messenger.app"
   │
-  └─ Handle: station-001        ──→  Autonomous IoT device
-       ├─ SubHandle: connector-1   (leaf, MAX_DEPTH = 2)
+  └─ Handle: station-001        ◀── attestHandle (signed by the root, issued once)
+       │   (autonomous IoT device — works offline)
+       ├─ SubHandle: connector-1   ◀── attestSubHandle (derived locally)
        └─ SubHandle: connector-2   (leaf, MAX_DEPTH = 2)
+                             │
+                             └─→ Session verified by ANY third party
+                                 using only the root PUBLIC key
 ```
 
 **Key properties:**
@@ -38,13 +43,14 @@ Identity (Root — from seed phrase)
 - 🔁 **Deterministic** — same seed + same name → same key (always)
 - 🧩 **Isolated** — compromise of one Handle does not affect others
 - 🌐 **Stateless** — servers verify signatures without database lookups
+- 🔗 **Delegatable** — attestation chains carry signed grants (audiences, scopes, TTL caps, name patterns) enforced at verification time
 - 🏗️ **Hierarchical** — `SubHandle` enables granular IoT/Enterprise access control
 
 ---
 
 ## 📦 Repository Structure
 
-This is a **pnpm monorepo** containing the Me2em protocol implementation and specifications.
+This is a **pnpm monorepo** containing the Me2em protocol implementation and documentation.
 
 ```
 me2em-protocol/
@@ -52,21 +58,20 @@ me2em-protocol/
 │   └── core/                    # 🧬 Core cryptographic primitives
 │       ├── src/
 │       │   ├── crypto/          # Ed25519, HKDF, derivation paths
-│       │   ├── identity.ts      # Root Identity
-│       │   ├── handle.ts        # Contextual Handle
+│       │   ├── identity.ts      # Root Identity (+ attestHandle)
+│       │   ├── handle.ts        # Contextual Handle (+ attestSubHandle)
 │       │   ├── subhandle.ts     # Hierarchical SubHandle (leaf node)
-│       │   ├── session.ts       # Stateless session tokens
+│       │   ├── attestation.ts   # Parent-signed attestation chains
+│       │   ├── session.ts       # Stateless sessions (verifyStateless + verifyAttested)
 │       │   ├── seed.ts          # BIP39 mnemonic utilities
 │       │   └── index.ts         # Public API
-│       ├── test/                # 96 tests (vitest)
+│       ├── test/                # 178 tests (vitest, 7 suites)
 │       ├── README.md            # Package documentation
-│       └── USE_CASES.md         # Production examples (EV, Drone, Messenger)
+│       ├── USE_CASES.md         # Production examples (EV, Drone, Messenger)
+│       └── CHANGELOG.md         # Release notes
 │
-├── specs/                       # 📜 Protocol specifications
-│   ├── core.md                  # Core protocol specification
-│   ├── test-vectors.json        # Canonical derivation examples
-│   └── openapi/
-│       └── server-ref.yaml      # Reference server API (OpenAPI 3.0)
+├── docs/                        # 📚 Project documentation
+│   └── BACKLOG.md               # Development backlog (advisory)
 │
 ├── README.md                    # This file
 ├── CONTRIBUTING.md              # How to contribute
@@ -92,24 +97,17 @@ me2em-protocol/
 ### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/me2em-org/me2em-protocol.git
 cd me2em-protocol
-
-# Install dependencies
 pnpm install
-
-# Build all packages
 pnpm -r build
-
-# Run tests
 pnpm -r test
 ```
 
 ### Using `@me2em/core`
 
 ```typescript
-import { Identity, Handle, SubHandle, Session } from '@me2em/core';
+import { Identity, Session } from '@me2em/core';
 
 // 1. Create Identity from seed
 const seed = new Uint8Array(32).fill(42); // Use a real secure seed!
@@ -137,7 +135,7 @@ console.log('Token:', session.token);
 console.log('Path:', session.path); // ['work', 'connector-1']
 ```
 
-📖 **More examples:** See [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) for production-ready scenarios (EV Charging Stations, Drone Fleets, Corporate Messengers).
+📖 **More examples:** See [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) for production-ready scenarios (EV Charging Stations, Drone Fleet access marketplace, Corporate Messengers).
 
 ---
 
@@ -145,11 +143,9 @@ console.log('Path:', session.path); // ['work', 'connector-1']
 
 | Package | Status | Description |
 |---------|--------|-------------|
-| [`@me2em/core`](./packages/core) | ✅ **Stable (v0.6.0-alpha.1)** | Core cryptographic primitives: `Identity`, `Handle`, `SubHandle`, `Session` |
-| `@me2em/sdk` | 🚧 Planned | Browser wrapper: IndexedDB, PIN, biometric, session management |
-| `@me2em/react` | 🚧 Planned | React components: `SeedDisplay`, `HandleManager`, etc. |
-| `@me2em/auth-middleware` | 🚧 Planned | NestJS/Express middleware for `Handle.verify()` |
-| `@me2em/server` | 🚧 Planned | Reference NestJS backend implementation |
+| [`@me2em/core`](./packages/core) | 🧪 **alpha (v0.6.0-alpha.1)** | Core cryptographic primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
+| `@me2em/react` | 🚧 Planned (Q1 2027) | React components: seed display/import wizards, identity hooks, storage adapters |
+| `@me2em/server` | 🚧 Planned (Q3 2027) | Reference NestJS backend: attestation-aware verification middleware, revocation store |
 
 ### `@me2em/core` — Current Features
 
@@ -158,33 +154,59 @@ console.log('Path:', session.path); // ['work', 'connector-1']
 | `Identity` | ✅ | Root identity from 32-byte seed |
 | `Handle` | ✅ | Contextual Ed25519 keypair |
 | `SubHandle` | ✅ | Hierarchical leaf node (MAX_DEPTH = 2) |
-| `Session` | ✅ | Stateless token with `hPath` + `jti` |
-| `RevocationChecker` | ✅ | Optional interface for instant revocation |
+| `Session` | ✅ | Stateless tokens — `verifyStateless` (direct) + `verifyAttested` (chain) |
+| **`Attestation`** | ✅ | Parent-signed grants: audiences, scopes, TTL caps, name wildcards; offline third-party verification; branch revocation |
+| `RevocationChecker` | ✅ | Optional interface — covers session **and** attestation `jti` |
 | `derivePassword` | ✅ | Deterministic password derivation |
 | `deriveChannelKey` | ✅ | Symmetric key for encrypted channels |
-| `deriveSharedSecret` | ✅ | ECDH (X25519) for P2P key exchange |
+| `deriveSharedSecret` | ✅ | X25519 ECDH with peer-key binding (UKS-safe, `p2p-channel/v2`) |
 | BIP39 seed utilities | ✅ | 12/24-word mnemonic support |
 
 ---
 
-## 📜 Protocol Specifications
+## 🔗 Attestations in 30 Seconds
 
-The `specs/` directory contains the **authoritative protocol definitions**:
+The 0.6 headline feature. A parent **attests** a child key:
 
-| File | Purpose |
-|------|---------|
-| [`specs/core.md`](./specs/core.md) | Core protocol specification (derivation, signing, sessions) |
-| [`specs/test-vectors.json`](./specs/test-vectors.json) | Canonical test vectors for cross-implementation compatibility |
-| [`specs/openapi/server-ref.yaml`](./specs/openapi/server-ref.yaml) | Reference server API (OpenAPI 3.0) |
+> “public key `K` belongs to name `N`, valid within grant `G`, until time `T`.”
 
-### Key Cryptographic Constants
+```typescript
+// Root owner (once per handle):
+const A = await identity.attestHandle('station-001', {
+  audiences: ['ev-app.com'],
+  scopes: ['charge:start', 'charge:stop'],
+  maxSessionTtl: 7200,
+  subNamePatterns: ['connector-*'],
+});
+
+// The device, fully offline:
+const B = await station.attestSubHandle('connector-ccs', { /* child grant */ });
+const session = await Session.create(connector, { /* ... */ });
+
+// Any third party verifies with the PUBLIC root key:
+await Session.verifyAttested(session.token, rootPublicKey, [A.token, B.token], 'ev-app.com');
+```
+
+No shared secrets, no databases of delegations, no trust in the relay — and revoking `A.jti` disables the entire branch instantly. **Full guide:** [`packages/core/README.md` → Attestations](./packages/core/README.md#-attestations-verifiable-delegation).
+
+Two verification modes:
+
+| | `verifyStateless` (Mode 1) | `verifyAttested` (Mode 2) |
+|---|---|---|
+| Verifier needs | `Identity` (**private** root) | root **public** key + chain |
+| Use when | your own trusted backend | external audiences, delegation, selling access |
+
+---
+
+## 🔐 Cryptographic Constants
 
 All derivation paths are centralized in `packages/core/src/crypto/derivation-paths.ts`:
 
 ```typescript
-DERIVATION_PATHS.identity           // "me2em/identity/v1/root"
-DERIVATION_PATHS.handle(name)       // "me2em/handle/v1/{name}"
-DERIVATION_PATHS.subhandle(h, s)    // "me2em/subhandle/v1/{h}/{s}"
+DERIVATION_PATHS.identity      // "me2em/identity/v1/root"
+DERIVATION_PATHS.handle(name)  // "me2em/handle/v1/{name}"
+DERIVATION_PATHS.subhandle(h, s) // "me2em/subhandle/v1/{h}/{s}"
+DERIVATION_PATHS.p2pChannelV2  // "me2em/p2p-channel/v2" (peer-key bound)
 ```
 
 ⚠️ **Changing any of these strings is a BREAKING CHANGE** and requires a new protocol version.
@@ -196,39 +218,22 @@ DERIVATION_PATHS.subhandle(h, s)    // "me2em/subhandle/v1/{h}/{s}"
 ### Available Scripts
 
 ```bash
-# From the repository root:
 pnpm -r build          # Build all packages
 pnpm -r test           # Run tests across all packages
-pnpm -r lint           # Lint all packages
-pnpm -r typecheck      # TypeScript type checking
+pnpm build-docs        # Generate API docs (typedoc → ./docs)
 
 # For a specific package:
 pnpm --filter @me2em/core test
-pnpm --filter @me2em/core build
 ```
 
 ### Testing
 
-The protocol is covered by **96 unit tests** (vitest):
-
-```
-packages/core/test/
-├── derivation.spec.ts   # 27 tests — Identity, Handle, SubHandle derivation
-├── session.spec.ts      # 27 tests — Session create/verify, revocation
-└── subhandle.spec.ts    # 42 tests — SubHandle constraints, path, leaf behavior
-```
-
-Run with coverage:
-```bash
-cd packages/core
-pnpm test --coverage
-```
+**178 tests** across 7 suites (vitest): derivation & canonical names, session lifecycle (create, verify, tamper, expiry, revocation), SubHandle constraints and leaf enforcement, attestation issuance/decode/determinism, and the full attested-verification chain (nesting, wildcards, revocation at every level, signature robustness).
 
 ### Code Style
 
-- **TypeScript** with strict mode
-- **ESLint** + **Prettier** for formatting
-- **TSDoc** comments for all public APIs (used for auto-generated docs)
+- **TypeScript** strict mode · **ESLint** + **Prettier**
+- **TSDoc** on all public APIs — auto-generated into [docs.me2em.com](https://docs.me2em.com) with zero-warning build
 
 ---
 
@@ -236,23 +241,22 @@ pnpm test --coverage
 
 | Resource | Link |
 |----------|------|
-| **Package README** | [`packages/core/README.md`](./packages/core/README.md) |
+| **Package README** (incl. attestation guide + error table) | [`packages/core/README.md`](./packages/core/README.md) |
 | **Use Cases Guide** | [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) |
-| **Protocol Spec** | [`specs/core.md`](./specs/core.md) |
+| **Development Backlog** | [`packages/core/BACKLOG.md`](./packages/core/BACKLOG.md) |
+| **Changelog** | [`packages/core/CHANGELOG.md`](./packages/core/CHANGELOG.md) |
 | **API Reference** | [docs.me2em.com](https://docs.me2em.com) (auto-generated from TSDoc) |
-| **OpenAPI Spec** | [`specs/openapi/server-ref.yaml`](./specs/openapi/server-ref.yaml) |
 
 ---
 
 ## 🔐 Security
 
-Me2em is built with security as a first-class concern:
-
-- ✅ **Ed25519** signatures (RFC 8032) — fast, secure, widely audited
-- ✅ **HKDF-SHA256** for key derivation — industry standard
+- ✅ **Ed25519** signatures (RFC 8032) — fast, widely audited
+- ✅ **HKDF-SHA256** derivation with strict domain separation
+- ✅ **Peer-key binding** in ECDH channel derivation (UKS protection)
 - ✅ **Private key encapsulation** — keys never leave their owning class
-- ✅ **Domain separation** — different contexts produce different keys
-- ✅ **Stateless verification** — no server-side state to compromise
+- ✅ **Canonical name normalization** (NFKC) — no homoglyph or separator collisions
+- ✅ **Stateless verification** — no server-side session state to compromise
 
 For security concerns or to report vulnerabilities, see [`SECURITY.md`](./SECURITY.md).
 
@@ -267,27 +271,33 @@ We welcome contributions! Please read:
 - 🔐 [`SECURITY.md`](./SECURITY.md) — Responsible disclosure policy
 - 📜 [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — Community guidelines
 
-### Quick Start for Contributors
-
-```bash
-git clone https://github.com/me2em-org/me2em-protocol.git
-cd me2em-protocol
-pnpm install
-pnpm -r build
-pnpm -r test
-```
-
 ---
 
 ## 🌍 Roadmap
 
-| Quarter | Milestone |
-|---------|-----------|
-| **Q4 2026** | `@me2em/core` v1.0 stable release |
-| **Q1 2027** | `@me2em/sdk` — browser wrapper with IndexedDB + biometric |
-| **Q2 2027** | `@me2em/react` — UI components for seed management |
-| **Q3 2027** | `@me2em/server` — reference NestJS backend |
+| Period | Milestone |
+|--------|-----------|
+| **Now** | `@me2em/core` 0.6.0-alpha — attestations, attested verification, UKS-safe channels |
+| **Next** | `0.7.0` — BIP39 passphrase support, key lifecycle hardening |
+| **Q1 2027** | `@me2em/react` — UI components for seed management & identity |
+| **Q1–Q2 2027** | [me2em.com](https://me2em.com) — guides, tutorials, comparisons |
+| **Q2–Q3 2027** | `@me2em/server` — reference NestJS backend |
+| **Q3 2027** | `@me2em/core` v1.0 — stable API freeze |
 | **Q4 2027** | ZK-proof integration (anonymous attribute verification) |
+
+Forward-looking development items live in the [Backlog](./packages/core/BACKLOG.md).
+
+---
+
+## 📜 Protocol Specifications
+
+Implementation-independent protocol specs (derivation formulas, token
+formats, test vectors) are being rewritten against 0.6.0 — see
+[specs/draft](./specs/draft) for the archived pre-attestation drafts and
+the [Backlog](./packages/core/BACKLOG.md) (BL-20–22) for the plan.
+Until then, the behavior contract lives in
+[`packages/core/README.md`](./packages/core/README.md) and the
+[Use Cases](./packages/core/USE_CASES.md).
 
 ---
 
@@ -311,7 +321,8 @@ You may obtain a copy of the License at
 
 Me2em builds on the shoulders of giants:
 
-- [`@noble/ed25519`](https://github.com/paulmillr/noble-ed25519) — Audited Ed25519 implementation
+- [`@noble/curves`](https://github.com/paulmillr/noble-curves) — Audited Ed25519/X25519 implementations
+- [`@noble/ed25519`](https://github.com/paulmillr/noble-ed25519) — Ed25519 (legacy sync path)
 - [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) — HKDF, SHA-256
 - [`@scure/bip39`](https://github.com/paulmillr/scure-bip39) — BIP39 mnemonic support
 - [`vitest`](https://vitest.dev/) — Fast unit testing framework
