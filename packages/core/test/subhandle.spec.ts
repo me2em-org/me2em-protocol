@@ -371,6 +371,27 @@ describe('SubHandle', () => {
   // ---------------------------------------------------------------------------
   // Metadata
   // ---------------------------------------------------------------------------
+  describe('getMetadata', () => {
+    it('getMetadata does not leak constraint fields', async () => {
+      const identity = await Identity.fromSeed(testSeed);
+      const handle = await identity.deriveHandle('leak-test');
+      const sub = await handle.deriveSubHandle('c', {
+        displayName: 'Connector',
+        allowedScopes: ['charge:start'],
+        allowedAudiences: ['app.com'],
+        maxSessionTtl: 3600,
+      });
+      const meta = sub.getMetadata();
+      expect(meta?.displayName).toBe('Connector');
+      expect(meta?.allowedScopes).toBeUndefined();
+      expect(meta?.allowedAudiences).toBeUndefined();
+      expect(meta?.maxSessionTtl).toBeUndefined();
+      expect(meta?.expiresAt).toBeUndefined();
+      // constraints are still accessible through the specialized getter:
+      expect(sub.getSubMetadata().allowedScopes).toEqual(['charge:start']);
+    });
+  });
+
   describe('getSubMetadata', () => {
     it('should return the SubHandle-specific metadata', async () => {
       const metadata: SubHandleMetadata = {

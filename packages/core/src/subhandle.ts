@@ -44,6 +44,30 @@ export interface SubHandleMetadata extends HandleMetadata {
 }
 
 /**
+ * Extracts only display-safe fields for the base Handle metadata.
+ * Constraint fields stay in SubHandle's own storage and must never
+ * leak through Handle.getMetadata().
+ */
+function extractDisplayFields(
+  meta?: SubHandleMetadata
+): HandleMetadata | undefined {
+  if (!meta) return undefined;
+  const display: HandleMetadata = {};
+  if (meta.displayName !== undefined) display.displayName = meta.displayName;
+  if (meta.avatar !== undefined) display.avatar = meta.avatar;
+  // copy any other custom fields, but never the constraint ones
+  const CONSTRAINT_KEYS = new Set([
+    'allowedAudiences', 'allowedScopes', 'maxSessionTtl', 'expiresAt',
+  ]);
+  for (const [k, v] of Object.entries(meta)) {
+    if (!CONSTRAINT_KEYS.has(k)) {
+      (display as Record<string, unknown>)[k] = v;
+    }
+  }
+  return display;
+}
+
+/**
  * Represents a context-isolated child Handle in the Me2em hierarchy.
  *
  * A SubHandle is always derived from a parent {@link Handle} and represents
@@ -83,7 +107,7 @@ export class SubHandle extends Handle {
     path: string[],
     subMetadata?: SubHandleMetadata
   ) {
-    super(privateKey, name, subMetadata);
+    super(privateKey, name, extractDisplayFields(subMetadata));
 
     if (path.length !== 2) {
       throw new Error(
@@ -156,10 +180,10 @@ export class SubHandle extends Handle {
   getSubMetadata(): SubHandleMetadata {
     return {
       ...this._subMetadata,
-      allowedAudiences: this._subMetadata.allowedAudiences
+      allowedAudiences: this._subMetadata.allowedAudiences !== undefined
         ? [...this._subMetadata.allowedAudiences]
         : undefined,
-      allowedScopes: this._subMetadata.allowedScopes
+      allowedScopes: this._subMetadata.allowedScopes !== undefined
         ? [...this._subMetadata.allowedScopes]
         : undefined,
     };
