@@ -308,6 +308,21 @@ describe('Attestation: verifySignature', () => {
     expect(valid).toBe(false);
   });
 
+  it('malformed signature length → false, not throw', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    const att = await Attestation.issue(
+      signerKey, signerPub, 'test',
+      { scopes: ['read'], maxSessionTtl: 3600 }
+    );
+    const parts = att.token.split('.');
+    const shortSig = base64urlEncode(crypto.getRandomValues(new Uint8Array(10)));
+    const valid = await Attestation.verifySignature(
+      `${parts[0]}.${shortSig}`, signerPub
+    );
+    expect(valid).toBe(false);
+  });
+
   it('tampered payload → false', async () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     const signerPub = ed25519.getPublicKey(signerKey);

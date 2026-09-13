@@ -227,18 +227,21 @@ export class Attestation {
   }
 
   /**
-   * Verifies the token signature against a public key.
-   *
-   * @returns `false` for a bad signature or a wrong key. May reject
-   *   (throw `AttestationError` `MALFORMED`) for structurally invalid
-   *   tokens. Note: noble may throw on malformed signature lengths —
-   *   callers in `Session.verifyAttested` wrap this in try/catch;
-   *   making this method total (never throw) is tracked in the backlog.
-   */
-  static async verifySignature(token: string, signerPublicKey: Uint8Array): Promise<boolean> {
-    const { signatureBytes, payloadBytes } = parseToken(token);
-    return ed.verify(signatureBytes, payloadBytes, signerPublicKey);
-  }
+    * Verifies the token signature against a public key.
+    *
+    * @returns `false` for a bad signature or a wrong key. Returns
+    *   `false` for any invalid signature, including malformed lengths.
+    *   It still throws `AttestationError` `MALFORMED`/`FORMAT` for
+    *   structurally invalid tokens (see {@link decode}).
+    */
+   static async verifySignature(token: string, signerPublicKey: Uint8Array): Promise<boolean> {
+     const { signatureBytes, payloadBytes } = parseToken(token);
+     try {
+       return ed.verify(signatureBytes, payloadBytes, signerPublicKey);
+     } catch {
+       return false;
+     }
+   }
 
   /**
    * Wildcard name matching used for `subNamePatterns`.
