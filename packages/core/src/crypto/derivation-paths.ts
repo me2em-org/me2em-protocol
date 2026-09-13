@@ -1,4 +1,4 @@
-// crypto/derivation-paths.ts
+// packages/core/src/crypto/derivation-paths.ts
 //
 // Single source of truth for HKDF info strings used across the protocol.
 // All derivation functions (Identity, Handle, SubHandle) MUST import their
