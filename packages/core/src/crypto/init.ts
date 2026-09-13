@@ -1,3 +1,4 @@
+// packages/core/src/crypto/init.ts
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
 

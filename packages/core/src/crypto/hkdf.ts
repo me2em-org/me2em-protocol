@@ -1,3 +1,5 @@
+// packages/core/src/crypto/hkdf.ts
+
 import { hkdf as nobleHkdf } from '@noble/hashes/hkdf.js';
 import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
 

@@ -9,6 +9,7 @@ import {
   Identity,
   Handle,
   SubHandle,
+  Session,
   type SubHandleMetadata,
 } from '../src/index.js';
 
@@ -137,7 +138,8 @@ describe('SubHandle', () => {
         ).toThrow(/Audience "evil.com" not allowed/);
       });
 
-      it('should allow any audience when allowedAudiences is empty/undefined', async () => {
+      // Updated: empty allow-list now denies all (matches AttestationGrant)
+      it('should allow any audience when allowedAudiences is undefined (not empty)', async () => {
         const { sub } = await createTestSubHandle('h', 's', {});
         expect(() =>
           sub.validateSessionOptions({
@@ -189,7 +191,8 @@ describe('SubHandle', () => {
         ).toThrow(/write.*admin|admin.*write/);
       });
 
-      it('should allow any scopes when allowedScopes is empty/undefined', async () => {
+      // Updated: empty allow-list now denies all (matches AttestationGrant)
+      it('should allow any scopes when allowedScopes is undefined (not empty)', async () => {
         const { sub } = await createTestSubHandle('h', 's', {});
         expect(() =>
           sub.validateSessionOptions({
@@ -314,6 +317,54 @@ describe('SubHandle', () => {
           })
         ).toThrow(/TTL/);
       });
+    });
+  });
+
+  describe('SubHandle constraints: empty arrays deny all', () => {
+    it('allowedAudiences: [] rejects any audience', async () => {
+      const identity = await Identity.fromSeed(testSeed);
+      const handle = await identity.deriveHandle('deny-aud');
+      const sub = await handle.deriveSubHandle('c', {
+        allowedAudiences: [],
+      });
+      await expect(
+        Session.create(sub, { audience: 'any.com', scopes: ['read'], ttl: 3600 })
+      ).rejects.toThrow(/not allowed/);
+    });
+
+    it('allowedAudiences: undefined still unrestricted', async () => {
+      const identity = await Identity.fromSeed(testSeed);
+      const handle = await identity.deriveHandle('undef-aud');
+      const sub = await handle.deriveSubHandle('c', {
+        allowedAudiences: undefined,
+      });
+      const s = await Session.create(sub, {
+        audience: 'any.com', scopes: ['read'], ttl: 3600,
+      });
+      expect(s.audience).toBe('any.com');
+    });
+
+    it('allowedScopes: [] rejects any non-empty scope request', async () => {
+      const identity = await Identity.fromSeed(testSeed);
+      const handle = await identity.deriveHandle('deny-scp');
+      const sub = await handle.deriveSubHandle('c', {
+        allowedScopes: [],
+      });
+      await expect(
+        Session.create(sub, { audience: 'app.com', scopes: ['read'], ttl: 3600 })
+      ).rejects.toThrow(/Scopes not allowed/);
+    });
+
+    it('allowedScopes: [] with empty request passes', async () => {
+      const identity = await Identity.fromSeed(testSeed);
+      const handle = await identity.deriveHandle('deny-scp-empty');
+      const sub = await handle.deriveSubHandle('c', {
+        allowedScopes: [],
+      });
+      const s = await Session.create(sub, {
+        audience: 'app.com', scopes: [], ttl: 3600,
+      });
+      expect(s.scopes).toEqual([]);
     });
   });
 

@@ -1,4 +1,4 @@
-// crypto/derivation-paths.ts
+// packages/core/src/crypto/derivation-paths.ts
 //
 // Single source of truth for HKDF info strings used across the protocol.
 // All derivation functions (Identity, Handle, SubHandle) MUST import their
@@ -7,17 +7,7 @@
 // Changing any of these strings is a BREAKING CHANGE and requires a new
 // protocol version.
 
-/**
- * Normalizes a name for use in derivation paths.
- * Applies lowercase and trims whitespace to ensure deterministic derivation.
- *
- * @param name - The raw name to normalize.
- * @returns The normalized name.
- * @internal
- */
-function normalize(name: string): string {
-  return name.toLowerCase().trim();
-}
+import { normalizeName } from '../canonical-name.js';
 
 /**
  * Deterministic derivation paths for the Me2em protocol.
@@ -44,7 +34,7 @@ export const DERIVATION_PATHS = {
    * @returns The info string, e.g. `"me2em/handle/v1/station-001"`.
    */
   handle: (name: string): string =>
-    `me2em/handle/v1/${normalize(name)}`,
+    `me2em/handle/v1/${normalizeName(name)}`,
 
   /**
    * Builds the info string for deriving a SubHandle from a Handle.
@@ -54,5 +44,13 @@ export const DERIVATION_PATHS = {
    * @returns The info string, e.g. `"me2em/subhandle/v1/station-001/connector-1"`.
    */
   subhandle: (handleName: string, subName: string): string =>
-    `me2em/subhandle/v1/${normalize(handleName)}/${normalize(subName)}`,
+    `me2em/subhandle/v1/${normalizeName(handleName)}/${normalizeName(subName)}`,
+
+  /**
+   * Versioned info string for peer-to-peer channel key derivation.
+   * v2 binds both peers' public keys into the derivation, preventing
+   * unknown key-share attacks. The peer keys are appended in sorted
+   * order so both parties derive the identical string.
+   */
+  p2pChannelV2: 'me2em/p2p-channel/v2',
 } as const;

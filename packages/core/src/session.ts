@@ -2,10 +2,15 @@
 import { Handle } from './handle.js';
 import { SubHandle } from './subhandle.js';
 import { Identity } from './identity.js';
+import { base64urlEncode, base64urlDecode } from './util.js';
+import {
+  Attestation,
+  AttestationError,
+  type AttestationPayload,
+} from './attestation.js';
 
 const MAX_PAYLOAD_SIZE = 4096;
 const CLOCK_SKEW_SECONDS = 30;
-const FUTURE_WINDOW_SECONDS = 3600;
 
 /**
  * Options for creating a new {@link Session}.
@@ -48,6 +53,8 @@ export interface SessionPayload {
   scp: string[];
   /** Expiration timestamp (Unix seconds). */
   exp: number;
+  /** Issued-at timestamp (Unix seconds). */
+  iat: number;
   /**
    * Unique session identifier, used for revocation.
    * Always present (generated automatically if not provided).
@@ -183,10 +190,16 @@ export class Session {
     handle: Handle | SubHandle,
     options: SessionOptions
   ): Promise<Session> {
-    // If this is a SubHandle, validate constraints before signing
-    if (handle instanceof SubHandle) {
-      handle.validateSessionOptions(options);
+    if (
+      typeof options.ttl !== 'number' ||
+      !Number.isInteger(options.ttl) ||
+      options.ttl <= 0
+    ) {
+      throw new Error(
+        `ttl must be a positive integer (seconds), got: ${String(options.ttl)}`
+      );
     }
+    handle.validateSessionOptions(options);
 
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = now + options.ttl;
@@ -198,12 +211,14 @@ export class Session {
       aud: options.audience,
       scp: options.scopes,
       exp: expiresAt,
+      iat: now,
       jti: sessionId,
     };
 
     // Include derivation path for SubHandle sessions
-    if (handle instanceof SubHandle) {
-      payload.hPath = handle.getPath();
+    const hPath = handle.getPath();
+    if (hPath) {
+      payload.hPath = hPath;
     }
 
     const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
@@ -224,44 +239,11 @@ export class Session {
     );
   }
 
-  /**
-   * Verifies a session token statelessly without server-side storage.
-   *
-   * Validates:
-   * - Token format (two Base64URL parts)
-   * - Payload size limit
-   * - Required fields (`hId`, `hNm`, `aud`, `scp`, `exp`, `jti`)
-   * - Audience match
-   * - Expiration (with clock skew tolerance)
-   * - Signature (against the reconstructed Handle or SubHandle public key)
-   * - Revocation status (if a {@link RevocationChecker} is provided)
-   *
-   * For SubHandle sessions (those with `hPath`), the Handle/SubHandle is
-   * reconstructed atomically via {@link Identity.deriveSubHandle}.
-   *
-   * @param token - The Base64URL-encoded session token string.
-   * @param companyIdentity - The Identity used to reconstruct Handle/SubHandle public keys.
-   * @param expectedAudience - The audience that this token must be intended for.
-   * @param revocationChecker - Optional checker for revocation list.
-   * @returns A Promise resolving to a verified Session instance.
-   * @throws {Error} If the token is invalid, expired, tampered, audience mismatch, or revoked.
-   *
-   * @example
-   * ```ts
-   * const session = await Session.verifyStateless(
-   *   token,
-   *   companyIdentity,
-   *   'app.example.com',
-   *   redisRevocationChecker // optional
-   * );
-   * ```
-   */
-  static async verifyStateless(
-    token: string,
-    companyIdentity: Identity,
-    expectedAudience: string,
-    revocationChecker?: RevocationChecker
-  ): Promise<Session> {
+  private static parseSessionToken(token: string): {
+    payload: SessionPayload;
+    payloadBytes: Uint8Array;
+    signatureBytes: Uint8Array;
+  } {
     if (typeof token !== 'string') {
       throw new Error('Token must be a string');
     }
@@ -297,60 +279,108 @@ export class Session {
       !payload.aud ||
       !Array.isArray(payload.scp) ||
       typeof payload.exp !== 'number' ||
+      typeof payload.iat !== 'number' ||
       typeof payload.jti !== 'string'
     ) {
       throw new Error(
-        'Invalid token format: missing required fields (hId, hNm, aud, scp, exp, jti)'
+        'Invalid token format: missing required fields (hId, hNm, aud, scp, exp, iat, jti)'
       );
     }
+
+    const signatureBytes = base64urlDecode(signatureB64);
+
+    return { payload, payloadBytes, signatureBytes };
+  }
+
+  /**
+   * Verifies a session token statelessly without server-side storage.
+   *
+   * Validates:
+   * - Token format (two Base64URL parts)
+   * - Payload size limit
+   * - Required fields (`hId`, `hNm`, `aud`, `scp`, `exp`, `iat`, `jti`)
+   * - Audience match
+   * - Expiration (with clock skew tolerance)
+   * - Signature (against the reconstructed Handle or SubHandle public key)
+   * - Revocation status (if a {@link RevocationChecker} is provided)
+   *
+   * For SubHandle sessions (those with `hPath`), the Handle/SubHandle is
+   * reconstructed atomically via {@link Identity.deriveSubHandle}.
+   *
+   * @param token - The Base64URL-encoded session token string.
+   * @param companyIdentity - The Identity used to reconstruct Handle/SubHandle public keys.
+   * @param expectedAudience - The audience that this token must be intended for.
+   * @param revocationChecker - Optional checker for revocation list.
+   * @returns A Promise resolving to a verified Session instance.
+   * @throws {Error} If the token is invalid, expired, tampered, audience mismatch, or revoked.
+   *
+   * @example
+   * ```ts
+   * const session = await Session.verifyStateless(
+   *   token,
+   *   companyIdentity,
+   *   'app.example.com',
+   *   redisRevocationChecker // optional
+   * );
+   * ```
+   */
+  static async verifyStateless(
+    token: string,
+    companyIdentity: Identity,
+    expectedAudience: string,
+    revocationChecker?: RevocationChecker
+  ): Promise<Session> {
+    const { payload, payloadBytes, signatureBytes } = Session.parseSessionToken(token);
 
     // Audience check
     if (payload.aud !== expectedAudience) {
       throw new Error(`Audience mismatch: expected "${expectedAudience}", got "${payload.aud}"`);
     }
 
-    // Expiration check (with clock skew tolerance)
+    // Time checks
     const now = Math.floor(Date.now() / 1000);
-    const maxExpiry = payload.exp + CLOCK_SKEW_SECONDS;
-    const minExpiry = payload.exp - FUTURE_WINDOW_SECONDS;
-    if (now > maxExpiry) {
+    if (now > payload.exp + CLOCK_SKEW_SECONDS) {
       throw new Error('Token expired');
     }
-    if (now < minExpiry) {
-      throw new Error('Token is future-dated beyond allowed clock skew');
-    }
-
-    // Revocation check (if checker provided)
-    if (revocationChecker) {
-      const isRevoked = await revocationChecker.isRevoked(payload.jti);
-      if (isRevoked) {
-        throw new Error('Session has been revoked');
-      }
+    if (now < payload.iat - CLOCK_SKEW_SECONDS) {
+      throw new Error('Token is future-dated');
     }
 
     // Reconstruct Handle or SubHandle
-    let handle: Handle | SubHandle;
-
+    let handle: Handle;
     if (payload.hPath && payload.hPath.length === 2) {
-      // SubHandle session — atomic reconstruction via Identity
       handle = await companyIdentity.deriveSubHandle(
         payload.hPath[0],
         payload.hPath[1]
       );
     } else {
-      // Regular Handle session
       handle = await companyIdentity.deriveHandle(payload.hNm);
     }
 
-    // Signature verification
+    // Signature verification (wrapped to catch exceptions from the crypto lib)
     const publicKey = handle.getPublicKey();
-    const signatureBytes = base64urlDecode(signatureB64);
-    const isValid = await Handle.verify(signatureBytes, payloadBytes, publicKey);
-
+    let isValid = false;
+    try {
+      isValid = await Handle.verify(signatureBytes, payloadBytes, publicKey);
+    } catch {
+      isValid = false;
+    }
     if (!isValid) {
       throw new Error(
         'Invalid signature: token payload has been tampered with or was not signed by the claimed Handle'
       );
+    }
+
+    if (handle.getId() !== payload.hId) {
+      throw new Error('hId mismatch');
+    }
+
+    // Revocation check — last, after signature is verified
+    if (revocationChecker) {
+      const isRevoked = await revocationChecker.isRevoked(payload.jti);
+      if (isRevoked) {
+        throw new Error('Session has been revoked');
+      }
     }
 
     return new Session(
@@ -364,38 +394,267 @@ export class Session {
       payload.jti
     );
   }
-}
 
-/**
- * Encodes a Uint8Array to a URL-safe Base64 string (no padding).
- * @internal
- */
-function base64urlEncode(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
+  /**
+    * Verifies a session token together with its attestation chain
+    * (Mode 2 - using an attestation chain) — for verifiers that hold only the root PUBLIC key.
+    *
+    * The chain contains serialized attestations, root first:
+    * - handle sessions: `[attestHandle_token]` (length 1)
+    * - subhandle sessions: `[attestHandle_token, attestSubHandle_token]`
+    *   (length 2)
+    *
+    * Enforced, in order: token structure and required fields (including
+    * `iat`); audience; session time (±30 s skew); chain shape; parent
+    * signature against `rootPublicKey`; parent validity and revocation;
+    * for subhandle sessions — child signature against the parent's
+    * `subjectId`, child validity/revocation, name/path agreement,
+    * wildcard permitting, `hId == child.subjectId`, and grant nesting
+    * (child scopes ⊆ parent scopes, child maxTtl ≤ parent maxTtl);
+    * session vs the effective grant (scopes, audiences, TTL); session
+    * expiry against the earliest attestation expiry; session signature
+    * against `hId`; session revocation — last.
+    *
+    * @param attestationChain - Attestation tokens, root first; length
+    *   must match the session kind (1 for Handle, 2 for SubHandle).
+    * @param revocationChecker - Optional; consulted for attestation
+    *   `jti` values (each chain level) and the session `jti`.
+    * @returns The verified session.
+    * @throws {AttestationError} With `code` and `level` identifying the
+    *   failed layer — integrate on these fields, not on message text.
+    *
+    * @example
+    * ```ts
+    * const A = await identity.attestHandle('station-001', grantA);
+    * const sub = await station.deriveSubHandle('connector-ccs');
+    * const B = await station.attestSubHandle('connector-ccs', grantB);
+    * const session = await Session.create(sub, {
+    *   audience: 'ev-app.com', scopes: ['charge:start'], ttl: 1800,
+    * });
+    * const verified = await Session.verifyAttested(
+    *   session.token, identity.getPublicKey(), [A.token, B.token],
+    *   'ev-app.com',
+    * );
+    * ```
+    */
+   static async verifyAttested(
+    token: string,
+    rootPublicKey: Uint8Array,
+    attestationChain: string[],
+    expectedAudience: string,
+    revocationChecker?: RevocationChecker
+  ): Promise<Session> {
+    const { payload, payloadBytes, signatureBytes } = Session.parseSessionToken(token);
 
-/**
- * Decodes a URL-safe Base64 string to a Uint8Array.
- * @internal
- */
-function base64urlDecode(input: string): Uint8Array {
-  let base64 = input
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  while (base64.length % 4 !== 0) {
-    base64 += '=';
+    // Step 2: Audience
+    if (payload.aud !== expectedAudience) {
+      throw new AttestationError(
+        'AUDIENCE_NOT_PERMITTED',
+        'SESSION',
+        `Expected audience "${expectedAudience}", got "${payload.aud}"`
+      );
+    }
+
+    // Step 3: Session time
+    const now = Math.floor(Date.now() / 1000);
+    if (now > payload.exp + CLOCK_SKEW_SECONDS) {
+      throw new AttestationError('EXPIRED', 'SESSION', 'Session has expired');
+    }
+    if (now < payload.iat - CLOCK_SKEW_SECONDS) {
+      throw new AttestationError('NOT_YET_VALID', 'SESSION', 'Session is not yet valid');
+    }
+
+    // Step 4: Chain structure
+    const isSubSession = payload.hPath !== undefined;
+    if (isSubSession) {
+      if (!payload.hPath || payload.hPath.length !== 2) {
+        throw new AttestationError('PATH_MISMATCH', 'SESSION', 'SubHandle session requires hPath of length 2');
+      }
+      if (attestationChain.length !== 2) {
+        throw new AttestationError('CHAIN_INCOMPLETE', 'FORMAT', 'SubHandle session requires exactly 2 attestations');
+      }
+    } else {
+      if (attestationChain.length !== 1) {
+        throw new AttestationError('CHAIN_INCOMPLETE', 'FORMAT', 'Handle session requires exactly 1 attestation');
+      }
+    }
+
+    // Step 5: Decode A
+    const A = Attestation.decode(attestationChain[0]);
+
+    // Step 6: Verify A signature against root
+    let sigOkA = false;
+    try {
+      sigOkA = await Attestation.verifySignature(attestationChain[0], rootPublicKey);
+    } catch {
+      sigOkA = false;
+    }
+    if (!sigOkA) {
+      throw new AttestationError('BAD_SIGNATURE', 'ROOT', 'Root attestation signature is invalid');
+    }
+
+    // Step 7: A time
+    if (now > A.exp + CLOCK_SKEW_SECONDS) {
+      throw new AttestationError('EXPIRED', 'ROOT', 'Root attestation has expired');
+    }
+    if (now < A.iat - CLOCK_SKEW_SECONDS) {
+      throw new AttestationError('NOT_YET_VALID', 'ROOT', 'Root attestation is not yet valid');
+    }
+
+    // Step 8: A revocation
+    if (revocationChecker) {
+      const isRevoked = await revocationChecker.isRevoked(A.jti);
+      if (isRevoked) {
+        throw new AttestationError('REVOKED', 'ROOT', 'Root attestation has been revoked');
+      }
+    }
+
+    let G: AttestationPayload['grant'];
+    let bPayload: AttestationPayload | undefined;
+
+    if (isSubSession) {
+      // Step 9: SubHandle chain
+      const B = Attestation.decode(attestationChain[1]);
+      bPayload = B;
+
+      const signerPubABytes = (() => {
+        try { return base64urlDecode(A.subjectId); } catch { return null; }
+      })();
+      if (!signerPubABytes) {
+        throw new AttestationError('MALFORMED', 'FORMAT', 'Cannot decode root attestation subjectId');
+      }
+
+      let sigOkB = false;
+      try {
+        sigOkB = await Attestation.verifySignature(attestationChain[1], signerPubABytes);
+      } catch {
+        sigOkB = false;
+      }
+      if (!sigOkB) {
+        throw new AttestationError('BAD_SIGNATURE', 'HANDLE_ATTESTATION', 'Handle attestation signature is invalid');
+      }
+
+      if (now > B.exp + CLOCK_SKEW_SECONDS) {
+        throw new AttestationError('EXPIRED', 'HANDLE_ATTESTATION', 'Handle attestation has expired');
+      }
+      if (now < B.iat - CLOCK_SKEW_SECONDS) {
+        throw new AttestationError('NOT_YET_VALID', 'HANDLE_ATTESTATION', 'Handle attestation is not yet valid');
+      }
+
+      if (revocationChecker) {
+        const isRevoked = await revocationChecker.isRevoked(B.jti);
+        if (isRevoked) {
+          throw new AttestationError('REVOKED', 'HANDLE_ATTESTATION', 'Handle attestation has been revoked');
+        }
+      }
+
+      if (B.subjectName !== payload.hPath![1]) {
+        throw new AttestationError('PATH_MISMATCH', 'HANDLE_ATTESTATION',
+          `Handle attestation subject "${B.subjectName}" does not match session subName "${payload.hPath![1]}"`);
+      }
+      if (A.subjectName !== payload.hPath![0]) {
+        throw new AttestationError('PATH_MISMATCH', 'ROOT',
+          `Root attestation subject "${A.subjectName}" does not match session handleName "${payload.hPath![0]}"`);
+      }
+
+      if (A.grant.subNamePatterns !== undefined) {
+        if (!Attestation.matchNamePattern(B.subjectName, A.grant.subNamePatterns)) {
+          throw new AttestationError('NAME_NOT_PERMITTED', 'ROOT',
+            `SubHandle name "${B.subjectName}" not permitted by root patterns`);
+        }
+      }
+
+      if (payload.hId !== B.subjectId) {
+        throw new AttestationError('SUBJECT_MISMATCH', 'SUB_ATTESTATION',
+          'Session handleId does not match handle attestation subjectId');
+      }
+
+      // Nested grant check
+      const forbidden = B.grant.scopes.filter(s => !A.grant.scopes.includes(s));
+      if (forbidden.length > 0) {
+        throw new AttestationError('SCOPE_EXCEEDED', 'ROOT',
+          `Handle attestation scopes not subset of root: ${forbidden.join(', ')}`);
+      }
+      if (B.grant.maxSessionTtl > A.grant.maxSessionTtl) {
+        throw new AttestationError('TTL_EXCEEDED', 'ROOT',
+          'Handle attestation maxSessionTtl exceeds root attestation');
+      }
+
+      G = B.grant;
+    } else {
+      // Handle session
+      const subjectIdBytes = (() => {
+        try { return base64urlDecode(A.subjectId); } catch { return null; }
+      })();
+      if (!subjectIdBytes) {
+        throw new AttestationError('MALFORMED', 'FORMAT', 'Cannot decode root attestation subjectId');
+      }
+      if (payload.hId !== A.subjectId) {
+        throw new AttestationError('SUBJECT_MISMATCH', 'ROOT',
+          'Session handleId does not match root attestation subjectId');
+      }
+      G = A.grant;
+    }
+
+    // Step 10: Session vs grant G
+    const sessionForbidden = payload.scp.filter(s => !G.scopes.includes(s));
+    if (sessionForbidden.length > 0) {
+      throw new AttestationError('SCOPE_EXCEEDED', 'SESSION',
+        `Session scopes not permitted by grant: ${sessionForbidden.join(', ')}`);
+    }
+    if (G.audiences !== undefined && !G.audiences.includes(payload.aud)) {
+      throw new AttestationError('AUDIENCE_NOT_PERMITTED', 'SESSION',
+        `Session audience "${payload.aud}" not in grant audiences`);
+    }
+    if ((payload.exp - payload.iat) > G.maxSessionTtl) {
+      throw new AttestationError('TTL_EXCEEDED', 'SESSION',
+        `Session duration ${payload.exp - payload.iat}s exceeds grant maxSessionTtl ${G.maxSessionTtl}s`);
+    }
+
+    // Step 11: Session does not outlive attestation
+    const earliestAttestationExp = isSubSession
+      ? Math.min(A.exp, bPayload!.exp)
+      : A.exp;
+    if (payload.exp > earliestAttestationExp + CLOCK_SKEW_SECONDS) {
+      throw new AttestationError('SESSION_OUTLIVES_ATTESTATION', 'SESSION',
+        'Session expires after the earliest attestation');
+    }
+
+    // Step 12: Session signature
+    const sessionPub = (() => {
+      try { return base64urlDecode(payload.hId); } catch { return null; }
+    })();
+    if (!sessionPub) {
+      throw new AttestationError('BAD_SIGNATURE', 'SESSION', 'Cannot decode session hId');
+    }
+    let sigOk = false;
+    try {
+      sigOk = await Handle.verify(signatureBytes, payloadBytes, sessionPub);
+    } catch {
+      sigOk = false;
+    }
+    if (!sigOk) {
+      throw new AttestationError('BAD_SIGNATURE', 'SESSION', 'Session signature is invalid');
+    }
+
+    // Step 13: Session revocation
+    if (revocationChecker) {
+      const isRevoked = await revocationChecker.isRevoked(payload.jti);
+      if (isRevoked) {
+        throw new AttestationError('REVOKED', 'SESSION', 'Session has been revoked');
+      }
+    }
+
+    // Step 14
+    return new Session(
+      payload.hId,
+      payload.hNm,
+      payload.aud,
+      payload.scp,
+      payload.exp,
+      token,
+      payload.hPath,
+      payload.jti
+    );
   }
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
 }

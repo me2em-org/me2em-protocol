@@ -56,6 +56,22 @@ describe('Session.create', () => {
     expect(b64urlRegex.test(signature)).toBe(true);
   });
 
+  it.each([
+    ['NaN', NaN],
+    ['zero', 0],
+    ['negative', -100],
+    ['fractional', 1.5],
+    ['Infinity', Infinity],
+  ])('rejects ttl = %s', async (_name, badTtl) => {
+    const identity = await Identity.fromSeed(testSeed);
+    const handle = await identity.deriveHandle('ttl-validate');
+    await expect(
+      Session.create(handle, {
+        audience: 'app', scopes: ['read'], ttl: badTtl as number,
+      })
+    ).rejects.toThrow(/positive integer/);
+  });
+
   it('should set correct expiration based on TTL', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('carol');
@@ -110,14 +126,28 @@ describe('Session.verifyStateless', () => {
   it('should reject expired tokens', async () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('expired-test');
-    const session = await Session.create(handle, {
-      audience: 'app',
-      scopes: ['read'],
-      ttl: -100,
+    const farPast = Math.floor(Date.now() / 1000) - 100000;
+
+    const payload = JSON.stringify({
+      hId: handle.getId(),
+      hNm: handle.getName(),
+      aud: 'app',
+      scp: ['read'],
+      exp: farPast,
+      iat: farPast,
+      jti: 'mock-jti-expired',
     });
 
+    const payloadBytes = new TextEncoder().encode(payload);
+    const signature = await handle.sign(payloadBytes);
+    const payloadB64 = btoa(String.fromCharCode(...payloadBytes))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const signatureB64 = btoa(String.fromCharCode(...signature))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const token = `${payloadB64}.${signatureB64}`;
+
     await expect(
-      Session.verifyStateless(session.token, identity, 'app')
+      Session.verifyStateless(token, identity, 'app')
     ).rejects.toThrow(/expired/i);
   });
 
@@ -126,13 +156,13 @@ describe('Session.verifyStateless', () => {
     const handle = await identity.deriveHandle('future-test');
     const farFuture = Math.floor(Date.now() / 1000) + 100000;
     
-    // FIX: Added jti to manual payload
     const payload = JSON.stringify({
       hId: handle.getId(),
       hNm: handle.getName(),
       aud: 'app',
       scp: ['read'],
       exp: farFuture,
+      iat: farFuture,
       jti: 'mock-jti-future',
     });
     
@@ -178,7 +208,6 @@ describe('Session.verifyStateless', () => {
   });
 
   it('should reject malformed JSON payload', async () => {
-    // FIX: Corrected regex from ///g to /\//g
     const badPayload = btoa('not valid json{{{')
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const badSignature = btoa(String.fromCharCode(...new Uint8Array(64)))
@@ -207,7 +236,6 @@ describe('Session.verifyStateless', () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('size-test');
     
-    // FIX: Added jti to manual payload
     const oversizedPayload = JSON.stringify({
       hId: handle.getId(),
       hNm: handle.getName(),
@@ -273,14 +301,18 @@ describe('Session.isExpired', () => {
     expect(session.isExpired()).toBe(false);
   });
 
-  it('should return true for expired session', async () => {
-    const identity = await Identity.fromSeed(testSeed);
-    const handle = await identity.deriveHandle('expired-now');
-    const session = await Session.create(handle, {
-      audience: 'app',
-      scopes: ['read'],
-      ttl: -100,
-    });
+  it('should return true for expired session', () => {
+    const past = Math.floor(Date.now() / 1000) - 10;
+    const session = new Session(
+      'mock-hId',
+      'expired-now',
+      'app',
+      ['read'],
+      past,
+      'mock-token',
+      undefined,
+      'mock-jti'
+    );
     expect(session.isExpired()).toBe(true);
   });
 });
@@ -496,6 +528,23 @@ describe('Handle.deriveSharedSecret', () => {
 
     await expect(handle.deriveSharedSecret(new Uint8Array(16))).rejects.toThrow(/32 bytes/);
     await expect(handle.deriveSharedSecret(new Uint8Array(64))).rejects.toThrow(/32 bytes/);
+  });
+
+  it('binds peer keys: A↔B secret differs from A↔C (unknown key-share protection)', async () => {
+    const identityA = await Identity.fromSeed(testSeed);
+    const identityB = await Identity.fromSeed(new Uint8Array(32).fill(99));
+    const identityC = await Identity.fromSeed(new Uint8Array(32).fill(55));
+
+    const handleA = await identityA.deriveHandle('uks-test');
+    const handleB = await identityB.deriveHandle('uks-peer-b');
+    const handleC = await identityC.deriveHandle('uks-peer-c');
+
+    const ab = await handleA.deriveSharedSecret(handleB.getPublicKey());
+    const ac = await handleA.deriveSharedSecret(handleC.getPublicKey());
+    const ba = await handleB.deriveSharedSecret(handleA.getPublicKey());
+
+    expect(ab).not.toEqual(ac);   // different peer → different secret
+    expect(ab).toEqual(ba);       // symmetric: order-independent
   });
 });
 

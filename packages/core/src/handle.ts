@@ -3,8 +3,10 @@ import { ed } from './crypto/init.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';
+import { normalizeName } from './canonical-name.js';
 import type { SubHandleMetadata, SubHandle } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
+import { Attestation, type AttestationGrant } from './attestation.js';
 
 /**
  * Metadata associated with a {@link Handle}.
@@ -115,6 +117,19 @@ export class Handle {
     return this.publicKey;
   }
 
+  /** @returns The derivation path, or undefined for Handle (only SubHandle has a path). */
+  getPath(): string[] | undefined {
+    return undefined;
+  }
+
+  /**
+   * Validates session options against this Handle's constraints.
+   * Handle has no constraints.
+   */
+  validateSessionOptions(_options: {
+    audience: string; scopes: string[]; ttl: number;
+  }): void { /* Handle has no constraints */ }
+
   /**
    * Derives a {@link SubHandle} from this Handle.
    *
@@ -140,8 +155,9 @@ export class Handle {
    * ```
    */
   async deriveSubHandle(name: string, metadata?: SubHandleMetadata): Promise<SubHandle> {
+    const normalizedName = normalizeName(name);
     const info = new TextEncoder().encode(
-      DERIVATION_PATHS.subhandle(this._name, name)
+      DERIVATION_PATHS.subhandle(this._name, normalizedName)
     );
     // The private key is used internally and never leaves this class.
     const subKey = hkdf(
@@ -151,9 +167,49 @@ export class Handle {
       info,
       32
     );
-    const path = [this._name.toLowerCase().trim(), name.toLowerCase().trim()];
-    const SubHandle = (await import('./subhandle.js')).SubHandle;
-    return new SubHandle(subKey, name, path, metadata);
+    const path = [this._name, normalizedName];
+    const { SubHandle: SubHandleClass } = await import('./subhandle.js');
+    return new SubHandleClass(subKey, normalizedName, path, metadata);
+  }
+
+  /**
+    * Issues an attestation for a derived SubHandle, binding its
+    * derived key to the name and grant. Autonomous: requires only
+    * this Handle's own key, no Identity and no network.
+    *
+    * The child key is derived internally, so the attestation's
+    * `subjectId` always equals the key produced by
+    * `identity.deriveSubHandle(this.name, subName)`.
+    *
+    * Note: this method does not check this Handle's own grant — it may
+    * not have one (Mode 1). Nesting is enforced by verifiers in
+    * `Session.verifyAttested` (a child grant exceeding the parent's is
+    * rejected with `SCOPE_EXCEEDED`/`TTL_EXCEEDED` at level ROOT).
+    *
+    * @example
+    * ```ts
+    * const B = await station.attestSubHandle('connector-ccs', {
+    *   audiences: ['ev-app.com'],
+    *   scopes: ['charge:start', 'charge:stop'],
+    *   maxSessionTtl: 7200,
+    * }, { ttlSeconds: 1800 });
+    * // Ship [A.token, B.token] together with the session token.
+    * ```
+    */
+   async attestSubHandle(
+    subName: string,
+    grant: AttestationGrant,
+    opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
+  ): Promise<Attestation> {
+    const normalized = normalizeName(subName);
+    const sub = await this.deriveSubHandle(normalized);
+    return Attestation.issue(
+      this.privateKey,
+      sub.getPublicKey(),
+      normalized,
+      grant,
+      opts ?? {}
+    );
   }
 
   /**
@@ -244,7 +300,21 @@ export class Handle {
     const x25519Pub = ed25519.utils.toMontgomery(otherPubBytes);
     const rawSharedSecret = x25519.getSharedSecret(x25519Priv, x25519Pub);
 
-    const info = new TextEncoder().encode('me2em/p2p-channel/v1');
-    return hkdf(sha256, rawSharedSecret, new Uint8Array(0), info, 32);
+    // Canonical, order-independent binding of both peers' public keys.
+    const myPub = this.getPublicKey();
+    const peers = [myPub, otherPubBytes].sort((a, b) => {
+      for (let i = 0; i < 32; i++) {
+        if (a[i] !== b[i]) return a[i] - b[i];
+      }
+      return 0;
+    });
+    const bound = new Uint8Array(64);
+    bound.set(peers[0], 0);
+    bound.set(peers[1], 32);
+
+    const info = new TextEncoder().encode(
+      DERIVATION_PATHS.p2pChannelV2
+    );
+    return hkdf(sha256, rawSharedSecret, bound, info, 32);
   }
 }

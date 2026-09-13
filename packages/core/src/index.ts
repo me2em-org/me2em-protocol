@@ -2,6 +2,7 @@ export { Identity } from './identity.js';
 export { Handle, type HandleMetadata } from './handle.js';
 export { SubHandle, type SubHandleMetadata } from './subhandle.js';
 export { Session, type SessionOptions, type SessionPayload, type RevocationChecker } from './session.js';
+export { Attestation, AttestationError, ATTESTATION_TYPE, ATTESTATION_MAX_PAYLOAD, type AttestationGrant, type AttestationPayload, type AttestationErrorCode, type AttestationLevel } from './attestation.js';
 export * as crypto from './crypto/index.js';
 
 /**
