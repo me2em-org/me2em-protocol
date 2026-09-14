@@ -76,7 +76,7 @@ describe('SeedPhraseDisplay', () => {
     fireEvent.click(screen.getByTestId('reveal'));
     fireEvent.click(screen.getByTestId('dismiss'));
     expect(screen.queryByTestId('reveal')).toBeNull();
-    expect(screen.getByTestId('copy-error')).toBeInTheDocument();
+    expect(screen.getByTestId('dismissed')).toBeInTheDocument();
   });
 
   it('clipboard failure → no COPY dispatch, error shown', async () => {
@@ -92,7 +92,9 @@ describe('SeedPhraseDisplay', () => {
     fireEvent.click(screen.getByTestId('copy-all'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('copy-all')).not.toBeDisabled();
+      expect(screen.getByTestId('copy-error')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('copy-all')).not.toBeDisabled();
+    expect(screen.queryByTestId('dismissed')).toBeNull();
   });
 });

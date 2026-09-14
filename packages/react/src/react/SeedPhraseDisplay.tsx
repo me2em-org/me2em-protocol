@@ -1,5 +1,5 @@
 // packages/react/src/react/SeedPhraseDisplay.tsx
-import { useReducer } from 'react';
+import { useReducer, useState } from 'react';
 import {
   displayFlowReducer,
   initialDisplayState,
@@ -18,6 +18,7 @@ export function SeedPhraseDisplay({
   onCopyAllowed,
 }: SeedPhraseDisplayProps) {
   const [state, dispatch] = useReducer(displayFlowReducer, initialDisplayState);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const { status, copyCount } = state;
 
@@ -30,9 +31,10 @@ export function SeedPhraseDisplay({
       try {
         await (navigator as any).clipboard.writeText(words.join(' '));
         dispatch({ type: 'COPY', at: Date.now() });
+        setCopyFailed(false);
         onCopyAllowed?.();
       } catch {
-        // clipboard unavailable — show error, do not dispatch COPY
+        setCopyFailed(true);
       }
     }
   };
@@ -52,7 +54,7 @@ export function SeedPhraseDisplay({
 
   if (status === 'dismissed') {
     return (
-      <div data-testid="copy-error">
+      <div data-testid="dismissed">
         Phrase dismissed
       </div>
     );
@@ -71,6 +73,11 @@ export function SeedPhraseDisplay({
           </li>
         ))}
       </ol>
+      {copyFailed && (
+        <div data-testid="copy-error">
+          Copy failed — try again
+        </div>
+      )}
       <button
         data-testid="copy-all"
         onClick={handleCopy}
