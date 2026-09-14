@@ -4,7 +4,7 @@ import type { Identity } from '@me2em/core';
 export interface Me2emContextValue {
   identity: Identity | null;
   hasIdentity: boolean;
-  activateIdentity: (seed: Uint8Array) => void;
+  activateIdentity: (seed: Uint8Array) => Promise<boolean>;
   clearIdentity: () => void;
 }
 

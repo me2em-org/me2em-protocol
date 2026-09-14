@@ -28,7 +28,7 @@ export interface UseCreateIdentityResult {
 }
 
 export function useCreateIdentity(): UseCreateIdentityResult {
-  const { activateIdentity, clearIdentity } = useMe2emContext();
+  const { activateIdentity, clearIdentity, identity } = useMe2emContext();
   const [state, dispatch] = useReducer<
     React.Reducer<IdentityFlowState, IdentityFlowEvent>
   >(identityFlowReducer, initialIdentityFlowState);
@@ -46,9 +46,12 @@ export function useCreateIdentity(): UseCreateIdentityResult {
   );
 
   const confirmWords = useCallback(async () => {
-    if (state.status !== 'verified' || !state.identitySeed) return;
+    if (state.status !== 'seed-generated' || !state.identitySeed) return;
     dispatch({ type: 'CONFIRM_WORDS' });
-    await activateIdentity(state.identitySeed);
+    const ok = await activateIdentity(state.identitySeed);
+    if (!ok) {
+      dispatch({ type: 'FAIL', message: 'Identity activation failed' });
+    }
   }, [state.status, state.identitySeed, activateIdentity]);
 
   const reset = useCallback(() => {
@@ -63,7 +66,7 @@ export function useCreateIdentity(): UseCreateIdentityResult {
   return {
     status: state.status,
     seedWords: state.seedWords,
-    identity: null,
+    identity,
     error: state.error,
     generate,
     confirmWords,

@@ -20,7 +20,7 @@ export interface UseImportSeedResult {
 }
 
 export function useImportSeed(): UseImportSeedResult {
-  const { activateIdentity, clearIdentity } = useMe2emContext();
+  const { activateIdentity, clearIdentity, identity } = useMe2emContext();
   const [state, dispatch] = useReducer<
     React.Reducer<IdentityFlowState, IdentityFlowEvent>
   >(identityFlowReducer, initialIdentityFlowState);
@@ -51,7 +51,7 @@ export function useImportSeed(): UseImportSeedResult {
 
   return {
     status: state.status,
-    identity: null,
+    identity,
     error: state.error,
     importWords,
     reset,

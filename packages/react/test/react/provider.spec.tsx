@@ -3,7 +3,9 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { Me2emProvider } from '../../src/react/Me2emProvider.js';
 import { useMe2emContext } from '../../src/react/context.js';
 import { useHandle } from '../../src/react/useHandle.js';
-
+import { useCreateIdentity } from '../../src/react/useCreateIdentity.js';
+import { useImportSeed } from '../../src/react/useImportSeed.js';
+import { get32ByteSeedFromMnemonic } from '@me2em/core';
 describe('Me2emProvider', () => {
   it('returns hasIdentity=false when no identity', () => {
     const { result } = renderHook(() => useMe2emContext(), {
@@ -15,12 +17,9 @@ describe('Me2emProvider', () => {
   });
 
   it('activateIdentity sets hasIdentity=true after async completion', async () => {
-    const seed = await (async () => {
-      const { get32ByteSeedFromMnemonic } = await import('@me2em/core');
-      return get32ByteSeedFromMnemonic(
-        'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
-      );
-    })();
+    const seed = await get32ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
 
     const { result } = renderHook(() => useMe2emContext(), {
       wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
@@ -34,12 +33,9 @@ describe('Me2emProvider', () => {
   });
 
   it('clearIdentity sets hasIdentity=false', async () => {
-    const seed = await (async () => {
-      const { get32ByteSeedFromMnemonic } = await import('@me2em/core');
-      return get32ByteSeedFromMnemonic(
-        'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
-      );
-    })();
+    const seed = await get32ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
 
     const { result } = renderHook(() => useMe2emContext(), {
       wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
@@ -64,6 +60,64 @@ describe('Me2emProvider', () => {
   });
 });
 
+describe('useCreateIdentity', () => {
+  it('generate → confirmWords → identity in context is not null', async () => {
+    function useCreateAndActivate() {
+      const ctx = useMe2emContext();
+      const ci = useCreateIdentity();
+      return { ctx, ci };
+    }
+
+    const { result } = renderHook(() => useCreateAndActivate(), {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    expect(result.current.ci.status).toBe('idle');
+    expect(result.current.ci.seedWords).toBeNull();
+
+    result.current.ci.generate();
+    await waitFor(() => {
+      expect(result.current.ci.status).toBe('seed-generated');
+    });
+    expect(result.current.ci.seedWords).not.toBeNull();
+    expect(result.current.ci.seedWords!.length).toBe(12);
+
+    result.current.ci.confirmWords();
+    await waitFor(() => {
+      expect(result.current.ci.status).toBe('verified');
+    });
+    expect(result.current.ctx.identity).not.toBeNull();
+  });
+
+  it('confirmWords from idle does not change state', () => {
+    const { result } = renderHook(() => useCreateIdentity(), {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    expect(result.current.status).toBe('idle');
+
+    result.current.confirmWords();
+    expect(result.current.status).toBe('idle');
+  });
+
+  it('importWords with invalid phrase → error, identity null', async () => {
+    const { result } = renderHook(() => useImportSeed(), {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    expect(result.current.status).toBe('idle');
+    expect(result.current.identity).toBeNull();
+
+    await result.current.importWords(['not', 'a', 'valid', 'phrase']);
+
+    await waitFor(() => {
+      expect(result.current.status).toBe('error');
+    });
+    expect(result.current.error).not.toBeNull();
+    expect(result.current.identity).toBeNull();
+  });
+});
+
 describe('useHandle', () => {
   it('returns null without identity', () => {
     const { result } = renderHook(() => useHandle('test-handle'), {
@@ -74,12 +128,9 @@ describe('useHandle', () => {
   });
 
   it('returns Handle after identity activation', async () => {
-    const seed = await (async () => {
-      const { get32ByteSeedFromMnemonic } = await import('@me2em/core');
-      return get32ByteSeedFromMnemonic(
-        'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
-      );
-    })();
+    const seed = await get32ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
 
     function useHandleAndActivate() {
       const ctx = useMe2emContext();
