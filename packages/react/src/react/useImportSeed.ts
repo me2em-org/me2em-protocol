@@ -1,19 +1,20 @@
+// packages/react/src/react/useImportSeed.ts
 import { useReducer, useCallback } from 'react';
 import {
   validateSeedPhrase,
   get32ByteSeedFromMnemonic,
+  type Identity,
 } from '@me2em/core';
 import {
   identityFlowReducer,
   initialIdentityFlowState,
 } from '../headless/identity-flow.js';
-import type { IdentityFlowState, IdentityFlowEvent } from '../headless/types.js';
-import type { IdentityFlowStatus } from '../headless/types.js';
+import type { IdentityFlowState, IdentityFlowEvent, IdentityFlowStatus } from '../headless/types.js';
 import { useMe2emContext } from './context.js';
 
 export interface UseImportSeedResult {
   status: IdentityFlowStatus;
-  identity: import('@me2em/core').Identity | null;
+  identity: Identity | null;
   error: string | null;
   importWords: (words: string[], passphrase?: string) => Promise<void>;
   reset: () => void;

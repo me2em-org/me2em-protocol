@@ -1,25 +1,26 @@
+// packages/react/src/react/useCreateIdentity.ts
 import {
   useReducer,
   useCallback,
-  type Dispatch,
+  type Reducer,
 } from 'react';
 import {
   generateSeedPhrase,
   get32ByteSeedFromMnemonic,
   type SeedStrength,
+  type Identity,
 } from '@me2em/core';
 import {
   identityFlowReducer,
   initialIdentityFlowState,
 } from '../headless/identity-flow.js';
-import type { IdentityFlowState, IdentityFlowEvent } from '../headless/types.js';
+import type { IdentityFlowState, IdentityFlowEvent, IdentityFlowStatus } from '../headless/types.js';
 import { useMe2emContext } from './context.js';
-import type { IdentityFlowStatus } from '../headless/types.js';
 
 export interface UseCreateIdentityResult {
   status: IdentityFlowStatus;
   seedWords: string[] | null;
-  identity: import('@me2em/core').Identity | null;
+  identity: Identity | null;
   error: string | null;
   generate: (opts?: { strength?: SeedStrength }) => void;
   confirmWords: () => Promise<void>;
@@ -30,7 +31,7 @@ export interface UseCreateIdentityResult {
 export function useCreateIdentity(): UseCreateIdentityResult {
   const { activateIdentity, clearIdentity, identity } = useMe2emContext();
   const [state, dispatch] = useReducer<
-    React.Reducer<IdentityFlowState, IdentityFlowEvent>
+    Reducer<IdentityFlowState, IdentityFlowEvent>
   >(identityFlowReducer, initialIdentityFlowState);
 
   const generate = useCallback(

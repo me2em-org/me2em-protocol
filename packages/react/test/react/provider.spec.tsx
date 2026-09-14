@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { Me2emProvider } from '../../src/react/Me2emProvider.js';
 import { useMe2emContext } from '../../src/react/context.js';
@@ -54,9 +54,14 @@ describe('Me2emProvider', () => {
   });
 
   it('throws when used outside Provider', () => {
-    expect(() => renderHook(() => useMe2emContext())).toThrow(
-      'Me2em hooks must be used inside <Me2emProvider>'
-    );
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(() => renderHook(() => useMe2emContext())).toThrow(
+        'Me2em hooks must be used inside <Me2emProvider>'
+      );
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -86,7 +91,9 @@ describe('useCreateIdentity', () => {
     await waitFor(() => {
       expect(result.current.ci.status).toBe('verified');
     });
-    expect(result.current.ctx.identity).not.toBeNull();
+    await waitFor(() => {
+      expect(result.current.ctx.identity).not.toBeNull();
+    });
   });
 
   it('confirmWords from idle does not change state', () => {
@@ -149,7 +156,6 @@ describe('useHandle', () => {
       expect(result.current.handle).not.toBeNull();
     });
 
-    expect(result.current.handle).not.toBeNull();
     expect(result.current.handle!.getName()).toBe('test-handle');
   });
 });
