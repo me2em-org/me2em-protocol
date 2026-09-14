@@ -3,7 +3,21 @@ import {
   generateSeedPhrase,
   get32ByteSeedFromMnemonic,
   validateSeedPhrase,
+  wordlist,
 } from '../src/index.js';
+
+describe('BIP39 wordlist', () => {
+  it('has exactly 2048 entries', () => {
+    expect(wordlist.length).toBe(2048);
+  });
+
+  it('all entries are non-empty lowercase strings', () => {
+    for (const word of wordlist) {
+      expect(word.length).toBeGreaterThan(0);
+      expect(word).toBe(word.toLowerCase());
+    }
+  });
+});
 
 describe('BIP39 passphrase support', () => {
   it('empty passphrase (default) matches no-passphrase derivation', async () => {

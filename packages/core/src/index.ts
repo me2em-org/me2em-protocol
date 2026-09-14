@@ -37,3 +37,4 @@ export {
   get32ByteSeedFromMnemonic,
   type SeedStrength
 } from './seed.js';
+export { wordlist } from '@scure/bip39/wordlists/english';

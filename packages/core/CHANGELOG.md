@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0-alpha.2
+
+### Added
+- Exported BIP39 English wordlist (`wordlist`) from `@me2em/core` for
+  consumer components that need to validate user input against the
+  official 2048-entry list.
+
 ## 0.7.0-alpha.1
 
 ### Added

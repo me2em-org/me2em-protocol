@@ -63,6 +63,56 @@ const state = headless.identityFlowReducer(headless.initialIdentityFlowState, {
 });
 ```
 
+## Components
+
+### SeedPhraseDisplay
+Shows the seed phrase once. The user reveals the words, can copy them
+(allowed exactly once), then dismisses. After dismissal the phrase is
+hidden and cannot be re-revealed.
+
+```tsx
+<SeedPhraseDisplay
+  words={seedWords}
+  onDismiss={() => setRevealed(false)}
+/>
+```
+
+### SeedPhraseVerify
+Order-verification component: the user must click the seed phrase words
+in the correct order among decoy words in a grid. Auto-checks when all
+words are selected; shows "Try again" on failure.
+
+```tsx
+<SeedPhraseVerify
+  realWords={seedWords}
+  onVerified={() => confirmWords()}
+  onFailed={(attempts) => console.log(`Failed after ${attempts} attempts`)}
+/>
+```
+
+### SeedPhraseImport
+Step-by-step seed phrase import with 12/24 word toggle, per-word
+validation against the BIP39 wordlist, and automatic checksum check.
+
+```tsx
+<SeedPhraseImport
+  expectedCount={12}
+  onImported={(words) => importWords(words)}
+/>
+```
+
+### PassphraseInput
+BIP39 passphrase input with optional security warning. The passphrase
+is NFKC-normalized and case-sensitive — a different passphrase silently
+derives a different wallet.
+
+```tsx
+<PassphraseInput
+  onPassphraseChange={(p) => setPassphrase(p)}
+  showWarnings={true}
+/>
+```
+
 ## Status
 
 Alpha. API may change between 0.1.x releases. See [packages/core/README.md](../../packages/core/README.md) for the underlying protocol.
