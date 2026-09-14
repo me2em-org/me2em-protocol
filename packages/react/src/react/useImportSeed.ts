@@ -1,5 +1,5 @@
 // packages/react/src/react/useImportSeed.ts
-import { useReducer, useCallback } from 'react';
+import { useReducer, useCallback, type Reducer } from 'react';
 import {
   validateSeedPhrase,
   get32ByteSeedFromMnemonic,
@@ -23,7 +23,7 @@ export interface UseImportSeedResult {
 export function useImportSeed(): UseImportSeedResult {
   const { activateIdentity, clearIdentity, identity } = useMe2emContext();
   const [state, dispatch] = useReducer<
-    React.Reducer<IdentityFlowState, IdentityFlowEvent>
+    Reducer<IdentityFlowState, IdentityFlowEvent>
   >(identityFlowReducer, initialIdentityFlowState);
 
   const importWords = useCallback(
