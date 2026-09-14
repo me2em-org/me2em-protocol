@@ -397,12 +397,13 @@ describe('buildVerificationGrid', () => {
     const grid = buildVerificationGrid(realWords, 10, 99, TEST_WORDLIST);
 
     const realSet = new Set(realWords);
-    for (const w of grid.words) {
-      if (!grid.correctIndices.includes(grid.words.indexOf(w))) {
-        expect(realSet).not.toContain(w);
+    const correctPositions = new Set(grid.correctIndices);
+    grid.words.forEach((w, i) => {
+      if (!correctPositions.has(i)) {
+        expect(realSet.has(w)).toBe(false);
       }
-    }
-    // check no duplicates in grid
+    });
+    // no duplicates in grid at all
     expect(new Set(grid.words).size).toBe(grid.words.length);
   });
 
@@ -431,9 +432,9 @@ describe('isGridSelectionCorrect', () => {
     expect(isGridSelectionCorrect(grid, [0, 3, 5])).toBe(true);
   });
 
-  it('returns true regardless of click order', () => {
-    expect(isGridSelectionCorrect(grid, [5, 0, 3])).toBe(true);
-    expect(isGridSelectionCorrect(grid, [3, 5, 0])).toBe(true);
+  it('rejects selection in wrong order (order matters)', () => {
+    expect(isGridSelectionCorrect(grid, [5, 0, 3])).toBe(false);
+    expect(isGridSelectionCorrect(grid, [3, 5, 0])).toBe(false);
   });
 
   it('returns false for extra selection', () => {
@@ -444,7 +445,25 @@ describe('isGridSelectionCorrect', () => {
     expect(isGridSelectionCorrect(grid, [0, 3])).toBe(false);
   });
 
-  it('returns false for wrong indices', () => {
-    expect(isGridSelectionCorrect(grid, [0, 1, 2])).toBe(false);
+  it('repeated words in phrase get distinct cells (order-based check)', () => {
+    const realWords = ['abandon', 'ability', 'abandon'];
+    const grid = buildVerificationGrid(realWords, 6, 42, TEST_WORDLIST);
+
+    expect(grid.correctIndices.length).toBe(3);
+    // two distinct cells for the repeated word
+    const [first, , third] = grid.correctIndices;
+    expect(first).not.toBe(third);
+    expect(grid.words[first]).toBe('abandon');
+    expect(grid.words[third]).toBe('abandon');
+    // correct in-phrase-order selection passes
+    expect(isGridSelectionCorrect(grid, grid.correctIndices)).toBe(true);
+    // wrong order of the two identical-word cells fails
+    expect(isGridSelectionCorrect(grid, [third, grid.correctIndices[1], first])).toBe(false);
+  });
+
+  it('fills grid exactly to gridSize', () => {
+    const grid = buildVerificationGrid(['abandon', 'ability'], 10, 42, TEST_WORDLIST);
+    expect(grid.words.length).toBe(10);
+    expect(grid.correctIndices).toEqual([grid.words.indexOf('abandon'), grid.words.indexOf('ability')]);
   });
 });

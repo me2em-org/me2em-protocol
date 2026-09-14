@@ -1,3 +1,4 @@
+// packages/react/src/headless/seed-words.ts
 
 export function shuffleWithSeed<T>(items: T[], seed: number): T[] {
   const arr = [...items];
@@ -20,7 +21,9 @@ export function buildVerificationGrid(
   allWords: readonly string[]
 ): { words: string[]; correctIndices: number[] } {
   if (gridSize < realWords.length) {
-    throw new Error(`gridSize (${gridSize}) must be >= realWords.length (${realWords.length})`);
+    throw new Error(
+      `gridSize (${gridSize}) must be >= realWords.length (${realWords.length})`
+    );
   }
 
   const shuffled = shuffleWithSeed(realWords, randomSeed);
@@ -32,20 +35,41 @@ export function buildVerificationGrid(
   const decoys = shuffledDecoys.slice(0, needed);
 
   const words = [...shuffled, ...decoys];
-  const wordSet = new Set(words);
-  const correctIndices = realWords
-    .map((w) => words.indexOf(w))
-    .sort((a, b) => a - b);
+  if (words.length !== gridSize) {
+    throw new Error(
+      `Cannot fill grid: wordlist too small (got ${words.length}, need ${gridSize})`
+    );
+  }
+
+  // Map each word occurrence to a DISTINCT grid position, so
+  // repeated words in the phrase get their own cells.
+  const positions = new Map<string, number[]>();
+  words.forEach((w, i) => {
+    const list = positions.get(w);
+    if (list) list.push(i);
+    else positions.set(w, [i]);
+  });
+
+  const correctIndices = realWords.map((w) => {
+    const list = positions.get(w);
+    if (!list || list.length === 0) {
+      throw new Error(`Internal error: word "${w}" missing from grid`);
+    }
+    return list.shift() as number;
+  });
 
   return { words, correctIndices };
 }
 
+/**
+ * Selection is compared IN ORDER: selected[i] must equal
+ * correctIndices[i]. The i-th click must be the i-th word of the
+ * phrase. Repeated phrase words map to distinct grid cells.
+ */
 export function isGridSelectionCorrect(
   grid: { words: string[]; correctIndices: number[] },
   selected: number[]
 ): boolean {
   if (selected.length !== grid.correctIndices.length) return false;
-  const sortedSel = [...selected].sort((a, b) => a - b);
-  const sortedCorr = [...grid.correctIndices].sort((a, b) => a - b);
-  return sortedSel.every((v, i) => v === sortedCorr[i]);
+  return selected.every((v, i) => v === grid.correctIndices[i]);
 }
