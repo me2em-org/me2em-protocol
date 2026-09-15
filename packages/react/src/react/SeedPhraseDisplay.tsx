@@ -3,7 +3,6 @@ import { useReducer, useState } from 'react';
 import {
   displayFlowReducer,
   initialDisplayState,
-  type DisplayStatus,
 } from '../headless/display-flow.js';
 
 export interface SeedPhraseDisplayProps {

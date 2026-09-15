@@ -10,14 +10,15 @@ export interface ContextKeyStore {
   getCacheKey(): Promise<CryptoKey | null>;
   /** Delete the persisted CryptoKey (called on logout). */
   deleteCacheKey(): Promise<void>;
+  /** Persist the CryptoKey to IndexedDB for warm return after browser restart. */
+  persistCacheKey(): Promise<void>;
+  /** Load a previously persisted CryptoKey from IndexedDB. */
+  loadPersistedKey(): Promise<CryptoKey | null>;
 }
 
 /**
- * In-memory key store backed by IndexedDB object store 'keys'.
- * Keys are stored as encrypted records so no raw key material
- * leaks through IndexedDB — the CryptoKey itself is kept in
- * JavaScript memory and only the fact that a key exists is
- * persisted via a sentinel record.
+ * IndexedDB-backed key store. CryptoKey objects are structured-cloned
+ * into an object store 'cryptoKeys' so they survive browser restarts.
  */
 export class InMemoryKeyStore implements ContextKeyStore {
   private db: IDBDatabase | null = null;
@@ -26,64 +27,9 @@ export class InMemoryKeyStore implements ContextKeyStore {
     return `${KEYS_PREFIX}${identityId}`;
   }
 
-  async setCacheKey(key: CryptoKey): Promise<void> {
-    const db = await this.openOrCreate();
-    return new Promise<void>((resolve, reject) => {
-      const tx = db.transaction('keys', 'readwrite');
-      const store = tx.objectStore('keys');
-      // Store a sentinel to prove a key exists for this identity.
-      // The actual CryptoKey is kept in this.keyCache (in-memory).
-      store.put({ key: 'cacheKey', exists: true });
-
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(new Error('setCacheKey failed: ' + tx.error?.message));
-    });
-  }
-
-  async getCacheKey(): Promise<CryptoKey | null> {
-    const db = await this.openOrCreate();
-    return new Promise<CryptoKey | null>((resolve, reject) => {
-      const tx = db.transaction('keys', 'readonly');
-      const store = tx.objectStore('keys');
-      const request = store.get('cacheKey');
-
-      request.onsuccess = () => {
-        const record = request.result;
-        if (!record || !record.exists) {
-          resolve(null);
-          return;
-        }
-        // Key exists in DB — but we need the actual CryptoKey.
-        // Since CryptoKey cannot be serialized, we rely on the
-        // caller having set it via setCacheKey during this session.
-        resolve(null);
-      };
-
-      request.onerror = () => reject(new Error('getCacheKey failed: ' + request.error?.message));
-    });
-  }
-
-  async deleteCacheKey(): Promise<void> {
-    const db = await this.openOrCreate();
-    return new Promise<void>((resolve, reject) => {
-      const tx = db.transaction('keys', 'readwrite');
-      const store = tx.objectStore('keys');
-      store.delete('cacheKey');
-
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(new Error('deleteCacheKey failed: ' + tx.error?.message));
-    });
-  }
-
-  /**
-   * Open or create the keys database for the current identity.
-   * This is called lazily when a key operation is needed.
-   */
   private async openOrCreate(): Promise<IDBDatabase> {
     if (this.db) return this.db;
 
-    // We need an identityId to know which DB to open.
-    // Fall back to a generic keys DB.
     const name = this.getDbName('default');
     return new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(name, 1);
@@ -93,6 +39,9 @@ export class InMemoryKeyStore implements ContextKeyStore {
         if (!db.objectStoreNames.contains('keys')) {
           db.createObjectStore('keys', { keyPath: 'key' });
         }
+        if (!db.objectStoreNames.contains('cryptoKeys')) {
+          db.createObjectStore('cryptoKeys', { keyPath: 'key' });
+        }
       };
 
       request.onsuccess = () => {
@@ -101,6 +50,75 @@ export class InMemoryKeyStore implements ContextKeyStore {
       };
 
       request.onerror = () => reject(new Error('Keys DB open failed'));
+    });
+  }
+
+  async setCacheKey(key: CryptoKey): Promise<void> {
+    this.cacheKey = key;
+    const db = await this.openOrCreate();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('cryptoKeys', 'readwrite');
+      const store = tx.objectStore('cryptoKeys');
+      store.put({ key: 'cacheKey', cryptoKey: key });
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(new Error('setCacheKey failed: ' + tx.error?.message));
+    });
+  }
+
+  private cacheKey: CryptoKey | null = null;
+
+  async getCacheKey(): Promise<CryptoKey | null> {
+    if (this.cacheKey) return this.cacheKey;
+    return this.loadPersistedKey();
+  }
+
+  async deleteCacheKey(): Promise<void> {
+    this.cacheKey = null;
+    const db = await this.openOrCreate();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('cryptoKeys', 'readwrite');
+      const store = tx.objectStore('cryptoKeys');
+      store.delete('cacheKey');
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(new Error('deleteCacheKey failed: ' + tx.error?.message));
+    });
+  }
+
+  async persistCacheKey(): Promise<void> {
+    const key = this.cacheKey;
+    if (!key) {
+      throw new Error('No cache key to persist');
+    }
+    const db = await this.openOrCreate();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('cryptoKeys', 'readwrite');
+      const store = tx.objectStore('cryptoKeys');
+      store.put({ key: 'cacheKey', cryptoKey: key });
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(new Error('persistCacheKey failed: ' + tx.error?.message));
+    });
+  }
+
+  async loadPersistedKey(): Promise<CryptoKey | null> {
+    const db = await this.openOrCreate();
+    return new Promise<CryptoKey | null>((resolve, reject) => {
+      const tx = db.transaction('cryptoKeys', 'readonly');
+      const store = tx.objectStore('cryptoKeys');
+      const request = store.get('cacheKey');
+
+      request.onsuccess = () => {
+        const record = request.result;
+        if (!record || !record.cryptoKey) {
+          resolve(null);
+          return;
+        }
+        resolve(record.cryptoKey);
+      };
+
+      request.onerror = () => resolve(null);
     });
   }
 }
