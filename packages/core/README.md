@@ -6,7 +6,7 @@ signed sessions, and parent-signed **attestation chains** for delegatable,
 externally verifiable authorization — all on Ed25519.
 
 [![npm version](https://img.shields.io/npm/v/@me2em/core.svg)](https://www.npmjs.com/package/@me2em/core)
-[![License](https://img.shields.io/npm/l/@me2em/core.svg)](https://github.com/me2em/core/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/@me2em/core.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-docs.me2em.com-blue)](https://docs.me2em.com)
 
 ## 🎯 Overview
@@ -374,7 +374,7 @@ access marketplace, corporate messenger, and a production Redis
 - Don't reuse Handles across unrelated contexts.
 - Don't log private keys or seed phrases.
 - Don't rely on zeroing buffers as a hard guarantee — GC/JIT may retain
-  copies (tracked in [BACKLOG](./BACKLOG.md) BL-07).
+  copies (tracked in [BACKLOG](../../BACKLOG.md) BL-07).
 
 ## 🧪 Testing
 
@@ -382,7 +382,7 @@ access marketplace, corporate messenger, and a production Redis
 cd packages/core && pnpm test
 ```
 
-166 tests cover: deterministic derivation and cross-entry-point key
+186 tests cover: deterministic derivation and cross-entry-point key
 consistency, name canonicalization, session lifecycle (create, verify,
 tamper, expiry, iat), revocation, SubHandle constraint enforcement,
 MAX_DEPTH leaf enforcement, attestation issue/decode/signature
@@ -392,10 +392,11 @@ level, and signature robustness).
 
 ## 🗺️ Roadmap
 
-Recommendations for further development — including BIP39 passphrase
-support, revocation lineage (`sid`), key zeroing, and attestation
-reference compression — live in [BACKLOG.md](./BACKLOG.md).
-The backlog is advisory and not part of the shipped API contract.
+Passphrase support has shipped (0.7.0). Remaining recommendations —
+session lineage (`sid`), key zeroing, attestation reference compression,
+and the full package strategy (`@me2em/crypto`, `@me2em/messenger`,
+`@me2em/iot`) — live in [BACKLOG.md](../../BACKLOG.md). The backlog is
+advisory and not part of the shipped API contract.
 
 ## 📜 License
 

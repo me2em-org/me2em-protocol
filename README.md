@@ -55,7 +55,7 @@ This is a **pnpm monorepo** containing the Me2em protocol implementation and doc
 ```
 me2em-protocol/
 ├── packages/
-│   └── core/                    # 🧬 Core cryptographic primitives
+│   ├── core/                    # 🧬 Core cryptographic primitives
 │       ├── src/
 │       │   ├── crypto/          # Ed25519, HKDF, derivation paths
 │       │   ├── identity.ts      # Root Identity (+ attestHandle)
@@ -69,6 +69,7 @@ me2em-protocol/
 │       ├── README.md            # Package documentation
 │       ├── USE_CASES.md         # Production examples (EV, Drone, Messenger)
 │       └── CHANGELOG.md         # Release notes
+│   └── react/                   # ⚛️  React bindings & UX components
 │
 ├── docs/                        # 📚 Project documentation
 │   └── BACKLOG.md               # Development backlog (advisory)
@@ -143,9 +144,12 @@ console.log('Path:', session.path); // ['work', 'connector-1']
 
 | Package | Status | Description |
 |---------|--------|-------------|
-| [`@me2em/core`](./packages/core) | 🧪 **alpha (v0.6.0-alpha.1)** | Core cryptographic primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
-| `@me2em/react` | 🚧 Planned (Q1 2027) | React components: seed display/import wizards, identity hooks, storage adapters |
-| `@me2em/server` | 🚧 Planned (Q3 2027) | Reference NestJS backend: attestation-aware verification middleware, revocation store |
+| [`@me2em/core`](./packages/core) | 🧪 **alpha (v0.7.0-alpha.1)** | Core cryptographic primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
+| [`@me2em/react`](./packages/react) | 🧪 **alpha (v0.1.0-alpha.1)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
+| `@me2em/crypto` | 🚧 Planned (0.8) | Protocol-level crypto mechanisms: channels, pre-key management, Argon2id envelopes |
+| `@me2em/messenger` | 🚧 Planned (0.9) | Vertical: E2EE chats, groups with epoch key rotation |
+| `@me2em/iot` | 💤 Deferred | Vertical: managed attested devices (EV, drones) |
+| `@me2em/server` | 🚧 Planned | Reference NestJS backend: verification middleware, revocation store |
 
 ### `@me2em/core` — Current Features
 
@@ -243,7 +247,7 @@ pnpm --filter @me2em/core test
 |----------|------|
 | **Package README** (incl. attestation guide + error table) | [`packages/core/README.md`](./packages/core/README.md) |
 | **Use Cases Guide** | [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) |
-| **Development Backlog** | [`packages/core/BACKLOG.md`](./packages/core/BACKLOG.md) |
+| **Development Backlog** | [`packages/core/BACKLOG.md`](./BACKLOG.md) |
 | **Changelog** | [`packages/core/CHANGELOG.md`](./packages/core/CHANGELOG.md) |
 | **API Reference** | [docs.me2em.com](https://docs.me2em.com) (auto-generated from TSDoc) |
 
@@ -277,15 +281,15 @@ We welcome contributions! Please read:
 
 | Period | Milestone |
 |--------|-----------|
-| **Now** | `@me2em/core` 0.6.0-alpha — attestations, attested verification, UKS-safe channels |
-| **Next** | `0.7.0` — BIP39 passphrase support, key lifecycle hardening |
-| **Q1 2027** | `@me2em/react` — UI components for seed management & identity |
-| **Q1–Q2 2027** | [me2em.com](https://me2em.com) — guides, tutorials, comparisons |
-| **Q2–Q3 2027** | `@me2em/server` — reference NestJS backend |
+| **Shipped** | `@me2em/core` 0.6–0.7 alpha — attestations, verification modes, passphrase, UKS-safe channels |
+| **Shipped** | `@me2em/react` 0.1 alpha — identity hooks, seed UX, session management, context cache |
+| **Next (0.8)** | `@me2em/crypto` — session-bound profile, channels, pre-key management |
+| **Q1 2027** | [me2em.com](https://me2em.com) — guides, tutorials |
+| **Q2–Q3 2027** | `@me2em/messenger` + `@me2em/server` — first vertical + reference backend |
 | **Q3 2027** | `@me2em/core` v1.0 — stable API freeze |
-| **Q4 2027** | ZK-proof integration (anonymous attribute verification) |
+| **Q4 2027** | ZK-proof integration |
 
-Forward-looking development items live in the [Backlog](./packages/core/BACKLOG.md).
+Forward-looking items: [BACKLOG.md](./BACKLOG.md).
 
 ---
 
@@ -294,7 +298,7 @@ Forward-looking development items live in the [Backlog](./packages/core/BACKLOG.
 Implementation-independent protocol specs (derivation formulas, token
 formats, test vectors) are being rewritten against 0.6.0 — see
 [specs/draft](./specs/draft) for the archived pre-attestation drafts and
-the [Backlog](./packages/core/BACKLOG.md) (BL-20–22) for the plan.
+the [Backlog](./BACKLOG.md) (BL-20–22) for the plan.
 Until then, the behavior contract lives in
 [`packages/core/README.md`](./packages/core/README.md) and the
 [Use Cases](./packages/core/USE_CASES.md).
@@ -326,6 +330,7 @@ Me2em builds on the shoulders of giants:
 - [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) — HKDF, SHA-256
 - [`@scure/bip39`](https://github.com/paulmillr/scure-bip39) — BIP39 mnemonic support
 - [`vitest`](https://vitest.dev/) — Fast unit testing framework
+- [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) - pure JS in-memory implementation of the IndexedDB API.
 
 ---
 

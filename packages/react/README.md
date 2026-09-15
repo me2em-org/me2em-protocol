@@ -1,5 +1,11 @@
 # @me2em/react
 
+**Me2em never persists your seed.** The seed phrase exists in two
+places only: your paper and transient memory during login. This
+package stores only *derived, encrypted context caches* — losing your
+browser data never loses your identity, because your identity lives
+in your head.
+
 React bindings for the Me2em protocol: identity lifecycle, seed phrase UX, and hierarchical handle derivation.
 
 ## Install
@@ -113,8 +119,77 @@ derives a different wallet.
 />
 ```
 
+## Session management
+
+The `useSession` hook creates and auto-renews signed session tokens for a Handle.
+
+```tsx
+import { useHandle, useSession } from '@me2em/react';
+
+function ChatScreen() {
+  const handle = useHandle('alice');
+
+  const { session, isExpired, renew } = useSession(handle, {
+    audience: 'chat.example.com',
+    scopes: ['send', 'receive'],
+    ttl: 3600,
+  });
+
+  if (isExpired) {
+    return <button onClick={renew}>Renew session</button>;
+  }
+
+  return <p>Session valid until {new Date(session!.expiresAt * 1000)}</p>;
+}
+```
+
+The hook auto-renews at half the session TTL by default. Set `autoRenew: false` to disable.
+
+## Identity Context Cache
+
+The Identity Context Cache provides per-identity encrypted storage for Handle context data using IndexedDB with WebCrypto AES-GCM encryption.
+
+```tsx
+import {
+  IdentityContextIDBStorage,
+  useIdentityContext,
+  deriveCacheKey,
+} from '@me2em/react';
+
+function ContextPanel() {
+  const storage = useMemo(() => new IdentityContextIDBStorage(), []);
+
+  // At login time, derive and set the cache key:
+  useEffect(() => {
+    const salt = crypto.getRandomValues(new Uint8Array(32));
+    deriveCacheKey(identitySeed, salt).then((key) => {
+      storage.setCacheKey(key);
+    });
+  }, []);
+
+  const { context, save, clear, refresh } = useIdentityContext(storage);
+
+  if (!context) {
+    return <p>No context loaded</p>;
+  }
+
+  return (
+    <div>
+      <p>Identity: {context.identityId}</p>
+      <p>Saved: {new Date(context.savedAt)}</p>
+      <button onClick={() => save({ ...context, savedAt: Date.now() })}>
+        Save
+      </button>
+      <button onClick={clear}>Clear</button>
+    </div>
+  );
+}
+```
+
+Each identity gets a separate IndexedDB database (name = SHA-256 hash of identity ID), guaranteeing full isolation between identities.
+
 ## Status
 
 Alpha. API may change between 0.1.x releases. See [packages/core/README.md](../../packages/core/README.md) for the underlying protocol.
 
-Roadmap: @me2em/e2ee protocol mechanisms — planned
+Roadmap: @me2em/crypto protocol mechanisms — planned
