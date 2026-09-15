@@ -116,3 +116,5 @@ derives a different wallet.
 ## Status
 
 Alpha. API may change between 0.1.x releases. See [packages/core/README.md](../../packages/core/README.md) for the underlying protocol.
+
+Roadmap: @me2em/e2ee protocol mechanisms — planned
