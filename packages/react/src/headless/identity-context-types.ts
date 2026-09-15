@@ -17,8 +17,14 @@ export interface IdentityContextStorage {
   load(): Promise<IdentityContextData | null>;
   clear(): Promise<void>;
   close(): Promise<void>;
+  /** Open storage for identity and atomically load cached context. */
+  openAndLoad(identityId: string): Promise<IdentityContextData | null>;
   /** Set the persisted cache key (called at login). */
   setCacheKey(key: CryptoKey): void;
   /** Get the currently set cache key, or null. */
   getCacheKey(): CryptoKey | null;
+  /** Persist the CryptoKey to IndexedDB for warm return after browser restart. */
+  persistCacheKey(): Promise<void>;
+  /** Load a previously persisted CryptoKey from IndexedDB. */
+  loadPersistedKey(): Promise<CryptoKey | null>;
 }

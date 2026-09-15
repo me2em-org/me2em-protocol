@@ -36,3 +36,18 @@ export type {
   ImportStatus,
   ImportEvent,
 } from './import-flow.js';
+export {
+  IdentityContextIDBStorage,
+} from './identity-context-storage.js';
+export type {
+  IdentityContextData,
+  IdentityContextStorage,
+} from './identity-context-types.js';
+export {
+  deriveCacheKey,
+  encryptContext,
+  decryptContext,
+} from './context-crypto.js';
+export type {
+  ContextEnvelope,
+} from './context-crypto.js';
