@@ -42,16 +42,22 @@ export interface UseSessionResult {
  *
  * When `handle` is provided, creates a Session with the given options.
  * Supports auto-renewal: when `autoRenew` is true (default), a timer
- * fires at half the session TTL to create a fresh session with a new jti.
+ * fires at half the session TTL to create a fresh session with a new
+ * jti (the previous token remains valid until its own expiry, but the
+ * lineage identity is preserved through `handle`).
  *
- * On unmount, all timers are cleaned up to prevent state updates.
+ * On unmount, all timers are cleaned up to prevent state updates after
+ * the component is gone.
  *
- * Dependencies: `[handle, options]` — options are memoized via ref
- * to avoid unnecessary session recreation on every render.
+ * Dependencies: `[handle, renew]` — the options object is read through
+ * a ref, so passing a fresh object literal on every render does NOT
+ * re-trigger session creation. Only changes to `handle` (or to the
+ * renewal function identity, which follows `handle`) do.
  *
  * @param handle - The Handle to sign the session, or null.
  * @param options - Session options (audience, scopes, ttl).
  * @param autoRenew - Whether to auto-renew at half-life (default: true).
+ * @returns Session state with manual `renew` control.
  *
  * @example
  * ```ts
@@ -74,6 +80,7 @@ export function useSession(
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef(options);
+  const mountedRef = useRef(true);
 
   // Update options ref without triggering re-renders
   optionsRef.current = options;
@@ -87,7 +94,11 @@ export function useSession(
 
   // Cleanup on unmount
   useEffect(() => {
-    return clearTimer;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      clearTimer();
+    };
   }, [clearTimer]);
 
   const renew = useCallback(() => {
@@ -95,6 +106,7 @@ export function useSession(
     const opts = optionsRef.current;
 
     if (!handle) {
+      if (!mountedRef.current) return;
       setSession(null);
       setIsLoaded(true);
       setError(null);
@@ -106,6 +118,7 @@ export function useSession(
       scopes: opts.scopes,
       ttl: opts.ttl,
     }).then((s) => {
+      if (!mountedRef.current) return;
       setSession(s);
       setIsLoaded(true);
       setError(null);
@@ -120,6 +133,7 @@ export function useSession(
         }
       }
     }).catch((err) => {
+      if (!mountedRef.current) return;
       setSession(null);
       setIsLoaded(true);
       setError(err instanceof Error ? err.message : String(err));
@@ -128,7 +142,9 @@ export function useSession(
 
   // Create session when handle or options change
   useEffect(() => {
-    renew();
+    if (mountedRef.current) {
+      renew();
+    }
   }, [handle, renew]);
 
   return {

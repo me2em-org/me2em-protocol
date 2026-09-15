@@ -15,7 +15,7 @@ export interface UseIdentityContextResult {
   error: string | null;
   save: (data: IdentityContextData) => Promise<void>;
   clear: () => Promise<void>;
-  /** Перезагрузить кэш для текущей identity (после sync). */
+  /** Reload the cache for the current identity (after sync). */
   refresh: () => Promise<void>;
 }
 
@@ -43,14 +43,13 @@ export function useIdentityContext(
 
     // If identity changed, close old storage and open new
     if (prevIdentityIdRef.current !== null && prevIdentityIdRef.current !== identityId) {
-      storage.close();
+      storage.close().catch(() => { /* ignore close errors */ });
     }
 
     prevIdentityIdRef.current = identityId;
 
-    // Open storage for this identity and load cached context
-    storage.open(identityId)
-      .then(() => storage.load())
+    // Open storage for this identity and load cached context (atomic)
+    storage.openAndLoad(identityId)
       .then((data) => {
         if (cancelled) return;
         setContext(data);
@@ -81,8 +80,7 @@ export function useIdentityContext(
   const refresh = useCallback(async (): Promise<void> => {
     if (!identity) return;
     const identityId = publicKeyToId(identity.getPublicKey());
-    await storage.open(identityId);
-    const data = await storage.load();
+    const data = await storage.openAndLoad(identityId);
     setContext(data);
   }, [identity, storage]);
 

@@ -12,3 +12,12 @@ export { SeedPhraseImport } from './SeedPhraseImport.js';
 export type { SeedPhraseImportProps } from './SeedPhraseImport.js';
 export { PassphraseInput } from './PassphraseInput.js';
 export type { PassphraseInputProps } from './PassphraseInput.js';
+export { useIdentityContext } from './useIdentityContext.js';
+export type {
+  UseIdentityContextResult,
+} from './useIdentityContext.js';
+export { useSession } from './useSession.js';
+export type {
+  UseSessionOptions,
+  UseSessionResult,
+} from './useSession.js';
