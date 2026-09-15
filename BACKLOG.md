@@ -1,6 +1,6 @@
 # `@me2em/core` — Development Backlog
 
-Baseline: v0.7.0-alpha.1 (core 186 + react 264 tests, tsc clean,
+Baseline: v0.7.0-alpha.1 (core 186 + react 287 tests, tsc clean,
 build-docs clean). This document is **advisory** — a recommendation
 list for future development, not part of the shipped API contract.
 
@@ -53,9 +53,11 @@ list for future development, not part of the shipped API contract.
   attestation revocation events**.
 
   Dependencies: BL-15 (revocation namespaces). Boosters: BL-14 (PFS),
-  BL-12 (cross-domain verification). Implementer: `@me2em/e2ee` (BL-28).
+  BL-12 (cross-domain verification). Implementer: `@me2em/crypto` (BL-28).
 
-- **BL-28 · open · `@me2em/e2ee` package.** P2, target 0.8.
+  Cache key salt policy: SaltB — cacheKey is DETERMINED by the login material (which is itself deterministic from the constant seed) with a FIXED salt. Trade-off: compromise of one cacheKey compromises all cache epochs for THIS ONE USER (not others — identityId-scoped). Accepted because the cache contains no seed or key material, only derived operational data; future sensitive additions (SPK/OTK privates, chat keys) migrate to @me2em/crypto with Argon2id protection (BL-26). Document this trade-off in TSDoc of deriveCacheKey.
+
+- **BL-28 · open · `@me2em/crypto` package.** P2, target 0.8.
   Protocol-level E2EE mechanisms shared by all verticals — the missing
   layer between core and react. API sketch (to be finalized in a
   concept doc before implementation):
@@ -79,13 +81,8 @@ list for future development, not part of the shipped API contract.
   keep UI logic out (src/headless/ + src/react/ layout like
   @me2em/react) so a future framework-agnostic spin-off stays cheap.
 
-- **BL-26 · declined-for-0.8 · Argon2id in core.**
-  Was planned for password-based envelope encryption. With the
-  session-bound profile (BL-27) password-based storage of key material
-  leaves the main path: cache keys are HKDF-derived from high-entropy
-  login material (no slow KDF needed), and no human password ever
-  protects key bytes. Re-open only if a password-protects-seed product
-  mode (opt-in cloud backup) is ever requested.
+- **BL-26 · open · Argon2id in @me2em/crypto.**
+  Not needed for @me2em/react identity context cache (login materialis high-entropy, HKDF sufficient). But needed for @me2em/crypto(BL-28) when password-based protection is used for sensitivematerial (SPK/OTK privates, chat keys, optional cloud-backup mode).Dependency: hash-wasm in @me2em/crypto only (NOT in @me2em/react —keep zero-deps discipline there). Target: 0.8, with BL-28.
 
 ## P3 — Protocol Extensions (0.8+)
 
@@ -116,7 +113,7 @@ list for future development, not part of the shipped API contract.
   append-only attestation event log; depends on BL-12.
 - **BL-14 · open · PFS for P2P channels (Noise XK/KK).**
   Static-static ECDH has no forward secrecy. Blocks FS-grade messaging
-  in @me2em/e2ee; the BeSafeChat TZ per-message derivation
+  in @me2em/crypto; the BeSafeChat TZ per-message derivation
   (`HKDF(CK, salt=message_number)`) is a lightweight interim pattern
   inside a channel's lifetime.
 - **BL-15 · open · Revocation namespaces.**
@@ -173,7 +170,7 @@ BL-09 (Mode 1 semantics decision record).
 |---|---|---|
 | 0 — primitives | `@me2em/core` | ✅ alpha |
 | 1 — react bindings | `@me2em/react` | 🧪 in development (C1–C3) |
-| 2 — protocol mechanisms | `@me2em/e2ee` | planned (BL-28, with BL-27) |
+| 2 — protocol mechanisms | `@me2em/crypto` | planned (BL-28, with BL-27) |
 | 3 — verticals | `@me2em/messenger` | planned (BL-29) |
 | 3 — verticals | `@me2em/iot` | deferred (BL-30) |
 | — | `@me2em/server` | planned (reference NestJS) |
