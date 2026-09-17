@@ -21,4 +21,7 @@ export function hkdf(
   return nobleHkdf(nobleSha256, ikm, salt, info, length);
 }
 
-export { nobleSha256 as sha256 };
+/** SHA-256 hash function. */
+export function sha256(input: Uint8Array): Uint8Array {
+  return nobleSha256(input);
+}
