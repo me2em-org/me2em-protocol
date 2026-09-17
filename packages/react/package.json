@@ -1,6 +1,6 @@
 {
   "name": "@me2em/react",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "React bindings for the Me2em protocol: identity lifecycle, seed phrase UX, hierarchical handles",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@me2em/crypto",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Cryptographic mechanisms for the Me2em protocol: Argon2id envelopes, channel establishment, pre-key management, session-bound context profile",
   "type": "module",
   "main": "./dist/index.js",
