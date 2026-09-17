@@ -1,0 +1,39 @@
+{
+  "name": "@me2em/crypto",
+  "version": "0.1.0-alpha.1",
+  "description": "Cryptographic mechanisms for the Me2em protocol: Argon2id envelopes, channel establishment, pre-key management, session-bound context profile",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build-docs": "typedoc"
+  },
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@me2em/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typedoc": "^0.26.11",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.7"
+  }
+}

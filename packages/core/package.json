@@ -22,7 +22,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build-docs": "typedoc"
   },
   "license": "Apache-2.0",
   "publishConfig": {

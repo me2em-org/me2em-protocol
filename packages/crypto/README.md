@@ -1,0 +1,1 @@
+Cryptographic mechanisms for Me2em (planned, BL-28). This placeholder exists to establish the package identity and docs pipeline. See /docs page and BACKLOG.md.
