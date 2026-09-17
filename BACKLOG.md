@@ -14,6 +14,7 @@ list for future development, not part of the shipped API contract.
   new versioned string (`/v2`) with a migration note — never in place.
 - Publishing: only from `packages/*` directories (`pnpm --filter`),
   never from the workspace root (root is `"private": true`).
+- Versioning: independent per-package semver. Cross-packagecompatibility via workspace:* ranges at publish time. Changesetsadoption planned before 1.0.
 
 ## P1 — Correctness & Security
 

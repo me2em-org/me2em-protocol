@@ -1,17 +1,20 @@
 {
-  "name": "me2em-protocol-monorepo",
-  "version": "0.6.0-alpha.1",
+  "name": "me2em-protocol",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "build-docs": "typedoc"
+    "build-docs": "pnpm -r --filter './packages/*' run build-docs"
   },
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+  "onlyBuiltDependencies": ["esbuild"]
   },
   "devDependencies": {
     "typedoc": "^0.26.11",
