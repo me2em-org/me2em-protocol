@@ -1,15 +1,13 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["packages/core/src/index.ts"],
-  // "out": "docs",
   "name": "me2em Protocol API Reference",
   "includeVersion": true,
   "excludePrivate": true,
   "excludeProtected": true,
   "excludeInternal": true,
-   "treatWarningsAsErrors": false,
-  "readme": "packages/core/README.md",
-  "skipErrorChecking": true,
+   "treatWarningsAsErrors": true,
+  "skipErrorChecking": false,
   "navigation": {
     "includeCategories": true,
     "includeGroups": true
