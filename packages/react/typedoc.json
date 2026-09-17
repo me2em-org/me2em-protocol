@@ -1,5 +1,6 @@
 {
   "extends": ["../../typedoc.json"],
+  "name": "@me2em/react - React bindings",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
   "readme": "README.md"

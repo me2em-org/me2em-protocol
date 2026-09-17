@@ -1,4 +1,4 @@
-# 📦 `@me2em/core` — Core Cryptographic Primitives
+## 📦 Core Cryptographic Primitives
 
 Core primitives for the Me2em authorization protocol: hierarchical
 deterministic identities (`Identity` → `Handle` → `SubHandle`), stateless

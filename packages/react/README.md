@@ -1,10 +1,10 @@
-# @me2em/react
-
 **Me2em never persists your seed.** The seed phrase exists in two
 places only: your paper and transient memory during login. This
 package stores only *derived, encrypted context caches* — losing your
 browser data never loses your identity, because your identity lives
 in your head.
+
+## 📦 @me2em/react — React bindings
 
 React bindings for the Me2em protocol: identity lifecycle, seed phrase UX, and hierarchical handle derivation.
 
