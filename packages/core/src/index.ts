@@ -35,6 +35,7 @@ export {
   normalizeSeedPhrase,
   validateSeedPhrase,
   get32ByteSeedFromMnemonic,
-  type SeedStrength
+  type SeedStrength,
+  type SeedValidationResult
 } from './seed.js';
 export { wordlist } from '@scure/bip39/wordlists/english';
