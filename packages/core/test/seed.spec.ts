@@ -1,3 +1,4 @@
+// packages/core/test/seed.spec.ts
 import { describe, it, expect } from 'vitest';
 import {
   generateSeedPhrase,
@@ -41,7 +42,7 @@ describe('BIP39 passphrase support', () => {
     expect(a).toEqual(b);
   });
 
-  it('passphrase is case- and layout-sensitive (no silent normalization beyond NFKC)', async () => {
+  it('passphrase is case-sensitive (NFKC folds forms but not case)', async () => {
     const phrase = generateSeedPhrase(128);
     const lower = await get32ByteSeedFromMnemonic(phrase, 'secret');
     const upper = await get32ByteSeedFromMnemonic(phrase, 'SECRET');
