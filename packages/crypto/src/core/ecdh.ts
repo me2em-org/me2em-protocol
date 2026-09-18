@@ -94,3 +94,28 @@ export function ed25519PrivToX25519(edPrivateKey: Uint8Array): Uint8Array {
 export function deriveX25519PublicKey(xPriv: Uint8Array): Uint8Array {
   return x25519.getPublicKey(xPriv);
 }
+
+/**
+ * Converts an Ed25519 PUBLIC key to its X25519 (Montgomery) form.
+ *
+ * Used in X3DH to convert the recipient's identity public key
+ * (Ed25519) to X25519 for ECDH operations. Uses
+ * @noble/curves ed25519.utils.toMontgomery() which accepts both
+ * private and public keys.
+ *
+ * @param edPublicKey - 32-byte Ed25519 public key.
+ * @returns 32-byte X25519 public key.
+ * @throws {CryptoError} 'INVALID_LENGTH' if input ≠ 32B.
+ *
+ * @example
+ * ```ts
+ * const xPub = ed25519PubToX25519(edPubKey);
+ * const shared = x25519SharedSecret(ephemeralPriv, xPub);
+ * ```
+ */
+export function ed25519PubToX25519(edPublicKey: Uint8Array): Uint8Array {
+  if (edPublicKey.length !== 32) {
+    throwCryptoError('INVALID_LENGTH', 'KEY', 'Ed25519 public key must be 32 bytes');
+  }
+  return ed25519.utils.toMontgomery(edPublicKey);
+}

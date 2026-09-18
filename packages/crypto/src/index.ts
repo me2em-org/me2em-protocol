@@ -5,6 +5,7 @@ export {
   generateX25519KeyPair,
   x25519SharedSecret,
   ed25519PrivToX25519,
+  ed25519PubToX25519,
   deriveX25519PublicKey,
   type X25519KeyPair,
 } from './core/ecdh.js';
