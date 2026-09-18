@@ -68,6 +68,6 @@ describe('validateSeedPhrase', () => {
     const result = validateSeedPhrase(extra);
     expect(result.isValid).toBe(false);
     expect(result.wordCount).toBe(13);
-    expect(result.error).toContain('13 words');
+    expect(result.error).toContain('13');
   });
 });

@@ -43,7 +43,7 @@ export {
   ARGON2_PROFILES,
   deriveKeyArgon2id,
   generateArgon2Salt,
-  type Argon2Options,
+  verifyArgon2,
   type Argon2Profile,
-  type Argon2Params,
+  type DeriveKeyResult,
 } from './kdf/argon2.js';

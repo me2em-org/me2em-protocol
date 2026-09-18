@@ -1,5 +1,6 @@
 // packages/crypto/src/validation/seed.ts
-import { validateMnemonic, wordlist } from '@scure/bip39';
+import { validateMnemonic } from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 export interface SeedValidationResult {
   isValid: boolean;

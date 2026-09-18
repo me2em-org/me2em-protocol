@@ -70,7 +70,7 @@ async function checkPasswordLeak(password: string): Promise<boolean> {
     const timeoutId = setTimeout(() => abortController.abort(), 3000);
 
     try {
-      const response = await fetch(
+      const response = await globalThis.fetch(
         `https://api.pwnedpasswords.com/range/${prefix}`,
         { signal: abortController.signal }
       );
@@ -131,7 +131,7 @@ function hasSequentialPattern(password: string): boolean {
   const lower = password.toLowerCase();
   for (const pattern of SEQUENTIAL_PATTERNS) {
     for (let i = 0; i <= pattern.length - 4; i++) {
-      if (pattern.slice(i, i + 4).includes(lower)) {
+      if (lower.includes(pattern.slice(i, i + 4))) {
         return true;
       }
     }

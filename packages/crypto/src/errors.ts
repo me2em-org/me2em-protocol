@@ -5,6 +5,7 @@ export type CryptoErrorCode =
   | 'INVALID_KEY'
   | 'INVALID_SALT'
   | 'INVALID_IV'
+  | 'INVALID_ARGUMENT'
   | 'DERIVATION_FAILED'
   | 'ENCRYPTION_FAILED'
   | 'DECRYPTION_FAILED'
@@ -13,7 +14,7 @@ export type CryptoErrorCode =
   | 'UNSUPPORTED_VERSION'
   | 'UNSUPPORTED_ALGORITHM';
 
-export type CryptoErrorLevel = 'KEY' | 'CIPHER' | 'SIGNATURE' | 'KDF' | 'FORMAT';
+export type CryptoErrorLevel = 'KEY' | 'CIPHER' | 'SIGNATURE' | 'KDF' | 'FORMAT' | 'IDENTITY';
 
 export class CryptoError extends Error {
   constructor(

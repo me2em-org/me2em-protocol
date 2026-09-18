@@ -20,7 +20,7 @@
   "publishConfig": { "access": "public" },
   "dependencies": {
     "@me2em/core": "workspace:*",
-    "hash-wasm": "^7.1.0"
+    "hash-wasm": "^4.12.0"
   },
   "devDependencies": {
     "@noble/curves": "^1.8.1",
