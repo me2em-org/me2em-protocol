@@ -27,9 +27,6 @@
   "peerDependencies": {
     "react": ">=18.0.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
-  },
   "devDependencies": {
     "@testing-library/dom": "^10.0.0",
     "@testing-library/jest-dom": "^6.4.0",

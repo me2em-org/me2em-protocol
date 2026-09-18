@@ -14,6 +14,7 @@
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@10.11.1",
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] },
   "devDependencies": {
     "typedoc": "^0.26.11",
     "typescript": "5.6"
