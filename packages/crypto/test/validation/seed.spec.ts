@@ -52,7 +52,10 @@ describe('validateSeedPhrase', () => {
   });
 
   it('rejects bad checksum (swap two words)', () => {
-    const phrase = generateSeedPhrase(128);
+    const phrase = [
+      'abandon', 'ability', 'able', 'about', 'above', 'absent',
+      'absorb', 'abstract', 'absurd', 'abuse', 'access', 'ability',
+    ];
     const swapped = [...phrase];
     const temp = swapped[0];
     swapped[0] = swapped[1];
