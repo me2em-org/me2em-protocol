@@ -34,6 +34,9 @@ export async function hashIdentityMaterial(
   if (identityPrivKey.length !== 32) {
     throwCryptoError('INVALID_LENGTH', 'KEY', 'Identity private key must be 32 bytes');
   }
+  if (!identityId || identityId.trim().length === 0) {
+    throwCryptoError('INVALID_LENGTH', 'IDENTITY_ID', 'Identity ID must be a non-empty string');
+  }
   const enc = new TextEncoder();
   const idBytes = enc.encode(identityId);
   const combined = concat(idBytes, identityPrivKey);

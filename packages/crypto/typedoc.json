@@ -1,6 +1,6 @@
 {
   "extends": ["../../typedoc.json"],
-  "name": "@me2em/crypto - Cryptographic Library",
+  "name": "@me2em/crypto",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
   "readme": "README.md"

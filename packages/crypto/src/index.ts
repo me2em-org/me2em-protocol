@@ -28,3 +28,22 @@ export {
   bytesEqual,
 } from './utils/binary.js';
 export { CryptoError, type CryptoErrorCode, type CryptoErrorLevel } from './errors.js';
+export {
+  validateSeedPhrase,
+  normalizeSeedPhrase,
+  type SeedValidationResult,
+} from './validation/seed.js';
+export {
+  validatePasswordStrength,
+  generateSecurePassword,
+  quickPasswordValidation,
+  type PasswordValidationResult,
+} from './validation/password.js';
+export {
+  ARGON2_PROFILES,
+  deriveKeyArgon2id,
+  generateArgon2Salt,
+  type Argon2Options,
+  type Argon2Profile,
+  type Argon2Params,
+} from './kdf/argon2.js';

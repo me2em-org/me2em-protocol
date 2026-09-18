@@ -20,7 +20,7 @@ function toAB(bytes: Uint8Array): ArrayBuffer {
 /**
  * HKDF-SHA256 per RFC 5869, implemented with the native WebCrypto
  * HKDF primitive (NOT the PBKDF2-based workaround used in some
- * libraries.
+ * libraries).
  *
  * Domain separation: all info strings in Me2em start with
  * `me2em/crypto/v1/…` — callers MUST use a unique info per purpose.

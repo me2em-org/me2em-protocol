@@ -3,12 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { hkdf, hkdfWithInfo } from '../../src/core/hkdf.js';
 import { CryptoError } from '../../src/errors.js';
 
-// RFC 5869 Test Case 1
-const TC1_IKM = new Uint8Array(
-  '0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b'.match(/.{2}/g)!.map((b) => parseInt(b, 16))
-);
-// Fix: 22 bytes of 0x0b
-const TC1_IKM_FIXED = new Uint8Array(22).fill(0x0b);
+// RFC 5869 Test Case 1: 22 bytes of 0x0b
+const TC1_IKM = new Uint8Array(22).fill(0x0b);
 const TC1_SALT = new Uint8Array('000102030405060708090a0b0c'.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 const TC1_INFO = new Uint8Array('f0f1f2f3f4f5f6f7f8f9'.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 const TC1_EXPECTED = new Uint8Array(
@@ -19,13 +15,13 @@ const TC1_EXPECTED = new Uint8Array(
 
 describe('hkdf', () => {
   it('passes RFC 5869 Test Case 1', async () => {
-    const result = await hkdf(TC1_IKM_FIXED, TC1_SALT, TC1_INFO, 42);
+    const result = await hkdf(TC1_IKM, TC1_SALT, TC1_INFO, 42);
     expect(result).toEqual(TC1_EXPECTED);
   });
 
   it('is deterministic: two calls with same inputs produce same output', async () => {
-    const r1 = await hkdf(TC1_IKM_FIXED, TC1_SALT, TC1_INFO, 32);
-    const r2 = await hkdf(TC1_IKM_FIXED, TC1_SALT, TC1_INFO, 32);
+    const r1 = await hkdf(TC1_IKM, TC1_SALT, TC1_INFO, 32);
+    const r2 = await hkdf(TC1_IKM, TC1_SALT, TC1_INFO, 32);
     expect(r1).toEqual(r2);
   });
 
