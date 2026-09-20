@@ -3,10 +3,14 @@
 /**
  * A long-lived E2EE channel derived from an X3DH shared secret.
  *
- * The rootKey is a non-extractable AES-GCM CryptoKey — raw bytes
- * never exist in JavaScript after establish. Sequence counters
- * are managed by the APPLICATION (immutable design — React-
- * friendly).
+ * Key representations coexist: the raw root material (32B) lives
+ * in module-private internals (WeakMap) for message-key
+ * derivation and rotation; a non-extractable CryptoKey is
+ * derived from it for AEAD operations. The raw material is
+ * wiped only at rotation.
+ *
+ * Sequence counters are managed by the APPLICATION (immutable
+ * design — React-friendly).
  *
  * The channel's internal state (rootKeyMaterial, lastDecryptedSeq)
  * is stored in a module-private WeakMap keyed by the Channel object

@@ -55,3 +55,7 @@ export {
   decryptChannelMessage,
 } from './channels/message-keys.js';
 export type { Channel, ChannelMessage } from './channels/types.js';
+export { wrapKeyForRecipient, unwrapKeyForMe } from './envelopes/key-wrapping.js';
+export type { WrappedKey, WrapKeyParams, UnwrapKeyParams } from './envelopes/key-wrapping.js';
+export type { PreKeyBundle, IdentityKeys, SignedPreKey, OneTimePreKey } from './x3dh/types.js';
+export { generateFileKey, deriveChunkNonce, encryptMediaChunk, decryptMediaChunk } from './envelopes/media-chunks.js';
