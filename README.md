@@ -2,7 +2,7 @@
 
 **A decentralized, multi-context identity and authorization protocol built on Ed25519 cryptography.**
 
-[![CI](https://github.com/me2em-org/me2em-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/me2em-org/me2em-protocol/actions)
+[![CI](https://github.com/me2em-org/me2em-protocol/actions/workflows/ci-security.yml/badge.svg)](https://github.com/me2em-org/me2em-protocol/actions)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
 [![pnpm](https://img.shields.io/badge/maintained%20with-pnpm-cc00ff.svg)](https://pnpm.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6)](https://www.typescriptlang.org/)

@@ -1,0 +1,3 @@
+# .gitleaksignore — placeholder.
+# наполняется ТОЛЬКО после пробного прогона gitleaks, если будут
+# false positives, которые нельзя выразить в .gitleaks.toml.

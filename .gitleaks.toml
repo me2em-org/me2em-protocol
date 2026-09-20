@@ -1,0 +1,25 @@
+# packages/crypto test fixtures — synthetic vectors, not secrets
+# gitleaks v8: allowlist requires a rule regex/path to attach to.
+# Using a broad secret-matching rule whose only purpose is to
+# suppress known false-positive test fixtures via allowlist.
+
+[extend]
+# use default gitleaks rules
+
+[[rules]]
+id = "allow-test-fixtures"
+description = "Suppress known synthetic vectors in test directories"
+regex = '''(?:abandon( abandon){11}|0x0b{10,}|deadbeef|new Uint8Array\(\d+\)\.fill\(0x[0-9a-fA-F]{2}\))'''
+
+[rules.allowlist]
+description = "BIP39 test vectors and fixed test mnemonics"
+regexes = [
+  '''abandon( abandon){11}''',
+  '''(?i)0x0b{10,}''',
+  '''(?i)deadbeef''',
+]
+paths = [
+  '''packages/crypto/test/.*''',
+  '''packages/core/test/.*''',
+  '''packages/react/test/.*''',
+]
