@@ -241,6 +241,33 @@ pnpm --filter @me2em/core test
 
 ---
 
+## 🔒 CI & Security Pipeline
+
+Every push to `main` and every pull request runs through an automated
+security and quality pipeline (`.github/workflows/ci-security.yml`):
+
+| Job | What it does | Blocking? |
+|-----|--------------|-----------|
+| **Secret Scanning** (gitleaks) | Scans full git history for leaked keys, tokens, seed phrases | ✅ blocks merge |
+| **Build & Test** | Typecheck → build → 380+ tests across 3 packages → lint (non-blocking) → dependency audit (informational) | ✅ blocks merge |
+| **CodeQL SAST** | Deep static analysis (`security-extended` queries) for JS/TS | ✅ blocks merge |
+
+Weekly scheduled run (Mondays 02:00 UTC) re-verifies everything,
+including dependency audit against fresh advisory data.
+
+**CI badge on this page reflects the real pipeline state** — green
+means the latest commit passed all checks.
+
+> 📖 **Seeing a failed run?** Follow the
+> [CI troubleshooting guide](./.github/workflows/README.md) — it covers
+> every failure mode (leaked secrets, test failures, CodeQL alerts)
+> with step-by-step fixes.
+
+After 2+ consecutive green runs, `main` is protected: direct pushes
+with failing checks are rejected.
+
+---
+
 ## 📖 Documentation
 
 | Resource | Link |

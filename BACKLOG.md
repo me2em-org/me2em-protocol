@@ -125,6 +125,7 @@ development, not part of the shipped API contract.
   argon2.spec.ts says "passed as-is" — outdated after the NFKC fix).
 - **BL-24 · open ·** Final audit of non-English comments across all
   packages (Russian comments fixed in core and react; verify crypto).
+- **BL-34 · open ·** CI pipeline maintenance.DevSecOps pipeline shipped (CI1, ci-security.yml): gitleaks v3,build-and-test (Node 22, build-first, 438 tests), CodeQL v4(security-extended). Quarterly maintenance checklist:.github/workflows/README.md. Pending: lint config for root-levellegacy files (continue-on-error workaround), audit blocking policydecision, coverage thresholds (@vitest/coverage-v8 in devDeps,unused).
 
 ## Closed
 
