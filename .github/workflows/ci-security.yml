@@ -6,44 +6,56 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '0 2 * * 1'   # понедельник 02:00 UTC
+    - cron: '0 2 * * 1'   # Еженедельный прогон: понедельник 02:00 UTC
 
 permissions:
   contents: read
-  security-events: write
+  security-events: write   # CodeQL публикует SARIF-отчёты в Security tab
 
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. Secret Scanning — защита от утечки ключей в git-историю
+  # ─────────────────────────────────────────────────────────────
   secret-scan:
     name: Secret Scanning (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+          fetch-depth: 0   # полная история — gitleaks сканирует все коммиты
+
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
+  # ─────────────────────────────────────────────────────────────
+  # 2. Build & Test — typecheck, сборка, 380+ тестов, линт, аудит
+  # ─────────────────────────────────────────────────────────────
   build-and-test:
-    name: Build & Test
-    runs-on: ubuntu-latest
+    name: Build & Test (Node 22)
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         node: [22]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
 
-      - uses: pnpm/action-setup@v4   # версия из packageManager корня
+      # Версия pnpm берётся из packageManager корневого package.json
+      # (single source of truth — pnpm@10.11.1)
+      - uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
+      # Кэш хранилища pnpm: ключ по хешу lockfile — при неизменных
+      # зависимостях установка занимает секунды вместо минут
       - uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
@@ -53,30 +65,42 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # СБОРКА ПЕРЕД typecheck: workspace-зависимости (@me2em/core)
+      # резолвятся через dist/index.d.ts — без сборки core typecheck
+      # react/crypto падает с "Cannot find module '@me2em/core'"
+      - name: Build packages
+        run: pnpm -r build
+
       - name: Typecheck
         run: pnpm -r typecheck
 
-      - name: Build
-        run: pnpm -r build
-
-      - name: Test (438 tests)
+      - name: Test
         run: pnpm -r test
 
-      - name: Lint (per-package configs)
+      # Legacy-файлы вне пакетов не покрыты линт-конфигом —
+      # не блокер, чистка отдельным треком
+      - name: Lint
         run: pnpm -r lint
-        continue-on-error: true   # legacy-файлы вне пакетов не линтятся; фикс отдельным треком
+        continue-on-error: true
 
-      - name: Dependency audit (non-blocking on PR, informational)
+      # Информационный: advisory в глубине дерева не должны красить
+      # PR контрибьюторов. Блокирующий порог — отдельное решение.
+      - name: Dependency audit
         run: pnpm audit --prod --audit-level high
         continue-on-error: true
 
+  # ─────────────────────────────────────────────────────────────
+  # 3. CodeQL SAST — глубокий статический анализ
+  # ─────────────────────────────────────────────────────────────
   codeql:
     name: CodeQL SAST
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@v6
+
+      - uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           queries: security-extended
-      - uses: github/codeql-action/analyze@v3
+
+      - uses: github/codeql-action/analyze@v4
