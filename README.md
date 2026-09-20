@@ -146,7 +146,7 @@ console.log('Path:', session.path); // ['work', 'connector-1']
 |---------|--------|-------------|
 | [`@me2em/core`](./packages/core) | 🧪 **alpha (v0.7.0-alpha.1)** | Core cryptographic primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
 | [`@me2em/react`](./packages/react) | 🧪 **alpha (v0.1.0-alpha.1)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
-| `@me2em/crypto` | 🚧 Planned (0.8) | Protocol-level crypto mechanisms: channels, pre-key management, Argon2id envelopes |
+| `@me2em/crypto` | 🧪 **alpha (v0.1.0-alpha.1)** | Protocol-level crypto mechanisms: channels, pre-key management, Argon2id envelopes |
 | `@me2em/messenger` | 🚧 Planned (0.9) | Vertical: E2EE chats, groups with epoch key rotation |
 | `@me2em/iot` | 💤 Deferred | Vertical: managed attested devices (EV, drones) |
 | `@me2em/server` | 🚧 Planned | Reference NestJS backend: verification middleware, revocation store |

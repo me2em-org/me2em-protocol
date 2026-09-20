@@ -1,8 +1,9 @@
-# `@me2em/core` — Development Backlog
+# Me2em Protocol — Development Backlog
 
-Baseline: v0.7.0-alpha.1 (core 186 + react 287 tests, tsc clean,
-build-docs clean). This document is **advisory** — a recommendation
-list for future development, not part of the shipped API contract.
+Baseline: core v0.7.0-alpha.1 (186) · react v0.1.0-alpha.1 (101) ·
+crypto v0.1.0-alpha.1 (151) = 438 tests. tsc/build-docs clean per package.
+This document is **advisory** — a recommendation list for future
+development, not part of the shipped API contract.
 
 ## Workflow
 
@@ -14,76 +15,45 @@ list for future development, not part of the shipped API contract.
   new versioned string (`/v2`) with a migration note — never in place.
 - Publishing: only from `packages/*` directories (`pnpm --filter`),
   never from the workspace root (root is `"private": true`).
-- Versioning: independent per-package semver. Cross-packagecompatibility via workspace:* ranges at publish time. Changesetsadoption planned before 1.0.
+- Versioning: independent per-package semver. Cross-package
+  compatibility via workspace:* ranges at publish time.
+- Spec self-sufficiency: iteration specs must be executable in a fresh
+  agent session — no references to prior conversations; all context
+  inline.
+- Commit workflow: the agent does NOT commit; the architect reviews
+  and runs the commit commands provided after acceptance.
 
 ## P1 — Correctness & Security
 
-*(empty — all P1 items closed in 0.6.0-alpha.1 / 0.7.0-alpha.1)*
+*(empty — closed in 0.6.0/0.7.0-alpha.1)*
 
 ## P2 — Robustness & Package Strategy
 
-- **BL-27 · open · Session-Bound Context Profile.** P2, target 0.8.
-  References: BeSafeChat storage architecture (persisted non-extractable
-  CryptoKey, per-identity IDB), Lubimov "Beyond Signal" (seed-recoverable
-  keys, lazy activation), TZ v3.0 (epoch/GK patterns → messenger layer).
-
-  Invariants: seed is NEVER persisted (paper + transient RAM at login
-  only). Identity, Handles, SubHandles, attestations, hPK — CONSTANT
-  (deterministically derived from the constant seed); only ephemeral
-  materials rotate (SPK/OTK, cacheKey, session tokens).
-
-  Login (once per cache TTL): seed → PK → challenge signature → Session;
-  server supplies the registry of Handle-context names → the full tree
-  is recomputed; cacheKey = HKDF(login material, fresh salt) →
-  importKey(extractable: false) → persisted in IDB; cache (identity
-  context, future SPK/OTK privates, chat/channel keys) encrypted under
-  it; hPK and hash(PK) stay RAM-only; wipe seed/PK bytes. Warm restart:
-  persisted CryptoKey loaded from IDB — no seed needed. Cache TTL
-  (30–90 days, configurable) → cold login. Identity is stable forever.
-
-  Isolation: per-identity IndexedDB (`me2em_` + hash(identityId));
-  open/close lifecycle on login/logout; two-account-on-one-device test
-  mandatory.
-
-  Async messaging layer: SPK/OTK generated at login, privates in the
-  encrypted cache, publics on server with TTL; replay protection via
-  `used_otkeys UNIQUE(otk_pk, used_by_sender_id)`; replenishment
-  threshold 50/100 — server-triggered. Groups: random GK, epoch per
-  membership change, pairwise GK delivery (deriveSharedSecret; BL-14
-  for FS), no history for newcomers; **epoch rotation is triggered by
-  attestation revocation events**.
-
-  Dependencies: BL-15 (revocation namespaces). Boosters: BL-14 (PFS),
-  BL-12 (cross-domain verification). Implementer: `@me2em/crypto` (BL-28).
-
-  Cache key salt policy: SaltB — cacheKey is DETERMINED by the login material (which is itself deterministic from the constant seed) with a FIXED salt. Trade-off: compromise of one cacheKey compromises all cache epochs for THIS ONE USER (not others — identityId-scoped). Accepted because the cache contains no seed or key material, only derived operational data; future sensitive additions (SPK/OTK privates, chat keys) migrate to @me2em/crypto with Argon2id protection (BL-26). Document this trade-off in TSDoc of deriveCacheKey.
-
-- **BL-28 · open · `@me2em/crypto` package.** P2, target 0.8.
-  Protocol-level E2EE mechanisms shared by all verticals — the missing
-  layer between core and react. API sketch (to be finalized in a
-  concept doc before implementation):
-
-      establishChannel(myHandle, theirPubKey): Channel
-      rotateChannel(channel): Channel
-      deriveMessageKey(channel, sequence): Uint8Array
-      preKeyManager: { generateBatch(), replenish(), loadPersisted() }
-
-  Absorbs the session-bound profile of BL-27 (SPK/OTK management,
-  fresh-per-login cacheKey, envelope patterns). Invariant: no secret
-  stored plaintext in caches — everything sensitive goes under the
-  persisted non-extractable cache key. Design constraints: zero new
-  crypto primitives (WebCrypto + @noble via core), headless-first
-  (no react imports in the core logic layer), pnpm-only toolchain.
-
+- **BL-31 · open · Replay window for channels.**
+  Current protection: strictly increasing seq per direction — delayed
+  out-of-order messages are rejected as replays. Window-based
+  acceptance (like Signal's sliding window) allows bounded
+  out-of-order delivery. Requires: window bitmap per channel,
+  interaction with epoch rotation. Implementer: @me2em/crypto.
+- **BL-32 · open · PreKeyStorage IDB implementation.**
+  The `PreKeyStorage` contract (persisted SPK/OTK batches under the
+  non-extractable cache key) is defined but only the in-memory test
+  implementation exists. The IndexedDB implementation lives in the
+  messenger layer or @me2em/react vault — the pattern is proven
+  (IdentityContextIDBStorage). Prerequisite for the async messaging
+  profile of BL-27.
 - **BL-29 · open · `@me2em/messenger` package.** P3, target 0.9.
   First vertical: chats, groups (epoch/GK patterns from the BeSafeChat
   TZ v3.0), delivery receipts, @me2em/server integration. Pilot
-  consumer: BeSafeChat. Depends on BL-28. Design note: verticals must
-  keep UI logic out (src/headless/ + src/react/ layout like
+  consumer: BeSafeChat. Depends on BL-28 (done). Design note: verticals
+  must keep UI logic out (src/headless/ + src/react/ layout like
   @me2em/react) so a future framework-agnostic spin-off stays cheap.
-
-- **BL-26 · open · Argon2id in @me2em/crypto.**
-  Not needed for @me2em/react identity context cache (login materialis high-entropy, HKDF sufficient). But needed for @me2em/crypto(BL-28) when password-based protection is used for sensitivematerial (SPK/OTK privates, chat keys, optional cloud-backup mode).Dependency: hash-wasm in @me2em/crypto only (NOT in @me2em/react —keep zero-deps discipline there). Target: 0.8, with BL-28.
+- **BL-33 · open · Argon2id cloud-backup mode (product).**
+  The primitive is done (kdf/argon2, profiles, verifyArgon2). Missing:
+  the PRODUCT decision + flow (opt-in encrypted seed backup in cloud —
+  the BeSafeChat Cloud Recovery mode). Requires: UI flow, envelope
+  format for seed backup, recovery UX. Blocked on product priority,
+  not engineering.
 
 ## P3 — Protocol Extensions (0.8+)
 
@@ -92,8 +62,8 @@ list for future development, not part of the shipped API contract.
   revoked wholesale. Add optional `sid` in the payload (random at
   creation, stable across renewals); `RevocationChecker` checks both.
   `sid` must be random (not derived from the handle) to avoid
-  cross-audience linkability. Higher priority once auto-renewal ships
-  in @me2em/react (C3).
+  cross-audience linkability. Auto-renewal has shipped in @me2em/react
+  (C3) — this card is now practically relevant.
 - **BL-07 · open · `destroy()` for Identity/Handle/SubHandle.**
   `fill(0)` private key bytes + `destroyed` flag; key operations throw
   afterwards. TSDoc must honestly state GC/JIT limits. Partially
@@ -105,18 +75,19 @@ list for future development, not part of the shipped API contract.
   performance, not security.
 - **BL-11 · open · Renewal window for IoT attestation rotation.**
   Verifiers accept a chain expired ≤ N days with a warning flag. Pairs
-  with an operator dashboard. Relevant for `@me2em/iot` (see BL-30).
+  with an operator dashboard. Relevant for `@me2em/iot` (BL-30).
 - **BL-12 · open · Root public key distribution (DID / transparency log).**
   Bootstrap of trust for third-party verifiers. Elevated relevance:
   messenger vertical + any cross-domain attestation verification.
 - **BL-13 · open · Re-attestation transparency.**
   Detecting that the same identity was re-attested. Requires an
   append-only attestation event log; depends on BL-12.
-- **BL-14 · open · PFS for P2P channels (Noise XK/KK).**
-  Static-static ECDH has no forward secrecy. Blocks FS-grade messaging
-  in @me2em/crypto; the BeSafeChat TZ per-message derivation
-  (`HKDF(CK, salt=message_number)`) is a lightweight interim pattern
-  inside a channel's lifetime.
+- **BL-14 · open · PFS upgrade: Noise-style ratchet for channels.**
+  Current channels provide FS at epoch rotation points only (per-message
+  HKDF derivation is an interim pattern within an epoch). Full
+  Noise-style XK/KK or Double Ratchet gives per-message FS + PCS.
+  Prerequisite: channel abstraction is in place (@me2em/crypto
+  channels/). This is the deepest protocol extension on the roadmap.
 - **BL-15 · open · Revocation namespaces.**
   Attestations and sessions share one `RevocationChecker`. Priority
   raised: BL-27 ties attestation revocation to group epoch rotation —
@@ -124,8 +95,9 @@ list for future development, not part of the shipped API contract.
   (`att:` / `sess:` prefixes), split interfaces on demand.
 - **BL-20 · open · Real protocol test vectors.**
   Computed vectors for identity/handle/subhandle derivation, name
-  normalization, session sign/verify, attestation determinism. Also
-  covers react package flows once stable.
+  normalization, session sign/verify, attestation determinism — plus
+  X3DH/channel vectors for @me2em/crypto (the RFC 5869 vectors already
+  live in crypto tests; extend the pattern).
 - **BL-21 · open · Rewrite specs/core.md against 0.7.0.**
   Implementation-independent spec: derivation formulas, canonical
   names, session/attestation formats, both verification modes,
@@ -133,14 +105,12 @@ list for future development, not part of the shipped API contract.
   implementations.
 - **BL-22 · open · OpenAPI reference server spec.**
   Real flow: POST /auth/challenge, /auth/verify, /attestations,
-  /backup/envelope, revocation endpoints. Do together with
-  `@me2em/server`.
+  /backup/envelope, /prekeys/* (X3DH), revocation endpoints. Do
+  together with `@me2em/server`.
 - **BL-30 · open · `@me2em/iot` — device-management vertical.**
   Deferred until a real enterprise pilot exists (YAGNI). Merges the
-  EV-station and drone-fleet patterns (both are "managed attested
-  devices": provisioning, wildcard attestations, channel keys,
-  operator dashboards). Splitting later is easy; merging two separate
-  packages later is expensive.
+  EV-station and drone-fleet patterns. Splitting later is easy; merging
+  two separate packages later is expensive.
 
 ## P4 — Cosmetics
 
@@ -150,32 +120,63 @@ list for future development, not part of the shipped API contract.
 - **BL-18 · open ·** Replace `bPayload!` non-null assertion in
   `verifyAttested` step 11 with an explicit branch that throws.
 - **BL-23 · open ·** Cosmetic consistency sweep: docblock indent drift,
-  stale file-header comments, unused type imports.
-- **BL-24 · open ·** Audit remaining non-English comments in src/
-  (Russian comment in Handle.validateSessionOptions already fixed).
-- **BL-25 · done · Publish pipeline fixed.**
-  Root marked `"private": true`; @me2em/core published from
-  packages/core with `--tag alpha`.
+  stale file-header comments, unused type imports
+  (crypto: TC1_IKM dead variable removed in D2; NFKC test comment in
+  argon2.spec.ts says "passed as-is" — outdated after the NFKC fix).
+- **BL-24 · open ·** Final audit of non-English comments across all
+  packages (Russian comments fixed in core and react; verify crypto).
 
-## Closed — 0.6.0-alpha.1 / 0.7.0-alpha.1
+## Closed
 
-BL-01 (UKS binding, commit `1d8f705`) · BL-02 (fail-closed `[]`,
-commit `bdcd63e`) · BL-03 (verifySignature total, commit `5e58309`) ·
-BL-04 (BIP39 passphrase, seed.spec.ts) · BL-05 (ttl validation,
-commit `a83d0c6`) · BL-08 (metadata leak, extractDisplayFields) ·
-BL-09 (Mode 1 semantics decision record).
+**0.6.0-alpha.1:** BL-01 (UKS binding, `1d8f705`) · BL-02 (fail-closed
+`[]`, `bdcd63e`) · BL-03 (verifySignature total, `5e58309`) · BL-05
+(ttl validation, `a83d0c6`) · BL-08 (metadata leak,
+extractDisplayFields) · BL-09 (Mode 1 semantics decision record) ·
+BL-25 (publish pipeline fixed).
+
+**0.7.0-alpha.1:** BL-04 (BIP39 passphrase, seed.spec.ts).
+
+**crypto-0.1.0 (D1–D5):**
+- **BL-26 · done · Argon2id in @me2em/crypto.** kdf/argon2 with
+  INTERACTIVE/SENSITIVE profiles, verifyArgon2, NFKC normalization.
+  hash-wasm dependency scoped to crypto only.
+- **BL-27 · done · Session-Bound Context Profile.** Implemented across
+  @me2em/crypto D1–D5: X3DH (canonical Signal §3.3, OTK mandatory,
+  no zero-fallback), pre-key management (SPK signature verification,
+  batch + refill threshold), channels (per-message HKDF keys, replay
+  protection via strictly-increasing seq, epoch rotation with forward
+  secrecy), key envelopes (self-contained, offline delivery), hPK
+  pattern (hashIdentityMaterial, RAM-only). References: BeSafeChat
+  storage architecture, Lubimov "Beyond Signal". Isolation and warm-
+  restart patterns live in @me2em/react (IdentityContextIDBStorage).
+- **BL-28 · done · `@me2em/crypto` package.** Published as
+  v0.1.0-alpha.1. Final API (evolved from the sketch):
+    - core: hkdf (RFC 5869 verified), x25519SharedSecret (full 32B,
+      no slice-bug), aead (AES-256-GCM), signRaw, secureWipe
+    - kdf: hashIdentityMaterial, Argon2id (BL-26)
+    - x3dh: initiateX3DH / completeX3DH, generateSignedPreKey,
+      generateOneTimePreKeys, PreKeyBundle
+    - channels: establishChannel, encrypt/decryptChannelMessage
+      (replay: REPLAY_DETECTED), rotateChannel (epoch FS)
+    - envelopes: wrapKeyForRecipient / unwrapKeyForMe (self-contained),
+      media chunk encryption (deterministic nonces)
+    - validation: seed (extended SeedValidationResult), password
+      (strength + HIBP fail-open)
+  151 tests. Found and fixed during implementation: BeSafeChat X3DH
+  deviations (swapped DH roles, slice(1) truncation, zero-fallback),
+  NFKC gap in hash-wasm password handling.
 
 ## Package Roadmap (strategy)
 
 | Layer | Package | Status |
 |---|---|---|
-| 0 — primitives | `@me2em/core` | ✅ alpha |
-| 1 — react bindings | `@me2em/react` | 🧪 in development (C1–C3) |
-| 2 — protocol mechanisms | `@me2em/crypto` | planned (BL-28, with BL-27) |
-| 3 — verticals | `@me2em/messenger` | planned (BL-29) |
+| 0 — primitives | `@me2em/core` | ✅ alpha (0.7.0-alpha.1) |
+| 1 — react bindings | `@me2em/react` | ✅ alpha (0.1.0-alpha.1) |
+| 2 — protocol mechanisms | `@me2em/crypto` | ✅ alpha (0.1.0-alpha.1) |
+| 3 — verticals | `@me2em/messenger` | planned (BL-29, pilot: BeSafeChat) |
 | 3 — verticals | `@me2em/iot` | deferred (BL-30) |
-| — | `@me2em/server` | planned (reference NestJS) |
+| — | `@me2em/server` | planned (reference NestJS, with BL-22) |
 
-Dependency rule: strictly upward (verticals → e2ee → core); verticals
+Dependency rule: strictly upward (verticals → crypto → core); verticals
 never depend on each other. Every vertical keeps UI logic in
 `src/react/`, domain logic in `src/headless/`.
