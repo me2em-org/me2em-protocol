@@ -48,3 +48,10 @@ export {
   type Argon2Profile,
   type DeriveKeyResult,
 } from './kdf/argon2.js';
+export { establishChannel } from './channels/establish.js';
+export { rotateChannel } from './channels/rotate.js';
+export {
+  encryptChannelMessage,
+  decryptChannelMessage,
+} from './channels/message-keys.js';
+export type { Channel, ChannelMessage } from './channels/types.js';
