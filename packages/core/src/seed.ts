@@ -1,4 +1,4 @@
-// seed.ts
+// packages/core/src/seed.ts
 import { generateMnemonic, mnemonicToSeed, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { sha256 } from './crypto/hkdf.js';
@@ -65,36 +65,69 @@ export function normalizeSeedPhrase(seedPhrase: string | string[]): string[] {
   return words.map(word => word.toLowerCase().trim()).filter(word => word.length > 0);
 }
 
+export interface SeedValidationResult {
+  isValid: boolean;
+  error?: string;
+  wordCount: number;
+  invalidWords: string[];
+}
+
 /**
- * Validates a mnemonic seed phrase against the BIP39 standard.
+ * Validates a mnemonic seed phrase against the BIP39 standard with
+ * detailed feedback.
  *
- * Checks:
- * - Correct word count (12 or 24 words)
- * - All words exist in the BIP39 wordlist
- * - Valid checksum
+ * Checks (in order):
+ * 1. Word count must be 12 or 24.
+ * 2. Each word must exist in the BIP39 English wordlist.
+ * 3. Checksum must be valid.
  *
  * @param words - The mnemonic phrase to validate.
- * @returns An object with `isValid` flag and optional `error` message.
+ * @returns A result object with isValid, error, wordCount, and invalidWords.
  *
  * @example
  * ```ts
  * const result = validateSeedPhrase(['abandon', 'abandon', ..., 'art']);
- * if (!result.isValid) console.error(result.error);
+ * if (!result.isValid) {
+ *   console.error(result.error);
+ *   console.log('Invalid words:', result.invalidWords);
+ * }
  * ```
  */
-export function validateSeedPhrase(words: string[]): { isValid: boolean; error?: string } {
-  const wordCount = words.length;
-  if (wordCount !== 12 && wordCount !== 24) {
-    return { isValid: false, error: `Seed phrase must be 12 or 24 words, got ${wordCount}` };
-  }
+export function validateSeedPhrase(words: string[]): SeedValidationResult {
   const normalized = normalizeSeedPhrase(words);
+  const invalidWords: string[] = [];
+
   for (const word of normalized) {
     if (!wordlist.includes(word)) {
-      return { isValid: false, error: `Invalid word: ${word}` };
+      invalidWords.push(word);
     }
   }
+
+  if (normalized.length !== 12 && normalized.length !== 24) {
+    return {
+      isValid: false,
+      error: `Seed phrase must be 12 or 24 words, got ${normalized.length}`,
+      wordCount: normalized.length,
+      invalidWords,
+    };
+  }
+
+  if (invalidWords.length > 0) {
+    return {
+      isValid: false,
+      error: `Invalid words found: ${invalidWords.join(', ')}`,
+      wordCount: normalized.length,
+      invalidWords,
+    };
+  }
+
   const isValid = validateMnemonic(normalized.join(' '), wordlist);
-  return { isValid, error: isValid ? undefined : 'Invalid seed phrase checksum' };
+  return {
+    isValid,
+    error: isValid ? undefined : 'Invalid seed phrase checksum',
+    wordCount: normalized.length,
+    invalidWords: [],
+  };
 }
 
 /**
