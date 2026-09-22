@@ -2,21 +2,29 @@
 
 ## 🔐 Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| 0.1.x   | ✅ Yes    |
-| < 0.1   | ❌ No     |
+Me2em packages version independently. Security fixes ship in the
+latest alpha of every package:
 
-> Me2em is in active development. Always use the latest version for security fixes.
+| Package | Version | Supported |
+|---------|---------|-----------|
+| `@me2em/core` | 0.7.0-alpha.x | ✅ Yes |
+| `@me2em/crypto` | 0.1.0-alpha.x | ✅ Yes |
+| `@me2em/react` | 0.1.0-alpha.x | ✅ Yes |
+| any older release | — | ❌ No |
+
+> Me2em is in active development. Always use the latest alpha of each
+> package for security fixes.
 
 ## 🚨 Reporting a Vulnerability
 
-Me2em handles cryptographic identities and authentication. We take security seriously.
+Me2em handles cryptographic identities, key derivation, and
+authentication. We take security seriously.
 
 **If you discover a security vulnerability:**
 
-1. **Do NOT** open a public issue or discuss it publicly
+1. **Do NOT** open a public issue or discuss it publicly.
 2. Email `security@me2em.com` with:
+   - Affected package (`@me2em/core` / `@me2em/crypto` / `@me2em/react`)
    - Description of the vulnerability
    - Steps to reproduce (if applicable)
    - Potential impact assessment
@@ -27,43 +35,73 @@ Me2em handles cryptographic identities and authentication. We take security seri
 
 - **Acknowledgment**: Within 72 hours
 - **Assessment**: Within 7 business days
-- **Fix timeline**: Depends on severity (critical: ≤14 days)
-- **Disclosure**: Coordinated with reporter, after fix is released
+- **Fix timeline**: Severity-dependent (critical: ≤14 days)
+- **Disclosure**: Coordinated with the reporter, after the fix is released
+
+## 🔍 Security Model Notes for Reporters
+
+Understanding the architecture helps you report accurately:
+
+- **Seed-derived identity**: the seed phrase is the only permanent
+  carrier of identity. A report of "recovering the key tree from a
+  leaked seed" describes expected behavior, not a vulnerability — the
+  seed is assumed secret by the threat model.
+- **Transient key material**: private keys exist in RAM during login
+  and are wiped after use. GC/JIT copies are a documented limitation
+  (see BACKLOG BL-07), not a vulnerability.
+- **Verification modes**: SubHandle constraint enforcement at
+  *verification* time is Mode 2 (`verifyAttested`) only. Mode 1
+  enforces at creation — see the README "Verification modes" section.
 
 ## 🛡️ Security Best Practices for Users
 
 When implementing Me2em in your application:
 
 ✅ **Do**:
-- Store seed phrases in secure, user-controlled storage (never in plaintext)
-- Use short-lived sessions and rotate tokens frequently
-- Validate Handle metadata server-side, not just client-side
-- Keep dependencies updated (`@me2em/*` packages)
+- Treat the seed phrase as the ONLY permanent carrier of identity —
+  paper and the user's head. Never device storage, never cloud, never
+  logs.
+- Use short-lived sessions and rely on auto-renewal
+  (`@me2em/react useSession`).
+- Prefer Mode 2 (`verifyAttested`) for any external audience; reserve
+  `verifyStateless` for infrastructure you fully control.
+- Implement a `RevocationChecker` — it is consulted for attestation
+  **and** session `jti`.
+- Isolate per-identity storage (see `@me2em/react` context cache —
+  per-identity IndexedDB).
+- Keep all `@me2em/*` packages updated.
 
 ❌ **Don't**:
-- Expose private keys or seed phrases in client-side code
-- Reuse sessions across different contexts/applications
-- Trust Handle metadata without verification
-- Disable cryptographic signature verification
+- Never transmit the seed or raw private keys — derivation is
+  client-side, always.
+- Never persist key material in plaintext storage.
+- Don't trust attestation constraints without Mode 2 verification —
+  Mode 1 enforces SubHandle constraints at creation only.
+- Don't rely on zeroing buffers as a hard guarantee — GC/JIT may
+  retain copies.
+- Don't log private keys, seed phrases, or cache keys.
 
 ## 🔍 Audit Status
 
 | Component | Audit Date | Auditor | Report |
 |-----------|------------|---------|--------|
-| protocol-core | Planned Q2 2026 | TBD | — |
+| `@me2em/core` | Planned before v1.0 | TBD | — |
+| `@me2em/crypto` | Planned before v1.0 | TBD | — |
+| `@me2em/react` | Planned before v1.0 | TBD | — |
 
-> We plan independent security audits before v1.0 release. Follow [Discussions](https://github.com/me2em-org/me2em-protocol/discussions) for updates.
+> Independent security audits are planned before the v1.0 release.
+> Follow [Discussions](https://github.com/me2em-org/me2em-protocol/discussions) for updates.
 
 ## 📜 Responsible Disclosure Policy
 
 We follow responsible disclosure principles:
-- No legal action against good-faith researchers
-- Public acknowledgment (with consent) after fix
-- Bug bounty program: Planned for post-v1.0
+- No legal action against good-faith researchers.
+- Public acknowledgment (with consent) after the fix is released.
+- Bug bounty program: planned for post-v1.0.
 
 ## 🔄 Updates
 
-This policy is reviewed quarterly. Last updated: May 2026.
+This policy is reviewed quarterly. Last updated: September 2026.
 
 ---
 
