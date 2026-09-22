@@ -1,8 +1,9 @@
 # Me2em Protocol: Advanced Use Cases & Scenarios
 
-Production-ready examples for `@me2em/core` 0.6.0.
+Production-ready examples for `@me2em/core` v0.7.0-alpha.1 and
+`@me2em/crypto` v0.1.0-alpha.1.
 
-The library supports **two verification modes** (full definition in the
+The protocol supports **two verification modes** (full definition in the
 [README](./README.md#verification-modes)):
 
 - **Mode 1 — `Session.verifyStateless`.** The verifier holds the
@@ -14,15 +15,26 @@ The library supports **two verification modes** (full definition in the
   attestation `jti` disables the whole branch — current and future
   sessions.
 
-Every scenario below shows where each mode fits.
+Every scenario below shows where each mode fits — and which approved
+use case (UC) it implements. Protocol terms are domain-neutral; each
+scenario defines its own interpretation (see the root
+[README → Terminology](../../README.md#-terminology)):
+
+| Scenario | UC | Handle is… | SubHandle is… | Attestation is… |
+|----------|-----|------------|----------------|-----------------|
+| 1 — EV Charging Station | UC-2 | A physical charging station | A connector / meter | Device provisioning |
+| 2 — Drone Fleet | UC-2 | A drone | A camera / sensor / sold capability | The capability grant |
+| 3 — Corporate Messenger | UC-3 | A department | An employee / contractor | Employment / contract |
+| 4 — AI Agent Delegation | UC-1 | An autonomous AI agent | — | The agent's mandate |
 
 Shared architecture: `MAX_DEPTH = 2`, two derivation entry points
 (`Handle.deriveSubHandle` autonomous / `Identity.deriveSubHandle`
 atomic), strict key encapsulation, TTL + optional `RevocationChecker`.
+Scenario 4 additionally uses `@me2em/crypto` (X3DH, channels).
 
 ---
 
-## Scenario 1: EV Charging Station
+## Scenario 1: EV Charging Station (UC-2 — IoT Device Hierarchy)
 
 ```text
 Identity: EV-Network-Main (network owner — root private key lives ONLY here)
@@ -212,7 +224,7 @@ const telemetry = await droneHandle.deriveSubHandle('telemetry', {
 
 ---
 
-## Scenario 3: Corporate Messenger
+## Scenario 3: Corporate Messenger (UC-3 — Multi-Context Identity)
 
 ```text
 Identity: Corp-Messenger-Root (corporation)
@@ -310,18 +322,103 @@ const B = await deptHandle.attestSubHandle('contractor-external-xyz', {
 
 ---
 
+## Scenario 4: AI Agent Delegation (UC-1)
+
+An autonomous AI agent needs its own cryptographic identity: isolated
+from its owner, attested by the owner, revocable instantly. This is the
+same split-knowledge pattern as the corporate scenario — but the
+"employee" is software, and the "employer" may be an orchestrator, an
+MCP host, or a human owner.
+
+```text
+Identity: Researcher (the human owner — seed on paper)
+  └─ Handle: agent-research-assistant  ◀── A = attestHandle:
+       │   (software agent — runs anywhere)   the agent's MANDATE
+       └─ connects to MCP servers, tools, and peer agents
+```
+
+### 4.1 Issuing the mandate (owner, once per agent)
+
+```typescript
+const A = await ownerIdentity.attestHandle('agent-research-assistant', {
+  audiences: ['mcp.example.com', 'tools.example.com'],
+  scopes: ['search:web', 'files:read'],
+  maxSessionTtl: 3600,
+});
+// Ship agentHandle + A.token to the agent runtime.
+```
+
+The attestation **is the mandate**: it cryptographically states that
+this key belongs to an agent of this owner, allowed these scopes, for
+these audiences, until this date. Anyone can verify it; nobody —
+including the agent itself — can forge a wider one.
+
+### 4.2 Agent ↔ known service (static ECDH — no pre-keys needed)
+
+For a KNOWN, online service (an MCP server publishing its static
+Ed25519 key), the agent derives a channel key directly — no pre-key
+material, no round trips:
+
+```typescript
+import { hkdfWithInfo } from '@me2em/crypto';
+
+const serverPub = await fetchServerIdentityKey('mcp.example.com');
+const shared = await agentHandle.deriveSharedSecret(serverPub);
+const sessionKey = await hkdfWithInfo(
+  shared, salt, 'me2em/crypto/v1/agent-session', 32,
+);
+```
+
+**Method selection rule** (see root README → Terminology):
+`deriveSharedSecret` is for two parties that already know each other's
+public keys. If the AGENT instead *accepts asynchronous tasks* while
+offline, it publishes a `PreKeyBundle` and peers use
+`wrapKeyForRecipient` (@me2em/crypto) — pre-key material matters only
+for inbound, not outbound.
+
+### 4.3 Agent sessions with attested verification
+
+```typescript
+const session = await Session.create(agentHandle, {
+  audience: 'mcp.example.com',
+  scopes: ['search:web'],
+  ttl: 1800,
+});
+
+// The MCP server verifies with the owner's PUBLIC root key only:
+await Session.verifyAttested(
+  session.token, OWNER_ROOT_PUB, [A.token], 'mcp.example.com',
+);
+// → knows: whose agent, what mandate, not revoked, within TTL
+```
+
+### 4.4 Revocation — the killer feature for agents
+
+An agent gone rogue (or a hijacked runtime) is neutralized by ONE
+operation:
+
+```typescript
+await revocationService.revokeAttestation(A.jti);
+```
+
+Every verifier that consults the store rejects the agent from that
+moment — across every service, every audience. Compare with API keys:
+there you must hunt down every deployment of the key.
+
+---
+
 ## Comparison
 
-| Aspect | EV Station | Drone Fleet | Corporate Messenger |
-|---|---|---|---|
-| Identity | network owner | fleet operator | corporation |
-| Handle | station (device) | drone (device) | department (group) |
-| SubHandle | connector / meter | camera / sensor | employee / contractor |
-| Autonomous ops | ✅ offline attest B | ✅ offline attest B (the sale) | ✅ HR without root |
-| External verifiers | ✅ Mode 2 | ✅ Mode 2 (the sale itself) | ✅ Mode 2 (messenger + Jira) |
-| Internal verifiers | Mode 1 optional | Mode 1 (telemetry) | Mode 1 optional |
-| Revocation granularity | station = A.jti; connector = B.jti | deal = B.jti | employee = B.jti |
-| Session TTL | 1–2 h | ≤ 1 h (deal ≤ 30 min) | 8 h workday |
+| Aspect | EV Station | Drone Fleet | Corporate Messenger | AI Agent |
+|---|---|---|---|---|
+| Identity | network owner | fleet operator | corporation | human owner |
+| Handle | station (device) | drone (device) | department (group) | agent (software) |
+| SubHandle | connector / meter | camera / sensor | employee / contractor | — |
+| Autonomous ops | ✅ offline attest B | ✅ offline attest B (the sale) | ✅ HR without root | ✅ the agent itself |
+| External verifiers | ✅ Mode 2 | ✅ Mode 2 (the sale) | ✅ Mode 2 (messenger + Jira) | ✅ Mode 2 (MCP servers) |
+| Internal verifiers | Mode 1 optional | Mode 1 (telemetry) | Mode 1 optional | — |
+| Revocation | station = A.jti; connector = B.jti | deal = B.jti | employee = B.jti | whole agent = A.jti |
+| Session TTL | 1–2 h | ≤ 1 h (deal ≤ 30 min) | 8 h workday | ≤ 1 h |
 
 ## Cryptographic consistency
 
@@ -410,11 +507,12 @@ async function authorizeRequest(req: Request, chain: string[]) {
 
 ## Summary
 
-| # | Scenario | What it demonstrates |
-|---|---|---|
-| 1 | EV Station | Fully offline device operation; external org verification; grant-bounded compromise; station-wide revocation |
-| 2 | Drone Fleet | **Selling access**: signed, time-boxed receipts verifiable by the buyer; Mode 1 for internal telemetry |
-| 3 | Corporate Messenger | Autonomous HR without the root; no privilege escalation past the department grant; cross-service revocation; contractor self-expiry |
+| # | Scenario | UC | What it demonstrates |
+|---|---|-----|----------------------|
+| 1 | EV Station | UC-2 | Fully offline device operation; external org verification; grant-bounded compromise; station-wide revocation |
+| 2 | Drone Fleet | UC-2 | **Selling access**: signed, time-boxed receipts verifiable by the buyer; Mode 1 for internal telemetry |
+| 3 | Corporate Messenger | UC-3 | Autonomous HR without the root; no privilege escalation past the department grant; cross-service revocation; contractor self-expiry |
+| 4 | AI Agent Delegation | UC-1 | Deterministic agent identities; owner-signed mandates; attested verification by MCP servers; instant agent revocation |
 
 Shared guarantees: `MAX_DEPTH = 2`, two derivation entry points with
 identical keys, encapsulated private keys, TTL + optional revocation —
