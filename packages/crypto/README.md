@@ -1,3 +1,7 @@
+[![npm version](https://img.shields.io/npm/v/@me2em/crypto.svg)](https://www.npmjs.com/package/@me2em/crypto)
+[![License](https://img.shields.io/npm/l/@me2em/crypto.svg)](./LICENSE)
+[![Docs](https://img.shields.io/badge/docs-crypto.me2em.com-blue)](https://crypto.me2em.com)
+
 # @me2em/crypto
 
 Cryptographic mechanisms for the Me2em protocol: E2EE channels, X3DH key exchange, purpose-based key derivation, and envelope patterns for offline recipients and media chunk encryption.
@@ -13,11 +17,39 @@ Cryptographic mechanisms for the Me2em protocol: E2EE channels, X3DH key exchang
 - **Ephemeral materials rotate.** Session keys, SPKs, and epoch materials are refreshed at defined rotation points to limit exposure.
 - **Non-extractable CryptoKey pattern.** Persisted keys are stored as non-extractable `CryptoKey` objects (see `@me2em/react` vault for the React integration). Raw key material lives only in module-private `WeakMap` internals and is wiped at rotation.
 
+---
+
+## 📖 Terminology (selected)
+
+Protocol terms are **domain-neutral**. The terms most relevant to
+this package:
+
+| Term | Definition |
+|------|------------|
+| **Channel** | A long-lived E2EE relationship derived from an X3DH shared secret. |
+| **Ephemeral material** | TTL-bound rotating material: SPK/OTK, cache keys, session tokens. |
+| **PreKeyBundle** | The public key set an initiator needs to start X3DH with an offline recipient. |
+| **Envelope** | A key wrapped via X3DH for offline delivery — self-contained. |
+| **Epoch** | Rotation counter for channel root keys. Messages from previous epochs are undecryptable. |
+
+Full glossary (including Identity, Handle, Attestation, Session):
+[root README → Terminology](../../README.md#-terminology).
+
+---
+
 ## Install
 
 ```sh
 pnpm add @me2em/crypto
 ```
+
+> 💡 This package depends on [`@me2em/core`](../core/README.md)
+> (workspace) and `hash-wasm` (Argon2id). It is headless-only —
+> no React imports, works in both browser and Node.js ≥ 20.
+> For React hooks and seed phrase UX use
+> [`@me2em/react`](../react/README.md). All three packages are
+> designed to work together — see the root
+> [README](../../README.md#-packages) for the full package map.
 
 ## Modules
 
