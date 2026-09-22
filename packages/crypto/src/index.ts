@@ -57,5 +57,13 @@ export {
 export type { Channel, ChannelMessage } from './channels/types.js';
 export { wrapKeyForRecipient, unwrapKeyForMe } from './envelopes/key-wrapping.js';
 export type { WrappedKey, WrapKeyParams, UnwrapKeyParams } from './envelopes/key-wrapping.js';
-export type { PreKeyBundle, IdentityKeys, SignedPreKey, OneTimePreKey } from './x3dh/types.js';
+export type { PreKeyBundle, IdentityKeys, SignedPreKey, OneTimePreKey, X3DHInitiationResult } from './x3dh/types.js';
+export {
+  initiateX3DH,
+  completeX3DH,
+  verifySignedPreKey,
+  generateSignedPreKey,
+  generateOneTimePreKeys,
+} from './x3dh/protocol.js';
+export { generatePreKeyBatch, publishableBundle } from './x3dh/prekeys.js';
 export { generateFileKey, deriveChunkNonce, encryptMediaChunk, decryptMediaChunk } from './envelopes/media-chunks.js';
