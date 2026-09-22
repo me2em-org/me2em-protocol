@@ -6,10 +6,39 @@ signed sessions, and parent-signed **attestation chains** for delegatable,
 externally verifiable authorization — all on Ed25519.
 
 [![npm version](https://img.shields.io/npm/v/@me2em/core.svg)](https://www.npmjs.com/package/@me2em/core)
-[![License](https://img.shields.io/npm/l/@me2em/core.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
-[![Docs](https://img.shields.io/badge/docs-docs.me2em.com-blue)](https://docs.me2em.com)
+[![License](https://img.shields.io/npm/l/@me2em/core.svg)](./LICENSE)
+[![Docs](https://img.shields.io/badge/docs-core.me2em.com-blue)](https://core.me2em.com)
 
 ## 🎯 Overview
+
+---
+
+## 📖 Terminology
+
+Protocol terms are **domain-neutral** — each use case assigns them
+its own meaning. The five terms most relevant to this package:
+
+| Term | Definition |
+|------|------------|
+| **Identity** | Root cryptographic identity derived from a seed phrase. Constant forever. |
+| **Handle** | A derived, attested, named key representing a distinct identity context. |
+| **SubHandle** | A leaf child of a Handle (MAX_DEPTH = 2). |
+| **Attestation** | A parent-signed statement binding a child key to a name and a grant. |
+| **Session** | A stateless signed authorization token. |
+
+**Domain interpretations** — the same primitives, read through
+different lenses:
+
+| Use case | Handle is… | SubHandle is… |
+|----------|------------|----------------|
+| **AI Agent Delegation** | An AI agent acting on behalf of a user | A capability of that agent |
+| **IoT Device Hierarchy** | A physical device | A component of that device |
+| **Multi-Context Identity** | A user persona (work, personal) | Delegated access within a persona |
+
+Full glossary (including Channel and material-class terms):
+[root README → Terminology](../../README.md#-terminology).
+
+---
 
 - **Hierarchical Deterministic Identities** — one seed → isolated
   `Handle`s and `SubHandle`s (MAX_DEPTH = 2), derived offline via HKDF.
@@ -23,6 +52,11 @@ externally verifiable authorization — all on Ed25519.
   derivation without storage.
 - **Secure Channels** — symmetric channel keys and X25519 shared
   secrets derived without key exchange.
+- **BIP39 Passphrase** — optional "25th word" support: the
+  passphrase silently derives a different identity if changed.
+- **UKS-Safe ECDH** — `deriveSharedSecret` binds both peers'
+  public keys into the KDF (`p2p-channel/v2`), preventing
+  unknown key-share attacks.
 
 ## 📦 Installation
 
@@ -34,6 +68,13 @@ pnpm add @me2em/core
 
 **Dependencies:** `@noble/curves` (Ed25519/X25519), `@noble/ed25519`,
 `@noble/hashes` (HKDF, SHA-256), `@scure/bip39` (mnemonic handling).
+
+> 💡 This package is self-contained. For E2EE channels, X3DH key
+> agreement, and Argon2id use [`@me2em/crypto`](../crypto/README.md).
+> For React hooks and seed phrase UX components use
+> [`@me2em/react`](../react/README.md). The three packages are
+> designed to work together — see the root
+> [README](../../README.md#-packages) for the full package map.
 
 ## 🚀 Quick Start
 
@@ -167,7 +208,7 @@ All failures throw `AttestationError` with `code` and `level`
 | `SCOPE_EXCEEDED`, `TTL_EXCEEDED`, `AUDIENCE_NOT_PERMITTED`, `SESSION_OUTLIVES_ATTESTATION` | SESSION |
 | `SUBJECT_MISMATCH` | ROOT, SUB_ATTESTATION |
 
-"Note on error types. Failures detected during token parsing — wrongshape, invalid Base64URL, payload over 4096 bytes, non-JSON payload,missing required fields — throw a plain Error, before any attestationlayer is consulted. Every failure after parsing throwsAttestationError. Integration code should handle both."
+"Note on error types. Failures detected during token parsing — wrong shape, invalid Base64URL, payload over 4096 bytes, non-JSON payload, missing required fields — throw a plain `Error`, before any attestation layer is consulted. Every failure **after** parsing throws an `AttestationError`. Integration code should handle both."
 
 ### Verification modes
 
@@ -388,7 +429,8 @@ tamper, expiry, iat), revocation, SubHandle constraint enforcement,
 MAX_DEPTH leaf enforcement, attestation issue/decode/signature
 determinism and validation, and the full `verifyAttested` chain
 (20+ cases including nesting, wildcard permitting, revocation at every
-level, and signature robustness).
+level, signature robustness, BIP39 passphrase derivation, and wordlist
+validation).
 
 ## 🗺️ Roadmap
 
