@@ -1,8 +1,6 @@
-**Me2em never persists your seed.** The seed phrase exists in two
-places only: your paper and transient memory during login. This
-package stores only *derived, encrypted context caches* — losing your
-browser data never loses your identity, because your identity lives
-in your head.
+[![npm version](https://img.shields.io/npm/v/@me2em/react.svg)](https://www.npmjs.com/package/@me2em/react)
+[![License](https://img.shields.io/npm/l/@me2em/react.svg)](./LICENSE)
+[![Docs](https://img.shields.io/badge/docs-react.me2em.com-blue)](https://react.me2em.com)
 
 ## 📦 @me2em/react — React bindings
 
@@ -15,6 +13,13 @@ pnpm add @me2em/react react
 ```
 
 Requires React >= 18.0.0 as a peer dependency.
+
+> 💡 This package requires [`@me2em/core`](../core/README.md) (peer
+> dependency via workspace) and React ≥ 18. It is self-contained —
+> for E2EE channels, X3DH, and Argon2id see
+> [`@me2em/crypto`](../crypto/README.md). All three packages are
+> designed to work together — see the root
+> [README](../../README.md#-packages) for the full package map.
 
 ## Quick Start
 
@@ -68,6 +73,30 @@ const state = headless.identityFlowReducer(headless.initialIdentityFlowState, {
   seed: new Uint8Array(32),
 });
 ```
+
+---
+
+## 📖 Terminology (selected)
+
+Protocol terms are **domain-neutral**. The terms most relevant to
+this package:
+
+| Term | Definition |
+|------|------------|
+| **Identity** | Root cryptographic identity derived from a seed phrase. Constant forever. |
+| **Handle** | A derived, attested, named key representing a distinct identity context. |
+| **Session** | A stateless signed authorization token. |
+| **Transient material** | Key bytes existing only in RAM at the moment of use. |
+| **Context cache** | Per-identity encrypted storage of derived Handle context. |
+
+Full glossary (including Attestation, SubHandle, Ephemeral material):
+[root README → Terminology](../../README.md#-terminology).
+
+**This package never persists your seed.** The seed phrase exists in
+two places only — your paper and transient memory during login. What
+this package stores is derived, encrypted context caches. Losing your
+browser data never loses your identity, because your identity lives
+in your head.
 
 ## Components
 
