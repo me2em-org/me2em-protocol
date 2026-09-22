@@ -1,3 +1,8 @@
 # .gitleaksignore — placeholder.
 # наполняется ТОЛЬКО после пробного прогона gitleaks, если будут
 # false positives, которые нельзя выразить в .gitleaks.toml.
+
+# .github/workflows/README.md — documentation example of a test
+# fixture pattern (referenced in the gitleaks troubleshooting guide,
+# not an actual secret)
+d906f51:.github/workflows/README.md:52:allow-test-fixtures

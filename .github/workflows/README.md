@@ -65,6 +65,9 @@ documentation example):
   scanner for everything.
 - ❌ Commit a "test" secret that actually works in production.
 
+### Live example
+The first real run of this pipeline flagged the code-fence example in this very guide (.github/workflows/README.md,the fill(0x42) pattern in the gitleaks section). Fixed via .gitleaksignore fingerprint — exactly the false-positive proceduredescribed above.
+
 ---
 
 ## Job 2: build-and-test failed
