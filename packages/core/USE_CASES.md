@@ -244,8 +244,10 @@ const grantA = {
   maxSessionTtl: 28800, // one workday
   subNamePatterns: ['worker-*', 'contractor-*'],
 };
-const A = await corpIdentity.attestHandle('department-engineering', grantA);
+const A = await corpIdentity.attestHandle('department-engineering', grantA,
+  { ttlSeconds: 365 * 24 * 3600 }); // one year
 // Ship deptHandle + A.token to the HR system.
+// Attestattion is valid for year, sessions -  one workday
 ```
 
 ### 3.2 HR hires — autonomously, without the root
