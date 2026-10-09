@@ -3,6 +3,5 @@
   "name": "@me2em/react",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
-  "readme": "README.md",
-  "treatWarningsAsErrors": false
+  "readme": "README.md"
 }

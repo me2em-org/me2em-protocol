@@ -11,6 +11,10 @@ import type {
   IdentityKeys,
 } from './types.js';
 
+/**
+ * A batch of X3DH pre-keys: one Signed Pre-Key and N One-Time Pre-Keys,
+ * plus a base64-encoded list of OTK public keys for server upload.
+ */
 export interface PreKeyBatch {
   signedPreKey: SignedPreKey;
   oneTimePreKeys: OneTimePreKey[];

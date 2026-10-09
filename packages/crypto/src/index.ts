@@ -65,5 +65,6 @@ export {
   generateSignedPreKey,
   generateOneTimePreKeys,
 } from './x3dh/protocol.js';
+export type { PreKeyBatch } from './x3dh/prekeys.js';
 export { generatePreKeyBatch, publishableBundle } from './x3dh/prekeys.js';
 export { generateFileKey, deriveChunkNonce, encryptMediaChunk, decryptMediaChunk } from './envelopes/media-chunks.js';
