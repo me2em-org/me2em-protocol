@@ -37,7 +37,7 @@ interpretation (see the root [README → Terminology](../../README.md#-terminolo
 | 3 — Drone Fleet Management | UC-2 | An airframe | A sensor / a maintenance grant | Provisioning / maintenance access |
 | 4 — Multi-App SSO | UC-4 | A per-app persona | — | Partner-app delegation (optional) |
 | 5 — Multi-Context Identity | UC-3 | A persona | A delegated leaf (guest, device) | In-persona delegation |
-| 6 — EV Charging Station | UC-2 | A charging station | A connector / meter | Device provisioning |
+| 6 — EV Charging Network | UC-2 | A charging station | A connector / meter | Device provisioning |
 | 7 — Corporate Messenger | UC-3 | A department | An employee / contractor | Employment / contract |
 | 8 — Deterministic Password Manager | UC-5 | A service context | — | — |
 | 9 — E2EE Messenger | UC-6 | The messaging identity | A device (optional) | — |
@@ -270,6 +270,8 @@ await revocationService.revokeAttestation(A.jti);
 Telemetry verifies with `verifyStateless` (Mode 1): fleet control is part
 of the trusted perimeter and already holds the root key.
 
+---
+
 ## Scenario 4: Multi-App SSO (UC-4 — Shared User Base)
 
 One Me2em instance, many applications, zero registered users. The account
@@ -326,6 +328,8 @@ For **external** apps (partners outside the perimeter) the same flow
 switches to Mode 2: the instance attests the partner's Handles, and the
 partner verifies chains with the root public key only.
 
+---
+
 ## Scenario 5: Multi-Context Identity (UC-3 — personas)
 
 The personal reading of the protocol: one human, many isolated contexts.
@@ -373,7 +377,7 @@ Full walkthrough: root README → Quick Start (UC-3).
 
 
 
-## Scenario 6: EV Charging Station (UC-2 — IoT Device Hierarchy)
+## Scenario 6: EV Charging Network (UC-2 — IoT Device Hierarchy)
 
 ```text
 Identity: EV-Network-Main (network owner — root private key lives ONLY here)
@@ -474,6 +478,8 @@ const verified = await Session.verifyStateless(
 
 Use Mode 1 only where the verifier is trusted with the root key.
 
+---
+
 ## Scenario 7: Corporate Messenger (UC-3 — Multi-Context Identity)
 
 ```text
@@ -497,7 +503,7 @@ const grantA = {
 const A = await corpIdentity.attestHandle('department-engineering', grantA,
   { ttlSeconds: 365 * 24 * 3600 }); // one year
 // Ship deptHandle + A.token to the HR system.
-// Attestattion is valid for year, sessions -  one workday
+// Attestation is valid for a year, sessions — one workday
 ```
 
 ### 7.2 HR hires — autonomously, without the root
@@ -569,9 +575,98 @@ const B = await deptHandle.attestSubHandle('contractor-external-xyz', {
   scopes: ['message:send', 'message:receive', 'channel:project-alpha'],
   maxSessionTtl: 28800,
 }, { ttlSeconds: 14 * 24 * 3600 }); // access self-expires in 2 weeks —
-                                    // no HR action needed on the end date
+                                     // no HR action needed on the end date
 
 ```
+---
+
+## Scenario 8: Deterministic Password Manager (UC-5)
+
+The zero-storage credential pattern: per-service secrets derived from the
+seed — nothing persisted, nothing to breach, no servers, no verification
+modes.
+
+```typescript
+import { Identity } from '@me2em/core';
+
+const identity = await Identity.fromSeed(seedBytes);
+const work = await identity.deriveHandle('work');
+
+// One call per service — same result on every device, forever:
+const githubSecret = work.derivePassword('github.com', 32);
+const jiraSecret   = work.derivePassword('jira.internal', 32);
+```
+
+Properties that fall out for free:
+
+- **Same seed + same context → same secret.** A new phone plus the seed
+  phrase restores every password.
+- **Per-context isolation.** A Handle per persona: the work Handle never
+  derives a secret the personal Handle could produce.
+- **Nothing to reset.** No "forgot password" exists because no password
+  is stored — losing the seed loses the identity, by design.
+
+`@me2em/crypto` adds the guard rails: Argon2id profiles for secrets the
+user must type rather than derive, and HIBP breach checks for the rare
+hand-chosen password.
+
+---
+
+## Scenario 9: E2EE Messenger (UC-6)
+
+The first vertical (`@me2em/messenger`, planned) — built directly on the
+crypto package: canonical X3DH for key agreement, long-lived channels
+with epoch rotation, envelopes for recipients who are offline.
+
+```text
+Identity: Alice (seed) ── Handle: @alice ── publishes PreKeyBundle
+Identity: Bob   (seed) ── Handle: @bob   ── publishes PreKeyBundle
+```
+
+### 9.1 Opening a channel
+
+```typescript
+import { initiateX3DH, establishChannel, encryptChannelMessage } from '@me2em/crypto';
+
+const bundle = await fetchPreKeyBundle('bob');
+const x3dh = await initiateX3DH(aliceIdentity, bundle);
+const channel = await establishChannel(x3dh.sharedSecret, 'chat-42');
+
+const msg = await encryptChannelMessage(channel, 0, plaintext);
+```
+
+Bob completes the same X3DH on his side — consuming a one-time pre-key
+(mandatory, no zero-fallback) — and derives the same channel.
+
+### 9.2 Writing to someone offline
+
+Envelopes wrap a message key for a recipient who has not been online for
+days; each envelope is self-contained and replay-guarded by OTK
+consumption:
+
+```typescript
+const wrapped = await wrapKeyForRecipient({
+  keyBytes: fileKey,
+  recipientBundle: bobsBundle,
+  myIdentity: aliceIdentity,
+  contextSalt: new TextEncoder().encode('chat-42'),
+});
+```
+
+### 9.3 Forward secrecy at rotation points
+
+Channels rotate epochs; previous-epoch material is wiped and messages
+from it become undecryptable. Per-message keys and a strictly-increasing
+replay counter protect everything in between.
+
+The identity layer stays Me2em: `@alice` is a Handle derived from her
+seed — the messenger account is recoverable on any device from the seed
+alone, and a second device derives the same identity without a sync
+service.
+
+An optional device SubHandle (`@alice` → `phone-1`) follows the same
+pattern — see the interpretation table.
+
 ---
 
 ## Comparison
@@ -677,93 +772,16 @@ async function authorizeRequest(req: Request, chain: string[]) {
 
 | # | Scenario | UC | What it demonstrates |
 |---|---|-----|----------------------|
-| 1 | EV Station | UC-2 | Fully offline device operation; external org verification; grant-bounded compromise; station-wide revocation |
-| 2 | Drone Fleet | UC-2 | **Selling access**: signed, time-boxed receipts verifiable by the buyer; Mode 1 for internal telemetry |
-| 3 | Corporate Messenger | UC-3 | Autonomous HR without the root; no privilege escalation past the department grant; cross-service revocation; contractor self-expiry |
-| 4 | AI Agent Delegation | UC-1 | Deterministic agent identities; owner-signed mandates; attested verification by MCP servers; instant agent revocation |
+| 1 | AI Agent Delegation | UC-1 | Deterministic agent identities; owner-signed mandates; attested verification by MCP servers; instant agent revocation |
+| 2 | Satellite Capacity Marketplace | UC-2 | **Selling capacity**: signed, time-boxed receipts verifiable by the buyer; Mode 1 for internal payload/telemetry |
+| 3 | Drone Fleet Management | UC-2 | Provisioning at deploy; in-field maintenance grants; lost-airframe revocation in one call |
+| 4 | Multi-App SSO | UC-4 | Shared User Base: no user database; cookie auto-login across apps; opt-in correlation |
+| 5 | Multi-Context Identity | UC-3 | Isolated personas from one seed; in-persona delegation (guest token); the Quick Start scenario |
+| 6 | EV Charging Network | UC-2 | Fully offline device operation; external org verification; grant-bounded compromise; station-wide revocation |
+| 7 | Corporate Messenger | UC-3 | Autonomous HR without the root; no privilege escalation past the department grant; cross-service revocation; contractor self-expiry |
+| 8 | Deterministic Password Manager | UC-5 | Zero-storage credentials: derive per service, restore from the seed, nothing to breach |
+| 9 | E2EE Messenger | UC-6 | X3DH channels, epoch forward secrecy, envelopes for offline recipients — the messenger vertical's foundation |
 
 Shared guarantees: `MAX_DEPTH = 2`, two derivation entry points with
 identical keys, encapsulated private keys, TTL + optional revocation —
 and, in Mode 2, **enforceable delegation without ever sharing the root**.
-
-## Scenario 8: Deterministic Password Manager (UC-5)
-
-The zero-storage credential pattern: per-service secrets derived from the
-seed — nothing persisted, nothing to breach, no servers, no verification
-modes.
-
-```typescript
-import { Identity } from '@me2em/core';
-
-const identity = await Identity.fromSeed(seedBytes);
-const work = await identity.deriveHandle('work');
-
-// One call per service — same result on every device, forever:
-const githubSecret = work.derivePassword('github.com', 32);
-const jiraSecret   = work.derivePassword('jira.internal', 32);
-```
-
-Properties that fall out for free:
-
-- **Same seed + same context → same secret.** A new phone plus the seed
-  phrase restores every password.
-- **Per-context isolation.** A Handle per persona: the work Handle never
-  derives a secret the personal Handle could produce.
-- **Nothing to reset.** No "forgot password" exists because no password
-  is stored — losing the seed loses the identity, by design.
-
-`@me2em/crypto` adds the guard rails: Argon2id profiles for secrets the
-user must type rather than derive, and HIBP breach checks for the rare
-hand-chosen password.
-
-## Scenario 9: E2EE Messenger (UC-6)
-
-The first vertical (`@me2em/messenger`, planned) — built directly on the
-crypto package: canonical X3DH for key agreement, long-lived channels
-with epoch rotation, envelopes for recipients who are offline.
-
-```text
-Identity: Alice (seed) ── Handle: @alice ── publishes PreKeyBundle
-Identity: Bob   (seed) ── Handle: @bob   ── publishes PreKeyBundle
-```
-
-### 9.1 Opening a channel
-
-```typescript
-import { initiateX3DH, establishChannel, encryptChannelMessage } from '@me2em/crypto';
-
-const bundle = await fetchPreKeyBundle('bob');
-const x3dh = await initiateX3DH(aliceIdentity, bundle);
-const channel = await establishChannel(x3dh.sharedSecret, 'chat-42');
-
-const msg = await encryptChannelMessage(channel, 0, plaintext);
-```
-
-Bob completes the same X3DH on his side — consuming a one-time pre-key
-(mandatory, no zero-fallback) — and derives the same channel.
-
-### 9.2 Writing to someone offline
-
-Envelopes wrap a message key for a recipient who has not been online for
-days; each envelope is self-contained and replay-guarded by OTK
-consumption:
-
-```typescript
-const wrapped = await wrapKeyForRecipient({
-  keyBytes: fileKey,
-  recipientBundle: bobsBundle,
-  myIdentity: aliceIdentity,
-  contextSalt: new TextEncoder().encode('chat-42'),
-});
-```
-
-### 9.3 Forward secrecy at rotation points
-
-Channels rotate epochs; previous-epoch material is wiped and messages
-from it become undecryptable. Per-message keys and a strictly-increasing
-replay counter protect everything in between.
-
-The identity layer stays Me2em: `@alice` is a Handle derived from her
-seed — the messenger account is recoverable on any device from the seed
-alone, and a second device derives the same identity without a sync
-service.

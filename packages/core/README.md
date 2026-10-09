@@ -11,6 +11,24 @@ externally verifiable authorization — all on Ed25519.
 
 ## 🎯 Overview
 
+- **Hierarchical Deterministic Identities** — one seed → isolated
+  `Handle`s and `SubHandle`s (MAX_DEPTH = 2), derived offline via HKDF.
+- **Stateless Authentication** — self-contained signed session tokens,
+  verified without server-side storage, with optional revocation.
+- **Attestations** — a parent cryptographically binds a child key to a
+  name and a grant (audiences, scopes, TTL caps, name patterns). Chains
+  are verified **offline by third parties using only the root public
+  key** — the root private key never leaves its owner.
+- **Zero-Knowledge Password Management** — deterministic password
+  derivation without storage.
+- **Secure Channels** — symmetric channel keys and X25519 shared
+  secrets derived without key exchange.
+- **BIP39 Passphrase** — optional "25th word" support: the
+  passphrase silently derives a different identity if changed.
+- **UKS-Safe ECDH** — `deriveSharedSecret` binds both peers'
+  public keys into the KDF (`p2p-channel/v2`), preventing
+  unknown key-share attacks.
+
 ---
 
 ## 📖 Terminology
@@ -42,24 +60,6 @@ Full glossary (including Channel and material-class terms):
 [root README → Terminology](../../README.md#-terminology).
 
 ---
-
-- **Hierarchical Deterministic Identities** — one seed → isolated
-  `Handle`s and `SubHandle`s (MAX_DEPTH = 2), derived offline via HKDF.
-- **Stateless Authentication** — self-contained signed session tokens,
-  verified without server-side storage, with optional revocation.
-- **Attestations** — a parent cryptographically binds a child key to a
-  name and a grant (audiences, scopes, TTL caps, name patterns). Chains
-  are verified **offline by third parties using only the root public
-  key** — the root private key never leaves its owner.
-- **Zero-Knowledge Password Management** — deterministic password
-  derivation without storage.
-- **Secure Channels** — symmetric channel keys and X25519 shared
-  secrets derived without key exchange.
-- **BIP39 Passphrase** — optional "25th word" support: the
-  passphrase silently derives a different identity if changed.
-- **UKS-Safe ECDH** — `deriveSharedSecret` binds both peers'
-  public keys into the KDF (`p2p-channel/v2`), preventing
-  unknown key-share attacks.
 
 ## 📦 Installation
 
@@ -261,8 +261,7 @@ entire branch: current **and** future sessions under it.
 
 The modes coexist naturally: internal telemetry verified with Mode 1,
 external access granted via Mode 2 — see
-[USE_CASES.md](./USE_CASES.md) for full production scenarios (EV
-charging, drone fleets, corporate messenger).
+[USE_CASES.md](./USE_CASES.md) for all nine production scenarios.
 
 ## 📖 API Reference
 
@@ -381,15 +380,18 @@ produce identical keys across platforms and entry points.
 
 ## 🎯 Core Use Cases
 
-1. **Deterministic password manager** — derive secrets per service, store nothing.
-2. **IoT fleets with encrypted channels** — devices operate fully offline.
-3. **Stateless multi-device sync** — same seed → same handles everywhere.
-4. **Delegatable access control** — attestation chains grant scope- and
-   time-limited access to components, verifiable by external parties.
+Mapped to the official registry — see [USE_CASES.md](./USE_CASES.md):
 
-👉 **[USE_CASES.md](./USE_CASES.md)** — EV charging stations, drone fleet
-access marketplace, corporate messenger, and a production Redis
-`RevocationChecker`.
+- **UC-5 — Deterministic password manager** — derive secrets per service, store nothing.
+- **UC-2 — IoT fleets with encrypted channels** — devices operate fully offline.
+- **Stateless multi-device sync** — same seed → same handles everywhere (spans UC-3/UC-4).
+- **UC-1 / UC-2 — Delegatable access control** — attestation chains grant scope- and
+  time-limited access, verifiable by external parties.
+
+👉 **[USE_CASES.md](./USE_CASES.md)** — nine scenarios: AI agents, satellite capacity
+marketplace, drone fleet management, multi-app SSO, multi-context identity, EV
+charging, corporate messenger, password manager, E2EE messenger — plus a production
+Redis `RevocationChecker`.
 
 ## 🔐 Cryptographic Details
 

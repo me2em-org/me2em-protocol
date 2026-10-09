@@ -165,8 +165,11 @@ The protocol is domain-neutral: protocol terms (Handle, Attestation, Channel) ar
 | **UC-1** | **AI Agent Delegation** | An AI agent acting on behalf of a user | `attestHandle` (the agent's mandate), `deriveSharedSecret` (agent ↔ known service), attestation revocation |
 | **UC-2** | **IoT Device Hierarchy** | A physical device | `attestHandle`/`attestSubHandle` (provisioning), `deriveChannelKey` (owner ↔ device), offline sessions |
 | **UC-3** | **Multi-Context Identity** | A user persona (work, personal) | `deriveHandle`/`deriveSubHandle`, `Session.create`, `verifyAttested` for external services |
+| **UC-4** | **Multi-App SSO** | A per-app persona of the user | `Session.create` per app, HttpOnly instance cookie, shared revocation (Shared User Base) |
+| **UC-5** | **Deterministic Password Manager** | A service context | `derivePassword` per service, Argon2id + HIBP guard rails |
+| **UC-6** | **E2EE Messaging** | The user's messaging identity | `initiateX3DH`, channels with epoch rotation, envelopes |
 
-> 📖 **More examples:** See [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) for production-ready scenarios (EV Charging Stations, Drone Fleet access marketplace, Corporate Messengers).
+> 📖 **More examples:** See [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) for production-ready scenarios (Satellite Capacity Marketplace, Drone Fleet Management, Multi-App SSO, Deterministic Password Manager, E2EE Messenger).
 
 ---
 
@@ -249,7 +252,7 @@ function CreateIdentityScreen() {
 
 *Note: Me2em never persists your seed. The seed phrase exists in two places only — your paper and transient memory during login. Browser storage holds only encrypted caches of derived material.*
 
-📖 **Deeper scenarios:** [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) — EV Charging Stations, Drone Fleet access marketplace, Corporate Messengers.
+📖 **Deeper scenarios:** [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) — Satellite Capacity Marketplace, Drone Fleet Management, Multi-App SSO, Deterministic Password Manager, E2EE Messenger.
 
 ---
 
