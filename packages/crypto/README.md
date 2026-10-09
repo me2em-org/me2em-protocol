@@ -33,7 +33,7 @@ this package:
 | **Epoch** | Rotation counter for channel root keys. Messages from previous epochs are undecryptable. |
 
 Full glossary (including Identity, Handle, Attestation, Session):
-[root README → Terminology](../../README.md#-terminology).
+see the [root README](../../README.md).
 
 ---
 
@@ -49,7 +49,7 @@ pnpm add @me2em/crypto
 > For React hooks and seed phrase UX use
 > [`@me2em/react`](../react/README.md). All three packages are
 > designed to work together — see the root
-> [README](../../README.md#-packages) for the full package map.
+> [README](../../README.md) for the full package map.
 
 ## Modules
 

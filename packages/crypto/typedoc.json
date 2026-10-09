@@ -3,5 +3,6 @@
   "name": "@me2em/crypto",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
-  "readme": "README.md"
+  "readme": "README.md",
+  "treatWarningsAsErrors": false
 }

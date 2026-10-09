@@ -57,7 +57,7 @@ different lenses:
 | **E2EE Messaging** (UC-6) | The user's messaging identity | An optional device identity |
 
 Full glossary (including Channel and material-class terms):
-[root README → Terminology](../../README.md#-terminology).
+see the [root README](../../README.md).
 
 ---
 
@@ -73,11 +73,11 @@ pnpm add @me2em/core
 `@noble/hashes` (HKDF, SHA-256), `@scure/bip39` (mnemonic handling).
 
 > 💡 This package is self-contained. For E2EE channels, X3DH key
-> agreement, and Argon2id use [`@me2em/crypto`](../crypto/README.md).
-> For React hooks and seed phrase UX components use
-> [`@me2em/react`](../react/README.md). The three packages are
-> designed to work together — see the root
-> [README](../../README.md#-packages) for the full package map.
+>  agreement, and Argon2id use [`@me2em/crypto`](../crypto/README.md).
+>  For React hooks and seed phrase UX components use
+>  [`@me2em/react`](../react/README.md). The three packages are
+>  designed to work together — see the root
+>  [README](../../README.md) for the full package map.
 
 ## 🚀 Quick Start
 

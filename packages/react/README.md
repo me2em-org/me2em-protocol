@@ -15,11 +15,11 @@ pnpm add @me2em/react react
 Requires React >= 18.0.0 as a peer dependency.
 
 > 💡 This package requires [`@me2em/core`](../core/README.md) (peer
-> dependency via workspace) and React ≥ 18. It is self-contained —
-> for E2EE channels, X3DH, and Argon2id see
-> [`@me2em/crypto`](../crypto/README.md). All three packages are
-> designed to work together — see the root
-> [README](../../README.md#-packages) for the full package map.
+>  dependency via workspace) and React ≥ 18. It is self-contained —
+>  for E2EE channels, X3DH, and Argon2id see
+>  [`@me2em/crypto`](../crypto/README.md). All three packages are
+>  designed to work together — see the root
+>  [README](../../README.md) for the full package map.
 
 ## Quick Start
 
@@ -90,7 +90,7 @@ this package:
 | **Context cache** | Per-identity encrypted storage of derived Handle context. |
 
 Full glossary (including Attestation, SubHandle, Ephemeral material):
-[root README → Terminology](../../README.md#-terminology).
+see the [root README](../../README.md).
 
 **This package never persists your seed.** The seed phrase exists in
 two places only — your paper and transient memory during login. What
