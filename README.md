@@ -23,7 +23,7 @@ The protocol addresses a growing class of problems in identity and authorization
 | **Non-persistent keys** — private key material must never be stored on devices | **Seed-Derived Identity**: keys are recomputed from a seed phrase; only encrypted caches of derived material persist |
 | **Privacy & trust** — requiring email/phone for registration | Anonymous, key-based authentication via seed phrases |
 
-*This list is open: the protocol is a mechanism, not a product catalog. See the [use cases](#-use-cases) for the three scenarios we document today — and note that new ones (e.g. AI agent authentication) map naturally onto the same primitives.*
+*This list is open: the protocol is a mechanism, not a product catalog. See the [use cases](#-use-cases) for the scenarios.*
 
 ### Core Architecture
 
@@ -73,11 +73,15 @@ Protocol terms are **domain-neutral** — each use case assigns them its own mea
 
 | Use case | Handle is… | SubHandle is… |
 |----------|------------|----------------|
-| **AI Agent Delegation** | An AI agent acting on behalf of a user | A capability of that agent |
-| **IoT Device Hierarchy** | A physical device | A component of that device |
-| **Multi-Context Identity** | A user persona (work, personal) | Delegated access within a persona |
+| **AI Agent Delegation** (UC-1) | An AI agent acting on behalf of a user | A capability of that agent |
+| **IoT Device Hierarchy** (UC-2) | A physical device | A component of that device |
+| **Multi-Context Identity** (UC-3) | A user persona (work, personal) | Delegated access within a persona |
+| **Multi-App SSO** (UC-4) | A per-app persona of the user | — |
+| **Deterministic Password Manager** (UC-5) | A service context | — |
+| **E2EE Messaging** (UC-6) | The user's messaging identity | An optional device identity |
 
-Full glossary and the method-to-relationship map: see the [Terminology section](#-use-cases) and each package README.
+Full glossary and the method-to-relationship map: see the
+[Use Cases section](#-use-cases) and each package README.
 
 ---
 
@@ -154,7 +158,7 @@ pnpm -r test
 
 ## 📚 Use Cases
 
-The protocol is domain-neutral: protocol terms (Handle, Attestation, Channel) are mechanical, and each scenario assigns them its own meaning. We document three use cases — and **all Quick Start examples below follow UC-3** for a consistent, end-to-end walkthrough across all three packages.
+The protocol is domain-neutral: protocol terms (Handle, Attestation, Channel) are mechanical, and each scenario assigns them its own meaning. We document six use cases — and **all Quick Start examples below follow UC-3** for a consistent, end-to-end walkthrough across all three packages.
 
 | # | Use case | Handle is… | Key mechanisms |
 |---|----------|------------|----------------|

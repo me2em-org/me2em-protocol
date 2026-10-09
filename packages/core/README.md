@@ -31,9 +31,12 @@ different lenses:
 
 | Use case | Handle is… | SubHandle is… |
 |----------|------------|----------------|
-| **AI Agent Delegation** | An AI agent acting on behalf of a user | A capability of that agent |
-| **IoT Device Hierarchy** | A physical device | A component of that device |
-| **Multi-Context Identity** | A user persona (work, personal) | Delegated access within a persona |
+| **AI Agent Delegation** (UC-1) | An AI agent acting on behalf of a user | A capability of that agent |
+| **IoT Device Hierarchy** (UC-2) | A physical device | A component of that device |
+| **Multi-Context Identity** (UC-3) | A user persona (work, personal) | Delegated access within a persona |
+| **Multi-App SSO** (UC-4) | A per-app persona of the user | — |
+| **Deterministic Password Manager** (UC-5) | A service context | — |
+| **E2EE Messaging** (UC-6) | The user's messaging identity | An optional device identity |
 
 Full glossary (including Channel and material-class terms):
 [root README → Terminology](../../README.md#-terminology).
