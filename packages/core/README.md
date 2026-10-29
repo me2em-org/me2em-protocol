@@ -49,7 +49,7 @@ different lenses:
 
 | Use case | Handle is… | SubHandle is… |
 |----------|------------|----------------|
-| **AI Agent Delegation** (UC-1) | An AI agent acting on behalf of a user | A capability of that agent |
+| **AI Agent Delegation** (UC-1) | An AI agent acting on behalf of a user | — (the agent signs sessions directly) |
 | **IoT Device Hierarchy** (UC-2) | A physical device | A component of that device |
 | **Multi-Context Identity** (UC-3) | A user persona (work, personal) | Delegated access within a persona |
 | **Multi-App SSO** (UC-4) | A per-app persona of the user | — |

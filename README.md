@@ -73,7 +73,7 @@ Protocol terms are **domain-neutral** — each use case assigns them its own mea
 
 | Use case | Handle is… | SubHandle is… |
 |----------|------------|----------------|
-| **AI Agent Delegation** (UC-1) | An AI agent acting on behalf of a user | A capability of that agent |
+| **AI Agent Delegation** (UC-1) | An AI agent acting on behalf of a user | — (the agent signs sessions directly) |
 | **IoT Device Hierarchy** (UC-2) | A physical device | A component of that device |
 | **Multi-Context Identity** (UC-3) | A user persona (work, personal) | Delegated access within a persona |
 | **Multi-App SSO** (UC-4) | A per-app persona of the user | — |
@@ -180,7 +180,7 @@ One scenario, three packages, end to end: a user with two personas (work and per
 ### Using `@me2em/core` — identity, handles, sessions
 
 ```typescript
-import { Identity, generateSeedPhrase, get32ByteSeedFromMnemonic } from '@me2em/core';
+import { Identity, Session, generateSeedPhrase, get32ByteSeedFromMnemonic } from '@me2em/core';
 
 // 1. Identity from a seed phrase (or 32 raw bytes)
 const phrase = generateSeedPhrase(128);            // 12 words — user writes them down
@@ -414,10 +414,10 @@ We welcome contributions! Please read:
 |--------|-----------|
 | **Shipped** | `@me2em/core` 0.6–0.7 alpha — attestations, verification modes, passphrase, UKS-safe channels |
 | **Shipped** | `@me2em/react` 0.1 alpha — identity hooks, seed UX, session management, context cache |
-| **Shipped** | `@me2em/crypto` 0.1 alpha — canonical X3DH, pre-keys, channels with epoch rotation, envelopes, Argon2id |
+| **Shipped** | `@me2em/crypto` 0.1 alpha — X3DH, E2EE channels, envelopes, Argon2id guard rails |
+| **Shipped** | [me2em.com](https://me2em.com) — protocol blog: guides, tutorials, deep dives (RU) |
 | **Next** | DevSecOps hardening — branch protection, coverage thresholds (CI pipeline live) |
 | **Next** | `@me2em/messenger` (0.9) — first vertical; `@me2em/server` reference backend |
-| **Q1 2027** | [me2em.com](https://me2em.com) — guides, tutorials, articles |
 | **Q3 2027** | `@me2em/core` v1.0 — stable API freeze |
 | **Q4 2027** | ZK-proof integration (anonymous attribute verification) |
 

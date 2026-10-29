@@ -277,6 +277,12 @@ of the trusted perimeter and already holds the root key.
 One Me2em instance, many applications, zero registered users. The account
 is the seed phrase; the server stores no profiles — only hashed refresh
 tokens and revoked `jti` entries. This is the commercial core of the
+
+The instance authenticates by orchestration — confirming SSO sessions and
+issuing per-app tokens — while all signature verification stays
+cryptographic (Mode 2): it never needs, and never holds, user key material.
+
+This is the commercial core of the
 cloud edition; a self-hosted instance becomes the auth center for its own
 apps the same way.
 
@@ -299,7 +305,9 @@ const session = await Session.create(handle, {
   scopes: ['ride:book'],
   ttl: 1800,
 });
-// taxi-app's backend verifies with verifyStateless — same org, Mode 1.
+// taxi-app's backend verifies with verifyAttested: the user's root public
+// key arrives with the request, the chain proves the Handle — the backend
+// never holds any user key material (Mode 2 everywhere, own apps included).
 ```
 
 The instance also sets an HttpOnly cookie for its own domain
@@ -587,22 +595,20 @@ seed — nothing persisted, nothing to breach, no servers, no verification
 modes.
 
 ```typescript
-import { Identity } from '@me2em/core';
-
 const identity = await Identity.fromSeed(seedBytes);
-const work = await identity.deriveHandle('work');
 
-// One call per service — same result on every device, forever:
-const githubSecret = work.derivePassword('github.com', 32);
-const jiraSecret   = work.derivePassword('jira.internal', 32);
+// One Handle per service — isolation lives in the key tree:
+const github = await identity.deriveHandle('github.com');
+const githubLogin = github.derivePassword('login', 32);
+
+const jira = await identity.deriveHandle('jira.internal');
+const jiraLogin = jira.derivePassword('login', 32);
 ```
 
 Properties that fall out for free:
 
-- **Same seed + same context → same secret.** A new phone plus the seed
-  phrase restores every password.
-- **Per-context isolation.** A Handle per persona: the work Handle never
-  derives a secret the personal Handle could produce.
+- **Same seed + same handle + same context → same secret.** A new phone plus the seed phrase restores every password.
+- **Per-context isolation.** A Handle per service: secrets derived under one Handle are unreachable from any other — the key tree is the isolation boundary.
 - **Nothing to reset.** No "forgot password" exists because no password
   is stored — losing the seed loses the identity, by design.
 
