@@ -3,6 +3,14 @@
 // Shared utility functions for the Me2eM protocol.
 
 /**
+ * Node.js console/inspect hook (`util.inspect.custom`), referenced by
+ * `Symbol.for` so that no `node:util` import — and therefore no Node
+ * dependency — leaks into browser bundles. In non-Node runtimes the
+ * symbol simply has no meaning and the method is never called.
+ */
+export const INSPECT_SYMBOL = Symbol.for('nodejs.util.inspect.custom');
+
+/**
  * Encodes a Uint8Array to a URL-safe Base64 string (no padding).
  */
 export function base64urlEncode(bytes: Uint8Array): string {

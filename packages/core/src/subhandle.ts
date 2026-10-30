@@ -6,6 +6,7 @@
 
 import { Handle, type HandleMetadata } from './handle.js';
 import { normalizeName } from './canonical-name.js';
+import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 /**
  * Metadata for a {@link SubHandle}, extending {@link HandleMetadata} with
@@ -68,6 +69,19 @@ function extractDisplayFields(
 }
 
 /**
+ * Deep-ish copy of SubHandle metadata: constraint arrays (the
+ * security-relevant part) are duplicated so the caller cannot mutate
+ * the enforced constraints after construction. Custom fields are
+ * shallow-copied (nested objects are not cloned).
+ */
+function copySubMetadata(meta?: SubHandleMetadata): SubHandleMetadata {
+  const out: SubHandleMetadata = { ...(meta ?? {}) };
+  if (out.allowedAudiences !== undefined) out.allowedAudiences = [...out.allowedAudiences];
+  if (out.allowedScopes !== undefined) out.allowedScopes = [...out.allowedScopes];
+  return out;
+}
+
+/**
  * Represents a context-isolated child Handle in the Me2eM hierarchy.
  *
  * A SubHandle is always derived from a parent {@link Handle} and represents
@@ -86,8 +100,8 @@ function extractDisplayFields(
  * @category Core Primitives
  */
 export class SubHandle extends Handle {
-  private readonly _path: string[];
-  private readonly _subMetadata: SubHandleMetadata;
+  #path: string[];
+  #subMetadata: SubHandleMetadata;
 
   /**
    * Creates a new SubHandle instance.
@@ -96,9 +110,12 @@ export class SubHandle extends Handle {
    * {@link Identity.deriveSubHandle}. Direct construction is discouraged.
    *
    * @param privateKey - The 32-byte Ed25519 private key for this SubHandle.
+   *   Copied on input by the Handle constructor.
    * @param name - The SubHandle name.
    * @param path - The derivation path, must have exactly 2 elements: `[handleName, subName]`.
+   *   Copied on input — later mutation of the caller's array has no effect.
    * @param subMetadata - Optional constraints and metadata.
+   *   Copied on input (constraint arrays are duplicated).
    * @throws {Error} If the path does not have exactly 2 elements.
    */
   constructor(
@@ -120,8 +137,9 @@ export class SubHandle extends Handle {
       throw new Error(`path[1] must equal normalized name: path[1]=${JSON.stringify(path[1])}, name=${JSON.stringify(normalizedName)}`);
     }
 
-    this._path = path;
-    this._subMetadata = subMetadata ?? {};
+    // Defensive copies: the caller keeps no live reference into this leaf.
+    this.#path = [...path];
+    this.#subMetadata = copySubMetadata(subMetadata);
   }
 
   /**
@@ -130,7 +148,7 @@ export class SubHandle extends Handle {
    * @returns A copy of the path array, e.g. `["station-001", "connector-1"]`.
    */
   getPath(): string[] {
-    return [...this._path];
+    return [...this.#path];
   }
 
   /**
@@ -139,7 +157,7 @@ export class SubHandle extends Handle {
    * @returns The path string, e.g. `"station-001/connector-1"`.
    */
   getPathString(): string {
-    return this._path.join('/');
+    return this.#path.join('/');
   }
 
   /**
@@ -179,12 +197,12 @@ export class SubHandle extends Handle {
    */
   getSubMetadata(): SubHandleMetadata {
     return {
-      ...this._subMetadata,
-      allowedAudiences: this._subMetadata.allowedAudiences !== undefined
-        ? [...this._subMetadata.allowedAudiences]
+      ...this.#subMetadata,
+      allowedAudiences: this.#subMetadata.allowedAudiences !== undefined
+        ? [...this.#subMetadata.allowedAudiences]
         : undefined,
-      allowedScopes: this._subMetadata.allowedScopes !== undefined
-        ? [...this._subMetadata.allowedScopes]
+      allowedScopes: this.#subMetadata.allowedScopes !== undefined
+        ? [...this.#subMetadata.allowedScopes]
         : undefined,
     };
   }
@@ -208,21 +226,21 @@ export class SubHandle extends Handle {
     ttl: number;
   }): void {
     // Audience check: undefined = unrestricted, [] = deny all
-    if (this._subMetadata.allowedAudiences !== undefined) {
-      if (!this._subMetadata.allowedAudiences.includes(options.audience)) {
+    if (this.#subMetadata.allowedAudiences !== undefined) {
+      if (!this.#subMetadata.allowedAudiences.includes(options.audience)) {
         throw new Error(
           `Audience "${options.audience}" not allowed for this SubHandle. ` +
-          `Allowed: ${this._subMetadata.allowedAudiences.length === 0
+          `Allowed: ${this.#subMetadata.allowedAudiences.length === 0
             ? '(none — empty list denies all)'
-            : this._subMetadata.allowedAudiences.join(', ')}`
+            : this.#subMetadata.allowedAudiences.join(', ')}`
         );
       }
     }
 
     // Scopes check: undefined = unrestricted, [] = deny all
-    if (this._subMetadata.allowedScopes !== undefined) {
+    if (this.#subMetadata.allowedScopes !== undefined) {
       const forbidden = options.scopes.filter(
-        s => !this._subMetadata.allowedScopes!.includes(s)
+        s => !this.#subMetadata.allowedScopes!.includes(s)
       );
       // An empty allow-list denies every requested scope.
       if (forbidden.length > 0) {
@@ -234,21 +252,39 @@ export class SubHandle extends Handle {
 
     // TTL check
     if (
-      this._subMetadata.maxSessionTtl !== undefined &&
-      options.ttl > this._subMetadata.maxSessionTtl
+      this.#subMetadata.maxSessionTtl !== undefined &&
+      options.ttl > this.#subMetadata.maxSessionTtl
     ) {
       throw new Error(
         `TTL ${options.ttl}s exceeds max allowed ` +
-        `${this._subMetadata.maxSessionTtl}s for this SubHandle`
+        `${this.#subMetadata.maxSessionTtl}s for this SubHandle`
       );
     }
 
     // SubHandle expiration check
-    if (this._subMetadata.expiresAt !== undefined) {
+    if (this.#subMetadata.expiresAt !== undefined) {
       const now = Math.floor(Date.now() / 1000);
-      if (now >= this._subMetadata.expiresAt) {
+      if (now >= this.#subMetadata.expiresAt) {
         throw new Error('SubHandle has expired');
       }
     }
+  }
+
+  /**
+   * Redacted serialization contract: `JSON.stringify(sub)` exposes only the
+   * object kind, the public identifier, the name and the derivation path —
+   * never key material or constraint metadata.
+   */
+  override toJSON(): { kind: string; id: string; name: string; path: string[] } {
+    return {
+      kind: 'SubHandle',
+      id: base64urlEncode(this.getPublicKey()),
+      name: this.getName(),
+      path: [...this.#path],
+    };
+  }
+
+  override [INSPECT_SYMBOL](): string {
+    return `SubHandle(id=${base64urlEncode(this.getPublicKey()).slice(0, 8)}…, path=${this.#path.join('/')})`;
   }
 }

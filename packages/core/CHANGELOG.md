@@ -3,6 +3,25 @@
 ## [Unreleased] → will ship in 0.8.0
 
 ### BREAKING
+- **Encapsulation hardening (PR-5, §7: "API preserved, internals hardened").**
+  `Identity`, `Handle` and `SubHandle` store key material in true
+  ECMAScript `#private` fields. Consequences, in order of visibility:
+  (1) internal fields are no longer reachable at runtime through casts
+  or property access — code that poked at `(handle as any).privateKey`
+  (TS-`private` was runtime-visible) now gets `undefined`, and methods
+  invoked on a foreign `this`
+  (`Handle.prototype.sign.call(fakeThis, …)`) throw `TypeError`;
+  (2) `getPublicKey()` / `getMetadata()` / `getPath()` /
+  `getSubMetadata()` return defensive copies — mutating them no longer
+  (and never officially did) affects the object; constructor inputs
+  (`privateKey`, `path`, constraint metadata) are copied on input, so
+  caller-side mutation after construction has no effect;
+  (3) new `dispose()` (inherited by `SubHandle`) zeroizes the private
+  key; capability methods then throw the new `DisposedError`
+  (`e.name === 'DisposedError'`), informational getters keep working;
+  (4) `JSON.stringify()` and console inspection are redacted — they emit
+  only `{ kind, id, name, path? }` and never key material or constraint
+  metadata. The public method surface is unchanged otherwise.
 - **Seed = 64 bytes (BIP39), D1.** `get32ByteSeedFromMnemonic` is replaced by
   `get64ByteSeedFromMnemonic`, which returns the full 64-byte BIP39 seed
   (PBKDF2-HMAC-SHA512 output) without the previous SHA-256 post-hashing.
@@ -21,6 +40,15 @@
   standard seed.
 
 ### Added
+- **`dispose()` / `DisposedError` (PR-5).** `Identity.dispose()` and
+  `Handle.dispose()` (inherited by `SubHandle`) zeroize the private key
+  and permanently revoke all capability methods (`sign`, derivations,
+  attestations); they throw `DisposedError` (`className` property names
+  the disposed class) afterwards. Informational getters
+  (`getName`, `getId`, `getPublicKey`, `getMetadata`, `getPath`,
+  `getSubMetadata`) deliberately keep working — public keys are not
+  secrets. `dispose()` is idempotent. `Session.create` on a disposed
+  handle fails with `DisposedError`.
 - **Real protocol test vectors + normative spec (BL-20/BL-21, PR-3).**
   `specs/test-vectors.json` (15 rows: BIP39 seed, identity/handle/subhandle
   derivation, passwords, channel keys, shared secrets, byte-exact
