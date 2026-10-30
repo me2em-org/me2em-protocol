@@ -246,13 +246,22 @@ quotes in this entry are intentional).
   Code comments and test strings were swept the same day (BL-38,
   closed). Code identifiers are machine text and are not renamed;
   archived drafts in specs/draft/ are left as-is.
+- **DR-6 (2026-10-30)** — LTS v1.0 program adopted. Final plan:
+  [PLAN-LTS-v1.md](./PLAN-LTS-v1.md) (supersedes the internal plan
+  draft v2.0 after a code audit at `0b73599`). Decisions D1–D9
+  accepted; amendments A1–A8 are part of the plan; baseline verified:
+  438 tests green (core 186 / crypto 151 / react 101). Work proceeds
+  as ~12 coherent PRs (PR map in §5 of the plan); `main` stays green
+  after every merge (same-PR consumer rule A6). Derivation freeze:
+  after the 64-byte seed PR, no derivation-affecting change before
+  v1.0.0 (§4). Release gated on external audit or bug bounty (D7).
 
 ## Package Roadmap (strategy)
 
 | Layer | Package | Status |
 |---|---|---|
-| 0 — primitives | `@me2em/core` | ✅ alpha (0.7.0-alpha.1) |
-| 1 — react bindings | `@me2em/react` | ✅ alpha (0.1.0-alpha.1) |
+| 0 — primitives | `@me2em/core` | ✅ alpha (0.7.0-alpha.2) — LTS program started (DR-6) |
+| 1 — react bindings | `@me2em/react` | ✅ alpha (0.1.0-alpha.2) |
 | 2 — protocol mechanisms | `@me2em/crypto` | ✅ alpha (0.1.0-alpha.1) |
 | 3 — verticals | `@me2em/messenger` | planned (BL-29, pilot: BeSafeChat) |
 | 3 — verticals | `@me2em/iot` | deferred (BL-30) |
