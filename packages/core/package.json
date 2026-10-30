@@ -21,12 +21,17 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "bench": "vitest bench --run",
+    "bench:baseline": "vitest bench --run --outputJson bench/baseline.json",
     "vectors": "tsc -p tsconfig.json && node scripts/generate-vectors.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "build-docs": "typedoc"
   },
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "publishConfig": {
     "access": "public"
   },

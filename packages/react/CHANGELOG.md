@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- `engines.node` floor raised to `>=22.0.0` (A2, applied workspace-wide:
+  root, core, crypto, react).
+
 ## 0.1.0-alpha.2
 
 ### Changed

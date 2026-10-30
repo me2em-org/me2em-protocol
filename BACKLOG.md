@@ -69,10 +69,13 @@ development, not part of the shipped API contract.
 - **BL-34 · in-progress · CI pipeline maintenance.**
   Shipped (CI1): gitleaks v3 (org license), build-first order (fixed
   TS2307 class), CodeQL v4 security-extended, pnpm store caching,
-  ubuntu-24.04 pin. Pending: lint config for root-level legacy files
-  (continue-on-error workaround), audit blocking policy decision,
-  coverage thresholds (@vitest/coverage-v8 in devDeps, unused),
-  branch protection after 2+ stable green runs.
+  ubuntu-24.04 pin. Coverage thresholds enforced in-repo via vitest
+  configs (PR-4, A7): core 90/90, crypto 90/90, react ratcheted at
+  82/71 — raise react to the 90/90 target with its next test slice
+  (this item); the CI wiring diff is supplied to the architect in the
+  PR-4 description. Pending: lint config for root-level
+  legacy files (continue-on-error workaround), audit blocking policy
+  decision, branch protection after 2+ stable green runs.
 - **BL-37 · open · npm dist-tag maintenance.** `latest` for
   @me2em/core points at 0.4.1-alpha.1 and for @me2em/react at
   0.1.0-alpha.1, while new releases ship under the `alpha` tag. When

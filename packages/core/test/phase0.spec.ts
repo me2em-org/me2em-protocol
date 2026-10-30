@@ -1,9 +1,15 @@
-// test/phase0.test.ts
+// test/phase0.spec.ts — Phase 0 smoke tests.
+// Duplication note: subhandle-leaf and atomic-vs-two-step parity tests
+// live in derivation.spec.ts (single source); vectors.spec.ts pins the
+// same paths byte-exactly. This file keeps only phase-0-unique behavior.
 import { describe, it, expect } from 'vitest';
-import { Identity, Handle, SubHandle, Session } from '../src/index.js';
+import { Identity, Session } from '../src/index.js';
 import { normalizeName } from '../src/canonical-name.js';
-
-const testSeed = new Uint8Array(64).fill(42);
+import {
+  TEST_SEED,
+  createTestHandle,
+  tamperPayload,
+} from './test-utils.js';
 
 describe('normalizeName', () => {
   it('should lowercase and trim: "Station-001" → "station-001"', () => {
@@ -32,11 +38,15 @@ describe('normalizeName', () => {
   it('should reject empty string', () => {
     expect(() => normalizeName('')).toThrow();
   });
+
+  it('rejects non-string input with TypeError (defensive branch)', () => {
+    expect(() => normalizeName(42 as unknown as string)).toThrow(TypeError);
+  });
 });
 
 describe('deriveHandle canonicalizes names', () => {
   it('deriveHandle("Station-001") and deriveHandle("station-001") give SAME getPublicKey()', async () => {
-    const identity = await Identity.fromSeed(testSeed);
+    const identity = await Identity.fromSeed(TEST_SEED);
     const h1 = await identity.deriveHandle('Station-001');
     const h2 = await identity.deriveHandle('station-001');
     expect(h1.getPublicKey()).toEqual(h2.getPublicKey());
@@ -44,29 +54,9 @@ describe('deriveHandle canonicalizes names', () => {
   });
 });
 
-describe('derivation entry points agree on keys', () => {
-  it('identity.deriveSubHandle("S","X") === handle.deriveSubHandle("x") same pubkey', async () => {
-    const identity = await Identity.fromSeed(testSeed);
-    const handle = await identity.deriveHandle('S');
-    const subFromIdentity = await identity.deriveSubHandle('S', 'X');
-    const subFromHandle = await handle.deriveSubHandle('x');
-    expect(subFromIdentity.getPublicKey()).toEqual(subFromHandle.getPublicKey());
-    expect(subFromIdentity.getId()).toBe(subFromHandle.getId());
-  });
-});
-
-describe('SubHandle is a leaf', () => {
-  it('subhandle.deriveSubHandle("anything") throws', async () => {
-    const identity = await Identity.fromSeed(testSeed);
-    const sub = await identity.deriveSubHandle('station', 'connector');
-    await expect(sub.deriveSubHandle('anything')).rejects.toThrow(/leaf|MAX_DEPTH/i);
-  });
-});
-
 describe('long-lived sessions verify immediately', () => {
   it('verifyStateless passes right away (not rejected as future-dated)', async () => {
-    const identity = await Identity.fromSeed(testSeed);
-    const handle = await identity.deriveHandle('phase0-session');
+    const { identity, handle } = await createTestHandle('phase0-session');
     const session = await Session.create(handle, {
       audience: 'app',
       scopes: ['read'],
@@ -84,38 +74,16 @@ describe('long-lived sessions verify immediately', () => {
 
 describe('tampered payload rejected', () => {
   it('tampered payload is rejected with signature error', async () => {
-    const identity = await Identity.fromSeed(testSeed);
-    const handle = await identity.deriveHandle('tamper-phase0');
+    const { identity, handle } = await createTestHandle('tamper-phase0');
     const session = await Session.create(handle, {
       audience: 'app',
       scopes: ['read', 'write'],
       ttl: 3600,
     });
 
-    const parts = session.token.split('.');
-    const payloadB64 = parts[0];
-    const signatureB64 = parts[1];
-
-    // Decode payload
-    let base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
-
-    const payloadObj = JSON.parse(
-      new TextDecoder().decode(payloadBytes)
-    ) as Record<string, unknown>;
-
-    payloadObj.scp = ['read']; // Tamper
-
-    const modifiedPayload = JSON.stringify(payloadObj);
-    const modifiedPayloadBytes = new TextEncoder().encode(modifiedPayload);
-    const modifiedPayloadB64 = btoa(String.fromCharCode(...modifiedPayloadBytes))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const tamperedToken = `${modifiedPayloadB64}.${signatureB64}`;
+    const tamperedToken = tamperPayload(session.token, (payload) => {
+      payload.scp = ['read']; // Tamper
+    });
 
     await expect(
       Session.verifyStateless(tamperedToken, identity, 'app')
@@ -125,8 +93,7 @@ describe('tampered payload rejected', () => {
 
 describe('iat is required', () => {
   it('token without iat field is rejected', async () => {
-    const identity = await Identity.fromSeed(testSeed);
-    const handle = await identity.deriveHandle('iat-test');
+    const { identity, handle } = await createTestHandle('iat-test');
     const session = await Session.create(handle, {
       audience: 'app',
       scopes: ['read'],
@@ -137,20 +104,9 @@ describe('iat is required', () => {
     // Подпись станет невалидной, но проверка required fields
     // выполняется РАНЬШЕ signature-проверки, поэтому ожидаем
     // именно 'missing required fields'.
-    const [payloadB64, signatureB64] = session.token.split('.');
-    let base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
-    const obj = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    delete obj.iat;
-    const modified = new TextEncoder().encode(JSON.stringify(obj));
-    const modifiedB64 = btoa(String.fromCharCode(...modified))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const tokenNoIat = `${modifiedB64}.${signatureB64}`;
+    const tokenNoIat = tamperPayload(session.token, (payload) => {
+      delete payload.iat;
+    });
 
     await expect(
       Session.verifyStateless(tokenNoIat, identity, 'app')

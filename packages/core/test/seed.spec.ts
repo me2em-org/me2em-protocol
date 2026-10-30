@@ -194,4 +194,19 @@ describe('Identity.fromSeed 64-byte contract', () => {
     expect(validateSeedPhrase(VECTOR_12.split(' ')).isValid).toBe(true);
     expect(validateSeedPhrase(VECTOR_24.split(' ')).isValid).toBe(true);
   });
+
+  it('rejects an invalid strength (not 128 or 256)', () => {
+    expect(() => generateSeedPhrase(192 as 128)).toThrow(
+      /Seed strength must be 128 \(12 words\) or 256 \(24 words\)/
+    );
+  });
+
+  it('reports invalid words in an otherwise well-formed phrase', () => {
+    const words = VECTOR_12.split(' ');
+    words[11] = 'zzzznotaword'; // 12 words, last one not in the wordlist
+    const result = validateSeedPhrase(words);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Invalid words found');
+    expect(result.error).toContain('zzzznotaword');
+  });
 });
