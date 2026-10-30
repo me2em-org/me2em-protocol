@@ -22,7 +22,7 @@ function toAB(bytes: Uint8Array): ArrayBuffer {
  * HKDF primitive (NOT the PBKDF2-based workaround used in some
  * libraries).
  *
- * Domain separation: all info strings in Me2em start with
+ * Domain separation: all info strings in Me2eM start with
  * `me2em/crypto/v1/…` — callers MUST use a unique info per purpose.
  *
  * @param ikm - Input key material (high entropy: derived from seed

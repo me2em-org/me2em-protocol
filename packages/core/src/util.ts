@@ -1,6 +1,6 @@
 // util.ts
 //
-// Shared utility functions for the Me2em protocol.
+// Shared utility functions for the Me2eM protocol.
 
 /**
  * Encodes a Uint8Array to a URL-safe Base64 string (no padding).

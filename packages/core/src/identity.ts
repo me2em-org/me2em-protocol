@@ -20,7 +20,7 @@ function parseHexSeed(hex: string): Uint8Array {
 /**
  * Represents the root cryptographic identity derived from a seed phrase.
  *
- * An Identity is the foundation of the Me2em protocol. It allows for the
+ * An Identity is the foundation of the Me2eM protocol. It allows for the
  * hierarchical derivation of isolated {@link Handle}s and {@link SubHandle}s
  * for different contexts (e.g., email, social, specific devices) from a
  * single master seed, ensuring zero cross-contamination of cryptographic material.

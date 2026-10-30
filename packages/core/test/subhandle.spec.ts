@@ -1,7 +1,7 @@
 // tests/subhandle.spec.ts
 //
 // Tests for the SubHandle primitive.
-// SubHandle is a leaf node in the Me2em derivation tree (MAX_DEPTH = 2).
+// SubHandle is a leaf node in the Me2eM derivation tree (MAX_DEPTH = 2).
 // It inherits from Handle for polymorphism in Session handling.
 
 import { describe, it, expect } from 'vitest';

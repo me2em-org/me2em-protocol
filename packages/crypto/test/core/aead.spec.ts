@@ -20,7 +20,7 @@ describe('importAeadKey', () => {
 describe('encryptAead / decryptAead', () => {
   it('roundtrip: encrypt then decrypt', async () => {
     const key = await importAeadKey(new Uint8Array(32).fill(0x42));
-    const plaintext = new TextEncoder().encode('Hello, Me2em!');
+    const plaintext = new TextEncoder().encode('Hello, Me2eM!');
     const { ciphertext, iv } = await encryptAead(key, plaintext);
     const decrypted = await decryptAead(key, ciphertext, iv);
     expect(decrypted).toEqual(plaintext);

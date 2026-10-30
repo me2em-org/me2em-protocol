@@ -1,7 +1,7 @@
 // packages/crypto/src/x3dh/types.ts
 
 /**
- * Identity key pair (Ed25519 in Me2em). Long-lived, deterministic
+ * Identity key pair (Ed25519 in Me2eM). Long-lived, deterministic
  * from the seed. In X3DH context: IK_A (initiator) / IK_B (recipient).
  *
  * @example

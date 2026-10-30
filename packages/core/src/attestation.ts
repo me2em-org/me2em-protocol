@@ -1,7 +1,7 @@
 // attestation.ts
 //
 // Attestation module: cryptographically signed, self-contained
-// authorization attestations for the Me2em protocol.
+// authorization attestations for the Me2eM protocol.
 
 import { normalizeName } from './canonical-name.js';
 import { base64urlEncode, base64urlDecode } from './util.js';

@@ -58,7 +58,7 @@ export function x25519SharedSecret(
 /**
  * Converts an Ed25519 private key to its X25519 equivalent
  * (RFC 7748 Montgomery form) — needed for identity keys, which are
- * Ed25519 in Me2em but must participate in ECDH.
+ * Ed25519 in Me2eM but must participate in ECDH.
  *
  * Uses @noble/curves ed25519.utils.toMontgomerySecret() for correct
  * clamping per RFC 7748 Section 5.
