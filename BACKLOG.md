@@ -129,16 +129,20 @@ development, not part of the shipped API contract.
   raised: BL-27 ties attestation revocation to group epoch rotation —
   namespace confusion there is dangerous. Convention first
   (`att:` / `sess:` prefixes), split interfaces on demand.
-- **BL-20 · open · Real protocol test vectors.**
-  Computed vectors for identity/handle/subhandle derivation, name
-  normalization, session sign/verify, attestation determinism — plus
-  X3DH/channel vectors for @me2em/crypto (RFC 5869 vectors already
-  live in crypto tests; extend the pattern).
-- **BL-21 · open · Rewrite specs/core.md against 0.7.0.**
-  Implementation-independent spec: derivation formulas, canonical
-  names, session/attestation formats, both verification modes,
-  revocation semantics. Prerequisite for v1.0 and third-party
-  implementations.
+- **BL-20 · done (PR-3) · Real protocol test vectors.**
+  `specs/test-vectors.json` — computed through the public runtime API by
+  `packages/core/scripts/generate-vectors.ts` (seed, identity/handle/subhandle
+  derivation, passwords, channel keys, shared secrets, byte-exact
+  attestation tokens, pinned session tokens) and enforced by the golden
+  test `packages/core/test/vectors.spec.ts`. X3DH/channel vectors for
+  @me2em/crypto remain future work (RFC 5869 vectors already live in
+  crypto tests).
+- **BL-21 · done (PR-3) · Rewrite specs/core.md against 0.7.0.**
+  Shipped as `specs/v1.0.md` (implementation-independent: derivation
+  formulas and info strings, canonicalization, token formats, payload
+  schemas, both verification modes with error levels, limits
+  2048/4096/±30s, issuance/Signer contract). Draft archived to
+  `specs/archive/draft-core.md` with a deprecation pointer.
 - **BL-22 · open · OpenAPI reference server spec.**
   Real flow: POST /auth/challenge, /auth/verify, /attestations,
   /backup/envelope, /prekeys/* (X3DH), revocation endpoints. Do
@@ -258,6 +262,20 @@ quotes in this entry are intentional).
   after every merge (same-PR consumer rule A6). Derivation freeze:
   after the 64-byte seed PR, no derivation-affecting change before
   v1.0.0 (§4). Release gated on external audit or bug bounty (D7).
+- **DR-7 (2026-10-31)** — Specs tree hygiene (rides in PR-3):
+  `specs/archive/` and `specs/draft/` are removed from the working
+  tree. Working-tree rule: only live artifacts — the normative spec
+  (`specs/v1.0.md`), machine-checkable vectors
+  (`specs/test-vectors.json`), active docs. The pre-0.6 draft
+  (server-issued sessions, registry-based lookup) is dead
+  architecture, incompatible with core 0.6+; everything still
+  normative in it is captured by `specs/v1.0.md` and
+  `derivation-paths.ts`. The 9-line OpenAPI stub under
+  `specs/draft/openapi/` was not a spec — BL-22 will be written
+  fresh with `@me2em/server`. Git history, not the tree, retains
+  the drafts (retrievable at `e0f4dc5`). This supersedes the
+  archive disposition of D9/PLAN-LTS as the final one; those
+  records remain untouched as history.
 
 ## Package Roadmap (strategy)
 

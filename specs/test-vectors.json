@@ -1,0 +1,186 @@
+{
+  "spec": "Me2eM core protocol",
+  "spec_version": "1.0",
+  "vector_file_version": 1,
+  "algorithm": "BIP39 (seed) + HKDF-SHA256 (RFC 5869, derivation) + Ed25519 (RFC 8032, signatures) + X25519 (RFC 7748, ECDH)",
+  "notes": [
+    "All derived keys are 32 bytes and used directly as Ed25519 seeds (RFC 8032).",
+    "Base64URL is unpadded (RFC 4648 §5); ids are base64url of the 32-byte public key.",
+    "Attestation tokens are byte-deterministic given (grant, ttlSeconds, jti, now).",
+    "Session tokens: iat/exp come from the issuer clock at creation time; vectors pin the payload bytes and reproduce the signature via Ed25519 over those bytes.",
+    "Fixed clock NOW = 1767225600 = 2026-01-01T00:00:00Z."
+  ],
+  "vectors": {
+    "seed": [
+      {
+        "description": "BIP39 official vector: 12 words, empty passphrase → 64-byte seed",
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "passphrase": "",
+        "expected_seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4"
+      },
+      {
+        "description": "BIP39 vector: 24 words, empty passphrase → 64-byte seed (same length as 12 words)",
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+        "passphrase": "",
+        "expected_seed_hex": "408b285c123836004f4b8842c89324c1f01382450c0d439af345ba7fc49acf705489c6fc77dbd4e3dc1dd8cc6bc9f043db8ada1e243c4a0eafb290d399480840"
+      }
+    ],
+    "identity_derivation": [
+      {
+        "description": "Root identity key: HKDF-SHA256(ikm=seed64, salt=empty, info=\"me2em/identity/v1/root\", L=32)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "expected_public_key_hex": "a03cecaa6ba63e62ba7f64279869a672a22fc743de3a4a6703a160e93f646876"
+      }
+    ],
+    "handle_derivation": [
+      {
+        "description": "Handle key: HKDF-SHA256(ikm=rootPriv, salt=empty, info=\"me2em/handle/v1/work\", L=32)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "expected_public_key_hex": "1c697498642c5a0897b06492127c261a5cd4e65a08f08c792e8a4da1e9a21fe3",
+        "expected_id_b64url": "HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M"
+      },
+      {
+        "description": "Different name → unrelated key (same identity)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "personal",
+        "expected_public_key_hex": "9fb7846aff2a1c9a0fabd5977742b636882e91c3ca26040019c2448fe53da9f6",
+        "expected_id_b64url": "n7eEav8qHJoPq9WXd0K2NogukcPKJgQAGcJEj-U9qfY"
+      }
+    ],
+    "subhandle_derivation": [
+      {
+        "description": "SubHandle key: HKDF-SHA256(ikm=handlePriv, salt=empty, info=\"me2em/subhandle/v1/work/connector-1\", L=32)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "sub_name": "connector-1",
+        "expected_public_key_hex": "2033c52f1064c0a86200b7725a798a6316be6ee7a88e814af51d41ea57d3be98",
+        "expected_id_b64url": "IDPFLxBkwKhiALdyWnmKYxa-bueojoFK9R1B6lfTvpg"
+      }
+    ],
+    "derive_password": [
+      {
+        "description": "Default length 16: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1\", L=16) → base64url",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "context": "github",
+        "length": 16,
+        "expected_b64url": "f9QVxZqJV-e5ChmLp_x5Vw"
+      },
+      {
+        "description": "Explicit length 32",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "context": "github",
+        "length": 32,
+        "expected_b64url": "f9QVxZqJV-e5ChmLp_x5V0KdGKwjHLrHMfHqQpspC9o"
+      },
+      {
+        "description": "Context canonicalization: lowercase + trim → identical to \"github\"",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "context": "  GitHub ",
+        "length": 16,
+        "expected_b64url": "f9QVxZqJV-e5ChmLp_x5Vw"
+      }
+    ],
+    "derive_channel_key": [
+      {
+        "description": "Channel key: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/channel/telemetry-v1\", info=\"me2em/channel/v1\", L=32)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "context": "telemetry-v1",
+        "expected_key_hex": "110b968a39b961615ac8e27b3511be3720981448da05822bce5af146305a3311"
+      }
+    ],
+    "derive_shared_secret": [
+      {
+        "description": "X25519 (Ed25519→Montgomery) + HKDF-SHA256(ikm=rawECDH, salt=sorted(64B both public keys), info=\"me2em/p2p-channel/v2\", L=32)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name_a": "work",
+        "handle_name_b": "personal",
+        "expected_secret_hex": "30df812d6ac4cb8f29789703373bd6dde017ade473c5d3446c672e46507be533"
+      }
+    ],
+    "attestation_handle": [
+      {
+        "description": "Root→Handle attestation; byte-deterministic given (grant, ttlSeconds, jti, now)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "subject_handle_name": "work",
+        "grant": {
+          "audiences": [
+            "ev-app.com"
+          ],
+          "scopes": [
+            "charge:start",
+            "charge:stop"
+          ],
+          "maxSessionTtl": 7200,
+          "subNamePatterns": [
+            "connector-*"
+          ]
+        },
+        "ttl_seconds": 31536000,
+        "now": 1767225600,
+        "jti": "vector-a-handle-0001",
+        "expected_payload_json": "{\"typ\":\"me2em/attestation/v1\",\"subjectName\":\"work\",\"subjectId\":\"HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M\",\"grant\":{\"audiences\":[\"ev-app.com\"],\"scopes\":[\"charge:start\",\"charge:stop\"],\"maxSessionTtl\":7200,\"subNamePatterns\":[\"connector-*\"]},\"iat\":1767225600,\"exp\":1798761600,\"jti\":\"vector-a-handle-0001\"}",
+        "expected_token": "eyJ0eXAiOiJtZTJlbS9hdHRlc3RhdGlvbi92MSIsInN1YmplY3ROYW1lIjoid29yayIsInN1YmplY3RJZCI6IkhHbDBtR1FzV2dpWHNHU1NFbndtR2x6VTVsb0k4SXg1TG9wTm9lbWlILU0iLCJncmFudCI6eyJhdWRpZW5jZXMiOlsiZXYtYXBwLmNvbSJdLCJzY29wZXMiOlsiY2hhcmdlOnN0YXJ0IiwiY2hhcmdlOnN0b3AiXSwibWF4U2Vzc2lvblR0bCI6NzIwMCwic3ViTmFtZVBhdHRlcm5zIjpbImNvbm5lY3Rvci0qIl19LCJpYXQiOjE3NjcyMjU2MDAsImV4cCI6MTc5ODc2MTYwMCwianRpIjoidmVjdG9yLWEtaGFuZGxlLTAwMDEifQ.FM1ptwUqDrtxDWRuV8i3PZQSRFg09qpf25TkUJn6v2m2x_4EfhjKoNNNiMfkhrNvspb7gvQbntjrQTzAss83BQ"
+      }
+    ],
+    "attestation_subhandle": [
+      {
+        "description": "Handle→SubHandle attestation signed by the Handle key (chain level 2)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "subject_handle_name": "work",
+        "subject_sub_name": "connector-1",
+        "grant": {
+          "audiences": [
+            "ev-app.com"
+          ],
+          "scopes": [
+            "charge:start"
+          ],
+          "maxSessionTtl": 3600
+        },
+        "ttl_seconds": 1800,
+        "now": 1767225600,
+        "jti": "vector-b-subhandle-0001",
+        "expected_payload_json": "{\"typ\":\"me2em/attestation/v1\",\"subjectName\":\"connector-1\",\"subjectId\":\"IDPFLxBkwKhiALdyWnmKYxa-bueojoFK9R1B6lfTvpg\",\"grant\":{\"audiences\":[\"ev-app.com\"],\"scopes\":[\"charge:start\"],\"maxSessionTtl\":3600},\"iat\":1767225600,\"exp\":1767227400,\"jti\":\"vector-b-subhandle-0001\"}",
+        "expected_token": "eyJ0eXAiOiJtZTJlbS9hdHRlc3RhdGlvbi92MSIsInN1YmplY3ROYW1lIjoiY29ubmVjdG9yLTEiLCJzdWJqZWN0SWQiOiJJRFBGTHhCa3dLaGlBTGR5V25tS1l4YS1idWVvam9GSzlSMUI2bGZUdnBnIiwiZ3JhbnQiOnsiYXVkaWVuY2VzIjpbImV2LWFwcC5jb20iXSwic2NvcGVzIjpbImNoYXJnZTpzdGFydCJdLCJtYXhTZXNzaW9uVHRsIjozNjAwfSwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjc0MDAsImp0aSI6InZlY3Rvci1iLXN1YmhhbmRsZS0wMDAxIn0.toSNsn0js4iTB72V3sSQb7jUnEZ11rSTq9QHQrmFgUjwMIDhNsmdRf8-wVepvITL-koz5oYBxa4oBZvd0GEyDA"
+      }
+    ],
+    "session_handle": [
+      {
+        "description": "Handle session token; payload pinned (Session.create stamps iat from the wall clock). Ed25519 over the exact payload bytes",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "audience": "ev-app.com",
+        "scopes": [
+          "charge:start"
+        ],
+        "ttl": 1800,
+        "iat": 1767225600,
+        "jti": "vector-session-handle-0001",
+        "expected_payload_json": "{\"hId\":\"HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M\",\"hNm\":\"work\",\"aud\":\"ev-app.com\",\"scp\":[\"charge:start\"],\"exp\":1767227400,\"iat\":1767225600,\"jti\":\"vector-session-handle-0001\"}",
+        "expected_token": "eyJoSWQiOiJIR2wwbUdRc1dnaVhzR1NTRW53bUdselU1bG9JOEl4NUxvcE5vZW1pSC1NIiwiaE5tIjoid29yayIsImF1ZCI6ImV2LWFwcC5jb20iLCJzY3AiOlsiY2hhcmdlOnN0YXJ0Il0sImV4cCI6MTc2NzIyNzQwMCwiaWF0IjoxNzY3MjI1NjAwLCJqdGkiOiJ2ZWN0b3Itc2Vzc2lvbi1oYW5kbGUtMDAwMSJ9.kNzVjPg5Vg5bV80sYQRJG3d5mN0VqMgE03nMzIvCwSo2X7wreomjvUdHVpzJUW_TwGhldq8Vgfi5P1ZzOrCxCw"
+      }
+    ],
+    "session_subhandle": [
+      {
+        "description": "SubHandle session token; hPath appended after base fields (normative key order)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "sub_name": "connector-1",
+        "audience": "ev-app.com",
+        "scopes": [
+          "charge:start"
+        ],
+        "ttl": 1800,
+        "iat": 1767225600,
+        "jti": "vector-session-subhandle-0001",
+        "expected_payload_json": "{\"hId\":\"IDPFLxBkwKhiALdyWnmKYxa-bueojoFK9R1B6lfTvpg\",\"hNm\":\"connector-1\",\"aud\":\"ev-app.com\",\"scp\":[\"charge:start\"],\"exp\":1767227400,\"iat\":1767225600,\"jti\":\"vector-session-subhandle-0001\",\"hPath\":[\"work\",\"connector-1\"]}",
+        "expected_token": "eyJoSWQiOiJJRFBGTHhCa3dLaGlBTGR5V25tS1l4YS1idWVvam9GSzlSMUI2bGZUdnBnIiwiaE5tIjoiY29ubmVjdG9yLTEiLCJhdWQiOiJldi1hcHAuY29tIiwic2NwIjpbImNoYXJnZTpzdGFydCJdLCJleHAiOjE3NjcyMjc0MDAsImlhdCI6MTc2NzIyNTYwMCwianRpIjoidmVjdG9yLXNlc3Npb24tc3ViaGFuZGxlLTAwMDEiLCJoUGF0aCI6WyJ3b3JrIiwiY29ubmVjdG9yLTEiXX0.ZULFAFrH3MvBZ6exkOFcijPlvODlEM_E-UxYzwPJaqfG7ML8USb755zmkdPe1l47A_d3DsRRiaULg9mmMrRRCQ"
+      }
+    ]
+  }
+}
