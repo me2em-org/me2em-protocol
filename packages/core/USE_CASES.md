@@ -1,4 +1,4 @@
-# Me2em Protocol: Advanced Use Cases & Scenarios
+# Me2eM Protocol: Advanced Use Cases & Scenarios
 
 Production-ready examples for `@me2em/core` v0.7.0-alpha.1 and
 `@me2em/crypto` v0.1.0-alpha.1.
@@ -274,7 +274,7 @@ of the trusted perimeter and already holds the root key.
 
 ## Scenario 4: Multi-App SSO (UC-4 — Shared User Base)
 
-One Me2em instance, many applications, zero registered users. The account
+One Me2eM instance, many applications, zero registered users. The account
 is the seed phrase; the server stores no profiles — only hashed refresh
 tokens and revoked `jti` entries. This is the commercial core of the
 
@@ -665,7 +665,7 @@ Channels rotate epochs; previous-epoch material is wiped and messages
 from it become undecryptable. Per-message keys and a strictly-increasing
 replay counter protect everything in between.
 
-The identity layer stays Me2em: `@alice` is a Handle derived from her
+The identity layer stays Me2eM: `@alice` is a Handle derived from her
 seed — the messenger account is recoverable on any device from the seed
 alone, and a second device derives the same identity without a sync
 service.

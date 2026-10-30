@@ -4,7 +4,7 @@
 
 ## 📦 @me2em/react — React bindings
 
-React bindings for the Me2em protocol: identity lifecycle, seed phrase UX, and hierarchical handle derivation.
+React bindings for the Me2eM protocol: identity lifecycle, seed phrase UX, and hierarchical handle derivation.
 
 ## Install
 
@@ -24,13 +24,13 @@ Requires React >= 18.0.0 as a peer dependency.
 ## Quick Start
 
 ```tsx
-import { Me2emProvider, useCreateIdentity } from '@me2em/react';
+import { Me2eMProvider, useCreateIdentity } from '@me2em/react';
 
 function App() {
   return (
-    <Me2emProvider>
+    <Me2eMProvider>
       <CreateIdentityScreen />
-    </Me2emProvider>
+    </Me2eMProvider>
   );
 }
 
@@ -90,7 +90,7 @@ this package:
 | **Context cache** | Per-identity encrypted storage of derived Handle context. |
 
 Full glossary (including Attestation, SubHandle, Ephemeral material):
-see the [root README](../../README.md).
+see the root [GLOSSARY.md](../../GLOSSARY.md).
 
 **This package never persists your seed.** The seed phrase exists in
 two places only — your paper and transient memory during login. What
@@ -221,4 +221,4 @@ Each identity gets a separate IndexedDB database (name = SHA-256 hash of identit
 
 Alpha. API may change between 0.1.x releases. See [packages/core/README.md](../../packages/core/README.md) for the underlying protocol.
 
-Roadmap: @me2em/crypto protocol mechanisms — planned
+Roadmap: `@me2em/crypto` shipped (0.1.0-alpha.1); `@me2em/messenger` planned (BACKLOG BL-29).

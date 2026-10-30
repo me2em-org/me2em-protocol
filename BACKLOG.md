@@ -1,6 +1,6 @@
-# Me2em Protocol — Development Backlog
+# Me2eM Protocol — Development Backlog
 
-Baseline: core v0.7.0-alpha.1 (186) · react v0.1.0-alpha.1 (101) ·
+Baseline: core v0.7.0-alpha.2 (186) · react v0.1.0-alpha.2 (101) ·
 crypto v0.1.0-alpha.1 (151) = 438 tests. tsc/build-docs clean per package.
 This document is **advisory** — a recommendation list for future
 development, not part of the shipped API contract.
@@ -15,17 +15,33 @@ development, not part of the shipped API contract.
   new versioned string (`/v2`) with a migration note — never in place.
 - Publishing: only from `packages/*` directories (`pnpm --filter`),
   never from the workspace root (root is `"private": true`).
+- Publication checklist (DR-4): fresh `pnpm build` before publish;
+  `pnpm publish --tag alpha`; post-checks — `npm view <pkg>@<ver>
+  dependencies`, tarball inspection, and a clean-install build of a
+  real consumer (workspace linking masks published-manifest issues).
+  npm serves metadata before the tarball (2–5 min) — not an error.
+- Status checks: pushing to `main` must never bypass required status
+  checks — CI must actually run (lesson of 2026-10-30).
+- TSDoc is the source of the per-package API docs
+  (core/crypto/react.me2em.com); TypeDoc runs with
+  `treatWarningsAsErrors: true` — every exported symbol needs complete
+  TSDoc (description, params/returns, `@example` for non-trivial API).
 - Versioning: independent per-package semver. Cross-package
-  compatibility via workspace:* ranges at publish time. Changesets
-  adoption planned before 1.0.
+  dependencies inside the monorepo use `workspace:^` — `pnpm publish`
+  substitutes `workspace:*` with an EXACT version, which breaks
+  consumers on every release (DR-4). Changesets adoption planned
+  before 1.0.
 - Spec self-sufficiency: iteration specs must be executable in a fresh
   agent session — no references to prior conversations; all context
   inline.
 - Commit workflow: the agent does NOT commit; the architect reviews
   and runs the commit commands provided after acceptance.
-- Terminology: protocol terms are domain-neutral (root README →
-  Terminology); every use case assigns its own domain interpretation.
-  Normative for all READMEs, specs, and articles.
+- Terminology: protocol terms are domain-neutral (normative glossary:
+  root GLOSSARY.md); every use case assigns its own domain
+  interpretation. Normative for all READMEs, specs, and articles.
+- Brand: writing canon — Me2eM (human-facing) / me2em (machine:
+  npm, code identifiers, domains, URLs, CLI); `Me2em` is forbidden.
+  Normative text: root README → Brand & Naming (DR-5).
 
 ## P1 — Correctness & Security
 
@@ -57,6 +73,19 @@ development, not part of the shipped API contract.
   (continue-on-error workaround), audit blocking policy decision,
   coverage thresholds (@vitest/coverage-v8 in devDeps, unused),
   branch protection after 2+ stable green runs.
+- **BL-37 · open · npm dist-tag maintenance.** `latest` for
+  @me2em/core points at 0.4.1-alpha.1 and for @me2em/react at
+  0.1.0-alpha.1, while new releases ship under the `alpha` tag. When
+  versions stabilize, re-point `latest` (`npm dist-tag add
+  @me2em/core@<ver> latest`) so a plain `npm install @me2em/core`
+  resolves to the current line.
+- **BL-38 · open · Brand sweep in code comments (DR-5).** Documentation
+  and package descriptions are swept (2026-10-30). Per DR-5, code
+  identifiers are machine text and are NOT renamed — `Me2emProvider`,
+  `Me2emContext`, `useMe2emContext` stay as-is. Remaining scope is
+  prose only: JSDoc/TSDoc comments across core/crypto/react, the test
+  fixture `Hello, Me2em!` and the suite name `Me2em Core
+  Functionality`. specs/draft/ archives stay untouched.
 
 ## P3 — Protocol Extensions (0.8+)
 
@@ -138,7 +167,7 @@ development, not part of the shipped API contract.
   test comment outdated ("passed as-is") after the NFKC fix.
 - **BL-24 · open ·** Final audit of non-English comments across all
   packages (core and react fixed; verify crypto).
-- **BL-24 · open ·** Create security@me2em.com Read:SECURITY.md
+- **BL-36 · open ·** Create security@me2em.com (see SECURITY.md).
 
 ## Closed
 
@@ -181,7 +210,8 @@ BL-25 (publish pipeline fixed).
 
 - **DR-1 (0.7.0)** — Terminology standard: protocol terms are
   domain-neutral; domain interpretations per use case. Normative
-  glossary lives in root README → Terminology. Terms "Session-Bound
+  glossary lives in root GLOSSARY.md (moved from the root README,
+  2026-10-30). Terms "Session-Bound
   Identity" and "Non-persistent private key" REJECTED as misleading
   (identity is constant, not session-bound; keys are computed, not
   stored) → adopted: **Seed-Derived Identity**, **Transient/Ephemeral
@@ -195,6 +225,28 @@ BL-25 (publish pipeline fixed).
   spec §3.3: EK in DH2/DH3/DH4, OTK mandatory on both sides,
   zero-fallback prohibited. Deviations found in earlier code
   (swapped roles, zero-fallback) documented as anti-patterns.
+- **DR-4 (core 0.7.0-alpha.2 / react 0.1.0-alpha.2, 2026-10-30)** —
+  Publishing incident and fix. `pnpm publish` substitutes `workspace:*`
+  with the EXACT workspace version, so the published react pinned
+  `@me2em/core@0.7.0-alpha.1`, whose artifact lacked the `wordlist`
+  export its changelog announced — the site build failed with
+  `[MISSING_EXPORT] "wordlist"`. Fixes: core alpha.2 ships the real
+  re-export (`@scure/bip39 ^1.3.0` added to dependencies); react
+  alpha.2 declares `^0.7.0-alpha.2` (source: `workspace:^`). Rules:
+  cross-package deps use `workspace:^` (never `workspace:*`, never
+  exact pins); every publication is verified as a "package + consumer"
+  pair on a clean install; required status checks on `main` are never
+  bypassed.
+- **DR-5 (2026-10-30)** — Brand writing canon: exactly two forms
+  project-wide — **Me2eM** (all human-facing text) and **me2em**
+  (machine contexts: npm, code identifiers, domains, URLs, CLI);
+  `Me2em` is a forbidden typo form. Normative text: root README →
+  Brand & Naming. The rough note formerly appended to this file was
+  removed; the documentation sweep (all Markdown, package.json
+  descriptions, BACKLOG header) is complete as of 2026-10-30.
+  Remaining: code comments and test strings — BL-38 (code identifiers
+  are machine text and are not renamed); archived drafts in
+  specs/draft/ are left as-is.
 
 ## Package Roadmap (strategy)
 
@@ -210,11 +262,3 @@ BL-25 (publish pipeline fixed).
 Dependency rule: strictly upward (verticals → crypto → core); verticals
 never depend on each other. Every vertical keeps UI logic in
 `src/react/`, domain logic in `src/headless/`.
-
-
--------
-
-Канон написания — Me2eM, и только две формы на весь проект
-Me2eM — всё человеческое: проза, заголовки, логотип, футер, мета, соцсети. Бренд не подчиняется предложению: iPhone в начале строки остаётся iPhone, а не «Iphone». Форма «Me2em в начале строки» — это деградация, которую придётся контролировать в трёх языках.
-me2em — только машинные контексты, где регистр технически ограничен: npm, идентификаторы в коде, домен, URL, CLI.
-Me2em — запретить как опечаточную форму. Три сосуществующих написания на сайте, который через этап станет трёхъязычным (а в ZH латиница бренда вообще не переводится) — гарантированный хаос на 113 страницах.

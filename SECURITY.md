@@ -2,7 +2,7 @@
 
 ## 🔐 Supported Versions
 
-Me2em packages version independently. Security fixes ship in the
+Me2eM packages version independently. Security fixes ship in the
 latest alpha of every package:
 
 | Package | Version | Supported |
@@ -12,12 +12,12 @@ latest alpha of every package:
 | `@me2em/react` | 0.1.0-alpha.x | ✅ Yes |
 | any older release | — | ❌ No |
 
-> Me2em is in active development. Always use the latest alpha of each
+> Me2eM is in active development. Always use the latest alpha of each
 > package for security fixes.
 
 ## 🚨 Reporting a Vulnerability
 
-Me2em handles cryptographic identities, key derivation, and
+Me2eM handles cryptographic identities, key derivation, and
 authentication. We take security seriously.
 
 **If you discover a security vulnerability:**
@@ -55,7 +55,7 @@ Understanding the architecture helps you report accurately:
 
 ## 🛡️ Security Best Practices for Users
 
-When implementing Me2em in your application:
+When implementing Me2eM in your application:
 
 ✅ **Do**:
 - Treat the seed phrase as the ONLY permanent carrier of identity —
@@ -105,4 +105,4 @@ This policy is reviewed quarterly. Last updated: September 2026.
 
 ---
 
-*Part of the Me2em ecosystem: [github.com/me2em-org](https://github.com/me2em-org) | Contact: security@me2em.com*
+*Part of the Me2eM ecosystem: [github.com/me2em-org](https://github.com/me2em-org) | Contact: security@me2em.com*

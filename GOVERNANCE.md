@@ -1,6 +1,6 @@
-# Governance Model: Me2em Ecosystem
+# Governance Model: Me2eM Ecosystem
 
-> This document describes how decisions are made in the Me2em open-source project.
+> This document describes how decisions are made in the Me2eM open-source project.
 
 **Version**: 1.0  
 **Last Updated**: May 2026  
@@ -10,7 +10,7 @@
 
 ## 🎯 Philosophy
 
-Me2em is built on three principles:
+Me2eM is built on three principles:
 
 1. **Privacy by Design**: Technical decisions must prioritize user privacy and cryptographic security.
 2. **Open Collaboration**: Anyone can contribute; merit is earned through quality work, not affiliation.
@@ -54,7 +54,7 @@ Strategic decision-makers for the protocol and ecosystem.
 - Approve breaking changes to the protocol spec
 - Resolve maintainer disputes
 - Manage security disclosures and releases
-- Represent Me2em in external partnerships
+- Represent Me2eM in external partnerships
 
 **How to become**:
 1. Be a Maintainer for ≥6 months
@@ -77,7 +77,7 @@ Representative body for broader community input (post-v1.0).
 - **Tie-breaker**: Repo Maintainer(s)
 
 ### Protocol Specification Changes
-- **Process**: Me2em Improvement Proposal (MIP) → Core Team review → Community comment period (14 days) → Core Team vote
+- **Process**: Me2eM Improvement Proposal (MIP) → Core Team review → Community comment period (14 days) → Core Team vote
 - **Threshold**: ≥2/3 Core Team approval
 - **Documentation**: All MIPs archived in `specs/MIPs/`
 
@@ -119,7 +119,7 @@ Core Team prioritizes based on:
 1. Security & stability
 2. Community demand (👍 reactions, use-case validation)
 3. Technical feasibility
-4. Alignment with Me2em philosophy
+4. Alignment with Me2eM philosophy
 
 ---
 
@@ -129,4 +129,4 @@ This document may be amended following the "Governance Changes" process above.
 
 ---
 
-*Part of the Me2em ecosystem: [github.com/me2em-org](https://github.com/me2em-org) | Contact: hello@me2em.com*
+*Part of the Me2eM ecosystem: [github.com/me2em-org](https://github.com/me2em-org) | Contact: hello@me2em.com*

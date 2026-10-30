@@ -1,7 +1,7 @@
 {
   "name": "@me2em/core",
   "version": "0.7.0-alpha.2",
-  "description": "Core primitives for the Me2em authorization protocol: Identity, Handle, and Session",
+  "description": "Core primitives for the Me2eM authorization protocol: Identity, Handle, and Session",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
