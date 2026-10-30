@@ -1,5 +1,37 @@
 # Changelog
 
+## [Unreleased] → will ship in 0.8.0
+
+### BREAKING
+- **Seed = 64 bytes (BIP39), D1.** `get32ByteSeedFromMnemonic` is replaced by
+  `get64ByteSeedFromMnemonic`, which returns the full 64-byte BIP39 seed
+  (PBKDF2-HMAC-SHA512 output) without the previous SHA-256 post-hashing.
+  `Identity.fromSeed` now accepts 64 raw bytes or a 128-character hex string;
+  a 32-byte / 64-hex seed throws `Invalid seed: must be 64 bytes`.
+  HKDF info strings are unchanged — only the input key material changes.
+  **All identities, handles, passwords, channel keys and shared secrets
+  derived from a mnemonic change.** Re-derive the seed via the new function
+  and re-issue attestations/sessions. There are no compatibility shims and
+  no migration guide (no-compatibility mandate): this record and the
+  CHANGELOG are the history.
+- Removed the undocumented SHA-256(`seed64`) reduction step. It was a
+  nonstandard deviation from BIP39: identities derived here could not be
+  reproduced from the same mnemonic in any BIP39-compatible tooling.
+  Ed25519 keys are now derived by HKDF-SHA256 directly from the 64-byte
+  standard seed.
+
+### Added
+- Official BIP39 test vectors in `test/seed.spec.ts` (12-word and 24-word
+  mnemonics, empty and non-empty passphrase), cross-verified against an
+  independent PBKDF2-HMAC-SHA512 implementation.
+- 12-vs-24-word seed equivalence tests: both strengths produce a 64-byte
+  seed; different strengths derive different (but deterministic) identities.
+
+### Fixed
+- `index.ts` module JSDoc example passed a mnemonic string directly to
+  `Identity.fromSeed` (would throw at runtime); the example now derives
+  the seed first.
+
 ## 0.7.0-alpha.2
 
 ### Fixed

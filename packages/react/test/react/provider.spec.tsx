@@ -5,7 +5,7 @@ import { useMe2emContext } from '../../src/react/context.js';
 import { useHandle } from '../../src/react/useHandle.js';
 import { useCreateIdentity } from '../../src/react/useCreateIdentity.js';
 import { useImportSeed } from '../../src/react/useImportSeed.js';
-import { get32ByteSeedFromMnemonic } from '@me2em/core';
+import { get64ByteSeedFromMnemonic } from '@me2em/core';
 describe('Me2emProvider', () => {
   it('returns hasIdentity=false when no identity', () => {
     const { result } = renderHook(() => useMe2emContext(), {
@@ -17,7 +17,7 @@ describe('Me2emProvider', () => {
   });
 
   it('activateIdentity sets hasIdentity=true after async completion', async () => {
-    const seed = await get32ByteSeedFromMnemonic(
+    const seed = await get64ByteSeedFromMnemonic(
       'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
     );
 
@@ -33,7 +33,7 @@ describe('Me2emProvider', () => {
   });
 
   it('clearIdentity sets hasIdentity=false', async () => {
-    const seed = await get32ByteSeedFromMnemonic(
+    const seed = await get64ByteSeedFromMnemonic(
       'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
     );
 
@@ -135,7 +135,7 @@ describe('useHandle', () => {
   });
 
   it('returns Handle after identity activation', async () => {
-    const seed = await get32ByteSeedFromMnemonic(
+    const seed = await get64ByteSeedFromMnemonic(
       'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
     );
 

@@ -84,8 +84,8 @@ pnpm add @me2em/core
 ```typescript
 import { Identity, Session } from '@me2em/core';
 
-// 1. Create an Identity from a 32-byte seed
-const seed = new Uint8Array(32).fill(42); // use a CSPRNG in production
+// 1. Create an Identity from a 64-byte seed
+const seed = new Uint8Array(64).fill(42); // use a CSPRNG in production
 const identity = await Identity.fromSeed(seed);
 
 // 2. Derive a contextual Handle
@@ -115,19 +115,19 @@ console.log(session.token); // base64url(payload).base64url(signature)
 ```typescript
 import {
   Identity, generateSeedPhrase,
-  get32ByteSeedFromMnemonic, validateSeedPhrase,
+  get64ByteSeedFromMnemonic, validateSeedPhrase,
 } from '@me2em/core';
 
 const phrase = generateSeedPhrase(128);          // 12 words (256 → 24 words)
 const check = validateSeedPhrase(phrase);
 if (!check.isValid) throw new Error(check.error);
 
-const seedBytes = await get32ByteSeedFromMnemonic(phrase);
+const seedBytes = await get64ByteSeedFromMnemonic(phrase); // full 64-byte BIP39 seed
 const identity = await Identity.fromSeed(seedBytes);
 ```
 
 > ⚠️ Passphrases (BIP39 "25th word") ARE supported:
-> `get32ByteSeedFromMnemonic(words, passphrase)`. The passphrase is
+> `get64ByteSeedFromMnemonic(words, passphrase)`. The passphrase is
 > case-sensitive, not recoverable, and silently derives a different
 > identity if mistyped. Store it with the same care as the words.
 
@@ -269,7 +269,7 @@ external access granted via Mode 2 — see
 
 ```typescript
 class Identity {
-  static fromSeed(seed: Uint8Array | string): Promise<Identity>; // 32 bytes or 64-char hex
+  static fromSeed(seed: Uint8Array | string): Promise<Identity>; // 64 bytes or 128-char hex
   deriveHandle(name: string, metadata?: HandleMetadata): Promise<Handle>;
   deriveSubHandle(handleName: string, subName: string,
                   metadata?: SubHandleMetadata): Promise<SubHandle>; // atomic, for verification

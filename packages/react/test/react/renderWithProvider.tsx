@@ -7,8 +7,8 @@ export const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
 export async function testSeed(): Promise<Uint8Array> {
-  const { get32ByteSeedFromMnemonic } = await import('@me2em/core');
-  return get32ByteSeedFromMnemonic(TEST_MNEMONIC);
+  const { get64ByteSeedFromMnemonic } = await import('@me2em/core');
+  return get64ByteSeedFromMnemonic(TEST_MNEMONIC);
 }
 
 export function withProvider(node?: ReactNode): (props: { children: ReactNode }) => ReactNode {

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { Identity, Attestation, AttestationError, Session, type RevocationChecker } from '../src/index.js';
 import { base64urlEncode, base64urlDecode } from '../src/util.js';
 
-const testSeed = new Uint8Array(32).fill(42);
+const testSeed = new Uint8Array(64).fill(42);
 const identity = await Identity.fromSeed(testSeed);
 
 async function expectCode(
@@ -410,7 +410,7 @@ describe('verifyAttested: negative cases', () => {
   });
 
   it('19. Handle-сессия с чужим hId', async () => {
-    const otherIdentity = await Identity.fromSeed(new Uint8Array(32).fill(55));
+    const otherIdentity = await Identity.fromSeed(new Uint8Array(64).fill(55));
     const otherHandle = await otherIdentity.deriveHandle('other-station');
     const A = await identity.attestHandle('station-001', grantA);
     const session = await Session.create(otherHandle, {

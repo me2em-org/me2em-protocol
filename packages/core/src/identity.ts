@@ -9,11 +9,11 @@ import { normalizeName } from './canonical-name.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 
 function parseHexSeed(hex: string): Uint8Array {
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error('Seed string must be 64 hex characters');
+  if (!/^[0-9a-fA-F]{128}$/.test(hex)) {
+    throw new Error('Seed string must be 128 hex characters');
   }
-  const out = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  const out = new Uint8Array(64);
+  for (let i = 0; i < 64; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   return out;
 }
 
@@ -45,13 +45,17 @@ export class Identity {
   /**
    * Initializes a new Identity from a BIP39 mnemonic seed phrase or raw seed bytes.
    *
-   * @param seed - A 32-byte raw Uint8Array seed, or a hex-encoded string of 32 bytes.
+   * The seed is the full 64-byte BIP39 seed (PBKDF2-HMAC-SHA512 output,
+   * as produced by {@link get64ByteSeedFromMnemonic}). It is used as the
+   * HKDF-SHA256 input key material; HKDF info strings are unchanged.
+   *
+   * @param seed - A 64-byte raw Uint8Array seed, or a hex-encoded string of 64 bytes.
    * @returns A Promise resolving to a new Identity instance.
-   * @throws {Error} If the provided seed is not exactly 32 bytes.
+   * @throws {Error} If the provided seed is not exactly 64 bytes.
    *
    * @example
    * ```ts
-   * const seed = await get32ByteSeedFromMnemonic('abandon abandon ... art');
+   * const seed = await get64ByteSeedFromMnemonic('abandon abandon ... art');
    * const identity = await Identity.fromSeed(seed);
    * ```
    */
@@ -60,8 +64,8 @@ export class Identity {
       ? parseHexSeed(seed)
       : seed;
 
-    if (seedBytes.length !== 32) {
-      throw new Error('Invalid seed: must be 32 bytes');
+    if (seedBytes.length !== 64) {
+      throw new Error('Invalid seed: must be 64 bytes');
     }
 
     const key = hkdf(

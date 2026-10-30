@@ -5,7 +5,7 @@ import { Me2emProvider } from '../../src/react/Me2emProvider.js';
 import { useMe2emContext } from '../../src/react/context.js';
 import { useSession } from '../../src/react/useSession.js';
 import { useHandle } from '../../src/react/useHandle.js';
-import { get32ByteSeedFromMnemonic } from '@me2em/core';
+import { get64ByteSeedFromMnemonic } from '@me2em/core';
 
 const MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -47,7 +47,7 @@ describe('useSession', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 
@@ -79,7 +79,7 @@ describe('useSession', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 
@@ -119,7 +119,7 @@ describe('useSession', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 
@@ -158,7 +158,7 @@ describe('useSession', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 

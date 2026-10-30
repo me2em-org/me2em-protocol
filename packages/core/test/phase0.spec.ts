@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session } from '../src/index.js';
 import { normalizeName } from '../src/canonical-name.js';
 
-const testSeed = new Uint8Array(32).fill(42);
+const testSeed = new Uint8Array(64).fill(42);
 
 describe('normalizeName', () => {
   it('should lowercase and trim: "Station-001" → "station-001"', () => {

@@ -184,11 +184,11 @@ One scenario, three packages, end to end: a user with two personas (work and per
 ### Using `@me2em/core` — identity, handles, sessions
 
 ```typescript
-import { Identity, Session, generateSeedPhrase, get32ByteSeedFromMnemonic } from '@me2em/core';
+import { Identity, Session, generateSeedPhrase, get64ByteSeedFromMnemonic } from '@me2em/core';
 
-// 1. Identity from a seed phrase (or 32 raw bytes)
+// 1. Identity from a seed phrase (or 64 raw bytes)
 const phrase = generateSeedPhrase(128);            // 12 words — user writes them down
-const seed = await get32ByteSeedFromMnemonic(phrase);
+const seed = await get64ByteSeedFromMnemonic(phrase);
 const identity = await Identity.fromSeed(seed);
 
 // 2. Two personas: cryptographically isolated contexts
@@ -275,7 +275,7 @@ function CreateIdentityScreen() {
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| `Identity` | ✅ | Root identity from 32-byte seed (or BIP39 phrase) |
+| `Identity` | ✅ | Root identity from 64-byte seed (or BIP39 phrase) |
 | `Handle` | ✅ | Contextual Ed25519 keypair |
 | `SubHandle` | ✅ | Hierarchical leaf node (MAX_DEPTH = 2) |
 | `Session` | ✅ | Stateless tokens — `verifyStateless` (direct) + `verifyAttested` (chain) |

@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session, type RevocationChecker } from '../src/index.js';
 
-const testSeed = new Uint8Array(32).fill(42);
+const testSeed = new Uint8Array(64).fill(42);
 
 // Mock revocation checker for testing
 class MockRevocationChecker implements RevocationChecker {
@@ -497,7 +497,7 @@ describe('Handle.deriveSharedSecret', () => {
   it('should produce identical shared secrets for both parties', async () => {
     const identityA = await Identity.fromSeed(testSeed);
     const handleA = await identityA.deriveHandle('shared-secret-a');
-    const identityB = await Identity.fromSeed(new Uint8Array(32).fill(99));
+    const identityB = await Identity.fromSeed(new Uint8Array(64).fill(99));
     const handleB = await identityB.deriveHandle('shared-secret-b');
 
     const secretA = await handleA.deriveSharedSecret(handleB.getPublicKey());
@@ -511,9 +511,9 @@ describe('Handle.deriveSharedSecret', () => {
   it('should produce different secrets for different key pairs', async () => {
     const identityA = await Identity.fromSeed(testSeed);
     const handleA = await identityA.deriveHandle('diff-secret-a');
-    const identityB = await Identity.fromSeed(new Uint8Array(32).fill(99));
+    const identityB = await Identity.fromSeed(new Uint8Array(64).fill(99));
     const handleB = await identityB.deriveHandle('diff-secret-b');
-    const identityC = await Identity.fromSeed(new Uint8Array(32).fill(55));
+    const identityC = await Identity.fromSeed(new Uint8Array(64).fill(55));
     const handleC = await identityC.deriveHandle('diff-secret-c');
 
     const secretAB = await handleA.deriveSharedSecret(handleB.getPublicKey());
@@ -532,8 +532,8 @@ describe('Handle.deriveSharedSecret', () => {
 
   it('binds peer keys: A↔B secret differs from A↔C (unknown key-share protection)', async () => {
     const identityA = await Identity.fromSeed(testSeed);
-    const identityB = await Identity.fromSeed(new Uint8Array(32).fill(99));
-    const identityC = await Identity.fromSeed(new Uint8Array(32).fill(55));
+    const identityB = await Identity.fromSeed(new Uint8Array(64).fill(99));
+    const identityC = await Identity.fromSeed(new Uint8Array(64).fill(55));
 
     const handleA = await identityA.deriveHandle('uks-test');
     const handleB = await identityB.deriveHandle('uks-peer-b');

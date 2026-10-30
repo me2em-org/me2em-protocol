@@ -9,8 +9,6 @@ import {
 import { base64urlEncode } from '../src/util.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
 
-const testSeed = new Uint8Array(32).fill(42);
-
 /**
  * For async throwers: rejections of async functions (including
  * sync-thrown errors inside their async bodies).

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { Identity, Attestation, AttestationError } from '../src/index.js';
 import { base64urlEncode, base64urlDecode } from '../src/util.js';
 
-const testSeed = new Uint8Array(32).fill(42);
+const testSeed = new Uint8Array(64).fill(42);
 const identity = await Identity.fromSeed(testSeed);
 
 describe('Attestation issuance: attestHandle', () => {
