@@ -1,6 +1,6 @@
 # Me2eM Protocol — LTS v1.0 Program Plan
 
-**Version:** 3.0 — final program plan (2026-10-30). Supersedes internal plan draft v2.0 after a full code audit at `0b73599`.
+**Version:** 3.1 — amended per architect review (2026-10-30): no-compatibility mandate (A9), `subjectWallet`/D8 → `@me2em/solano` track (A4), engines ≥22 (A2). Supersedes internal plan draft v2.0 after a full code audit at `0b73599`.
 **Goal:** ship `@me2em/core` v1.0.0 as an LTS release: 24-month security-support window, 7-day SLA for critical CVEs, frozen public API, gated on external audit or bug bounty (D7).
 **Roles:** Zed Wizard — implementation, branches, PRs, gates; architect — review, merge, CI workflow patches, Cloudflare config, audit, npm publishing.
 
@@ -38,7 +38,7 @@
 | D5 | Auto-init `@noble/ed25519` stays in `crypto/init.ts` | ✅ accepted | Documented as the single justified side effect; explicit `initEd25519()` optional for subpath imports |
 | D6 | `Session.fromVerified` → `@internal`, not exported from `index.ts` | ✅ accepted | Tests access it via test-utils, not the public surface |
 | D7 | External audit or bug bounty mandatory | ✅ accepted | LTS without it is marketing; see §9 (vendor search starts by PR-8) |
-| D8 | `subjectWallet?: string` in attestation payload (not in grant) | ✅ accepted with A4 | Validation amended — Solana PDA compatibility |
+| D8 | `subjectWallet?: string` in attestation payload (not in grant) | ⏸ deferred — out of LTS core scope | Per architect review 2026-10-30: wallet binding is designed in a separate TZ and shipped in `@me2em/solano`; plan tasks 2.3.* excluded from this program |
 | D9 | Spec is `specs/v1.0.md`; `specs/draft/core.md` archived | ✅ accepted | Draft vectors placeholder replaced by generated real vectors |
 
 ---
@@ -47,14 +47,15 @@
 
 | # | Ref | Amendment | Rationale |
 |---|---|---|---|
-| A1 | 2.1.2 | **Drop `derivePasswordLegacy`.** | After D1 every user's master key material changes (seed 32→64 bytes), so *no* v0.7 derived password or channel key survives the upgrade regardless of context normalization. A legacy path preserves nothing and would freeze a non-normalized variant for zero reachable users. Instead: explicit `MIGRATION.md` row — "all derived passwords/channel keys change in v0.8; re-derive and re-issue". |
-| A2 | 0.3.1 | `engines.node: ">=20"` (root + core), not `>=18`. | Node 18 is EOL (2025-04), Node 20 EOL (2026-04); CI already pins Node 22. Document browser support as evergreen + Node ≥20. |
-| A3 | 1.5, 2.3 | Add `@scure/base` dependency for base64url (1.5) and base58 (2.3). | Audited, tiny, same family as the already-depended-on `@scure/bip39`. No hand-rolled codecs in a crypto library. |
-| A4 | 2.3.2 | `subjectWallet` strict check = base58 decode → 32 bytes. On-curve check is **optional** (opt-in flag), not mandatory. | Solana Program Derived Addresses are valid addresses but off-curve; a hard on-curve check rejects them. On-curve is required only when the attestation asserts signing capability for that wallet. Final call at PR-9 review. |
+| A1 | 2.1.2 | **Drop `derivePasswordLegacy`** — confirmed. | After D1 the master key material changes (seed 32→64 bytes), so no v0.7 derived value survives; a legacy path preserves nothing. With A9 there is no migration guide either — the breaking change is stated in the package CHANGELOG. |
+| A2 | 0.3.1 | `engines.node: ">=22"` (root + core) — raised per architect review. | Node 18/20 are EOL; CI already pins Node 22 (LTS maintenance to 2027-04); zero installed base makes the floor a free choice, and one supported Node line keeps CI simple. |
+| A3 | 1.5 | Add `@scure/base` dependency for base64url. | Audited, tiny, same family as the already-depended-on `@scure/bip39`. No hand-rolled codecs in a crypto library. (The base58 use moved to the `@me2em/solano` track together with 2.3.) |
+| A4 | 2.3.* | **Excluded from the LTS program** (architect review 2026-10-30): `subjectWallet`, on-curve/base58 validation and everything Solana-bound moves to a separate TZ and the separate package `@me2em/solano`. The PDA note (off-curve addresses are valid) carries over into that TZ. | Freezes the core attestation format earlier and shrinks the LTS audit surface. PR-9 is retired (tombstone in §5). |
 | A5 | 3.3.2/3.3.3 | `crypto/ed25519.ts` is **not** deleted: it is re-exported by `crypto/index.ts` into the public `crypto` namespace. Keep the documented wrappers; unify only *internal* imports (3.3.1 unchanged). | Plan v2.0 called it dead code; the audit shows it is public API surface with owned TypeDoc documentation. Removing it would be a separate breaking decision, out of LTS scope. |
 | A6 | flow rule | **Same-PR consumer rule:** every breaking `core` PR carries the `@me2em/react` (and crypto where applicable) migration in the same PR. `main` must be green after every merge. | Verified: PR-2's rename breaks `useImportSeed.ts`, `useCreateIdentity.ts` and 4 react test files. A red `main` would also feed broken state to the docs sites on redeploy. |
 | A7 | 0.3.2 | CI already exists (`ci-security.yml`). Remaining work: enforce coverage ≥90% (lines+branches) via vitest thresholds in-repo (PR-4); CI wiring patch supplied to the architect. | Workflow edits require the Workflows token scope, which `me2em-sandbox-agent` deliberately does not have. |
 | A8 | docs debt | Fix `index.ts` `fromSeed` JSDoc example (passes a mnemonic; would throw) in PR-2; fix stale BACKLOG roadmap versions in PR-1. | Small, found during audit; riding on planned PRs. |
+| A9 | 4.3, program-level | **No-compatibility mandate** (architect, 2026-10-30): the protocol is new and has zero users — no backward-compat shims, no migration guides. `MIGRATION.md` (4.3) is removed from the program; every breaking change is documented honestly in the package CHANGELOG at the moment it lands. | Removes dead documentation weight; the breaking-changes record (§7) stays as the single program-level history. |
 
 ---
 
@@ -70,20 +71,20 @@ Base unit of work = **one PR** (not one stage; not one subtask). Stage 5 (tests)
 
 | PR | Branch | Plan v2.0 tasks | Content | Breaking? |
 |---|---|---|---|---|
-| PR-1 ✅ | `docs/lts-v1-plan` | — | This plan; BACKLOG: DR-6 + roadmap version fix (A8) | no |
+| PR-1 (this PR) | `docs/lts-v1-plan` | — | This plan; BACKLOG: DR-6 + roadmap version fix (A8) | no |
 | PR-2 | `core/seed-64` | 0.0.1–0.0.6 | 64-byte seed (D1): `get64ByteSeedFromMnemonic`, `Identity.fromSeed` 64 B / 128 hex, HKDF-length test, all vectors updated, 12-vs-24-word tests, README + USE_CASES; **react consumer fix (A6)**; `index.ts` JSDoc fix (A8); core CHANGELOG "Unreleased" | **yes** |
-| PR-3 | `core/test-vectors` | 0.1.1–0.1.3, 0.2.1–0.2.3, 4.8 | `scripts/generate-vectors.ts`, real `specs/test-vectors.json`, golden test `vectors.spec.ts`, `specs/v1.0.md` (info strings, token limits 2048/4096, `CLOCK_SKEW_SECONDS = 30`, `Signer`, `subjectWallet`), `specs/draft/core.md` → `specs/archive/draft-core.md` with deprecation pointer | no |
-| PR-4 | `core/engines-bench` | 0.3.1, 0.3.3, 0.3.4, 0.4.1, 0.4.2 | engines `>=20` (A2), vitest bench + `bench/baseline.json` fixed **before** Stage 1, `expectAttestationError()` helper replacing regex assertions, dedupe `derivation.spec`/`phase0.spec`, `createTestHandle()` factory, coverage thresholds in vitest config (A7; CI wiring patch to architect) | no |
+| PR-3 | `core/test-vectors` | 0.1.1–0.1.3, 0.2.1–0.2.3, 4.8 | `scripts/generate-vectors.ts`, real `specs/test-vectors.json`, golden test `vectors.spec.ts`, `specs/v1.0.md` (info strings, token limits 2048/4096, `CLOCK_SKEW_SECONDS = 30`, `Signer`), `specs/draft/core.md` → `specs/archive/draft-core.md` with deprecation pointer | no |
+| PR-4 | `core/engines-bench` | 0.3.1, 0.3.3, 0.3.4, 0.4.1, 0.4.2 | engines `>=22` (A2), vitest bench + `bench/baseline.json` fixed **before** Stage 1, `expectAttestationError()` helper replacing regex assertions, dedupe `derivation.spec`/`phase0.spec`, `createTestHandle()` factory, coverage thresholds in vitest config (A7; CI wiring patch to architect) | no |
 | PR-5 | `core/encapsulation` | 1.1, 1.3, 1.4, 1.8.1 | `#private` fields on `Identity`/`Handle`/`SubHandle`, constructor input copying + defensive getters, `dispose()` + `DisposedError`, `toJSON`/`inspect` redaction; tests 5.1–5.5 incl. `Handle.prototype.sign.call(fakeThis)` TypeError | **yes** (API preserved, internals hardened) |
 | PR-6 | `core/signer` | 1.2 | `interface Signer` in `types.ts`, `Attestation.issue(signer, subjectPublicKey, subjectName, grant, opts)`, `Identity`/`Handle` implement `Signer`, `attestHandle`/`attestSubHandle` pass `this`; tests 5.13 | **yes** |
 | PR-7 | `core/hardening` | 1.5, 1.6, 1.7, 1.8.2–1.8.7 | base64url via `@scure/base` (A3) + no-`btoa` test, `randomUUID` fallback, all errors → `AttestationError` with `code`/`level`, `MAX_DEPTH_EXCEEDED`, `DISPOSED`, error table test (5.8), `expectAttestationError` migration (5.9), signature-length pre-check, `jti` validation, `__proto__` protection, `getSubMetadata` deep copy, shared-secret mutation tests (5.12), fuzz on `parseToken`/`parseSessionToken` (5.15), no-`randomUUID` test (5.18) | **yes** (error types) |
-| PR-8 | `core/revisions` | 2.1, 2.2, 2.4, 5.6, 5.16 | `derivePassword(context, { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })`, NFKC on context+revision, `DERIVATION_PATHS.password(revision?)`/`.channel(revision?)`; `derivePasswordLegacy` **dropped** (A1); README/USE_CASES revision model + JSDoc `@since`; legacy note in MIGRATION (A1) | **yes** |
-| PR-9 | `core/subject-wallet` | 2.3, 5.17 | `subjectWallet?: string` in payload (not grant), base58+32-byte validation, **optional** on-curve (A4), deterministic JSON inclusion, `decode` validation; tests incl. off-curve/PDA case | no (additive) |
+| PR-8 | `core/revisions` | 2.1, 2.2, 2.4, 5.6, 5.16 | `derivePassword(context, { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })`, NFKC on context+revision, `DERIVATION_PATHS.password(revision?)`/`.channel(revision?)`; `derivePasswordLegacy` **dropped** (A1); README/USE_CASES revision model + JSDoc `@since`; CHANGELOG breaking note (A1, A9) | **yes** |
+| PR-9 | *(retired)* | 2.3, 5.17 | **Retired pre-implementation** — `subjectWallet` moved to the `@me2em/solano` TZ (A4). Number kept for traceability, not re-used. | — |
 | PR-10 | `core/arch-cycle` | 3.1, 3.2, 3.3.1, 3.3.4 | Static `SubHandle` import in `handle.ts` (D4), `deriveSubHandleKey()` in `crypto/derivation.ts` shared by both entry points + parity test (5.3.3), all internal `hkdf`/`sha256`/`ed` imports via `crypto/`, auto-init documented (D5); wrappers kept (A5) | no |
 | PR-11 | `core/session-split` | 3.4, 3.5, 3.6.1–3.6.3 | `#verifyChainStructure`/`#verifyRootAttestation`/`#verifyHandleAttestation`/`#verifySessionAgainstGrant`/`#verifySessionSignature` with order+levels preserved (all 20+ attested-session tests green untouched), private `Session` constructor + `@internal` `Session.fromVerified`, `MAX_DEPTH_EXCEEDED` override, no double normalization in `attestSubHandle` | **yes** (constructor) |
-| PR-12 | `docs-lts-rc` | 4.1–4.6, 6.4, 6.5 | `THREAT_MODEL.md` (incl. attestation/session replay, clock-skew exploitation, BL-07 limits), `SECURITY.md` update (SLA 7 days), `MIGRATION.md` (v0.7→v1.0 table incl. A1 row), README limits/runtime section, API freeze, `v1.0.0-rc.1` prep | docs + freeze |
+| PR-12 | `docs-lts-rc` | 4.1–4.2, 4.4–4.6, 6.4, 6.5 | `THREAT_MODEL.md` (incl. attestation/session replay, clock-skew exploitation, BL-07 limits), `SECURITY.md` update (SLA 7 days), README limits/runtime section, API freeze, `v1.0.0-rc.1` prep (no `MIGRATION.md` — A9) | docs + freeze |
 
-Excluded from LTS (as in v2.0): variant-A factory (3.1 long-term), `FinalizationRegistry` guarantees (1.4.3).
+Excluded from LTS: variant-A factory (3.1 long-term), `FinalizationRegistry` guarantees (1.4.3), `subjectWallet`/D8 → `@me2em/solano` TZ (A4), `MIGRATION.md` (A9).
 
 ---
 
@@ -95,7 +96,7 @@ Excluded from LTS (as in v2.0): variant-A factory (3.1 long-term), `Finalization
 2. **Atomic revert and bisect.** DR-4 proved the value: when a released artifact misbehaved, the fix was scoped to a coherent unit. Each PR here is revertable as one decision.
 3. **Status checks.** Every PR runs the full CI trio; nothing merges red (DR-4 rule). Because each PR is self-contained (code + tests + consumers), `main` is always releasable.
 4. **Deploy noise — the Cloudflare Pages concern.** Every merge currently rebuilds all three docs sites (`me2em-docs-core`, `me2em-docs-crypto`, `me2em-docs-react`). Mitigations:
-   - **Batching (this plan):** ~12 merges instead of ~50 subtask merges; cosmetics (plans, BACKLOG, doc sweeps) never ship as standalone merges — they ride with a content PR (PR-1 demonstrates this).
+   - **Batching (this plan):** ~11 executed merges (12 mapped, PR-9 retired) instead of ~50 subtask merges; cosmetics (plans, BACKLOG, doc sweeps) never ship as standalone merges — they ride with a content PR (PR-1 demonstrates this).
    - **Build watch paths (architect, Cloudflare dashboard — recommended):** `me2em-docs-core` ← `packages/core/**, specs/**`; `me2em-docs-crypto` ← `packages/crypto/**`; `me2em-docs-react` ← `packages/react/**`. Note JSDoc changes *do* change TypeDoc output, so code PRs legitimately rebuild their own site — watch paths make that rebuild targeted instead of triple.
 5. **Stage = PR is *not* adopted verbatim.** Stage 0 splits (PR-2 is the riskiest diff of the whole program — seed semantics — and deserves isolated review; PR-3/PR-4 are independent of it). Stage 1 splits into encapsulation / signer / hardening because PR-6 is a public-API signature change while PR-5 and PR-7 are internal. Stages 2–3 map 2:1. Docs consolidate in PR-12.
 
@@ -103,7 +104,7 @@ Excluded from LTS (as in v2.0): variant-A factory (3.1 long-term), `Finalization
 
 ---
 
-## 7. Updated breaking-changes table (supersedes v2.0 table)
+## 7. Breaking-changes record (supersedes the v2.0 table; per A9 this is a record, not a migration guide — CHANGELOGs document each landing)
 
 | Version | Breaking change | Mitigation |
 |---|---|---|
@@ -113,7 +114,6 @@ Excluded from LTS (as in v2.0): variant-A factory (3.1 long-term), `Finalization
 | v0.8.0 | `derivePassword(context, { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })` | Positional args → options object; no legacy shim (A1) — re-derive |
 | v0.8.0 | All errors are `AttestationError` with `code`/`level` | Match on `e.code`/`e.level`, not messages |
 | v0.8.0 | `Session` constructor private; `fromVerified` internal | `Session.create` / `Session.verify*` on the public surface |
-| v0.8.x | `subjectWallet` in payload (additive, A4) | Optional; absent field behaves exactly as before |
 | v1.0.0 | API freeze | — |
 
 ---
@@ -148,9 +148,9 @@ If capacity shrinks, these four PRs are the LTS floor; PR-10/PR-11 may defer to 
 | Week 1 | PR-2, PR-3 (seed + vectors/spec) |
 | Week 2 | PR-4, PR-5 |
 | Weeks 3–4 | PR-6, PR-7 (Stage 1 complete) |
-| Weeks 5–6 | PR-8, PR-9 (Stage 2 complete) |
-| Weeks 7–8 | PR-10, PR-11 (Stage 3 complete; code freeze) |
-| Week 9 | PR-12: THREAT_MODEL/SECURITY/MIGRATION, freeze, `rc.1` |
+| Week 5 | PR-8 (Stage 2 complete) |
+| Weeks 6–7 | PR-10, PR-11 (Stage 3 complete; code freeze) |
+| Week 8 | PR-12: THREAT_MODEL/SECURITY, freeze, `rc.1` |
 | Audit window | external audit / bounty on `rc` (lead time dominated) |
 | +2–4 weeks | audit fixes → `v1.0.0` → 24-month LTS window opens |
 
@@ -172,7 +172,7 @@ Cadence assumes one PR in review at a time with same-day review turnaround; the 
 | 0.4.1–0.4.2 | PR-4 | 3.6.1–3.6.3 | PR-11 |
 | 1.1.1–1.1.5 | PR-5 | 4.1 | PR-12 |
 | 1.2.1–1.2.6 | PR-6 | 4.2 | PR-12 |
-| 1.3.1–1.3.5 | PR-5 | 4.3 | PR-12 |
+| 1.3.1–1.3.5 | PR-5 | 4.3 | removed (A9) |
 | 1.4.1–1.4.5 | PR-5 | 4.4, 4.5 | PR-2/PR-8/PR-12 (ride-along), PR-12 (consolidate) |
 | 1.5.1–1.5.2 | PR-7 | 4.6 | PR-12 |
 | 1.6.1–1.6.2 | PR-7 | 4.7 | every feature PR |
@@ -182,6 +182,6 @@ Cadence assumes one PR in review at a time with same-day review turnaround; the 
 | 1.8.5–1.8.7 | PR-7 | 5.7 | PR-7 (property-based), distributed |
 | 2.1.1–2.1.5 | PR-8 (2.1.2 dropped, A1) | 5.8–5.10 | PR-4/PR-7 |
 | 2.2.1–2.2.3 | PR-8 | 5.11 | PR-3 |
-| 2.3.1–2.3.6 | PR-9 (per A4) | 5.12–5.14 | PR-7 (5.14 → PR-3/PR-7) |
-| — | — | 5.15, 5.17–5.19 | PR-7, PR-9 |
+| 2.3.1–2.3.6 | excluded → solano TZ (A4) | 5.12–5.14 | PR-7 (5.14 → PR-3/PR-7) |
+| — | — | 5.15, 5.18–5.19 | PR-7 (5.17 → solano TZ) |
 | 6.1–6.6, 7.1–7.5 | architect track (§9) + PR-12 | | |

@@ -248,10 +248,13 @@ quotes in this entry are intentional).
   archived drafts in specs/draft/ are left as-is.
 - **DR-6 (2026-10-30)** — LTS v1.0 program adopted. Final plan:
   [PLAN-LTS-v1.md](./PLAN-LTS-v1.md) (supersedes the internal plan
-  draft v2.0 after a code audit at `0b73599`). Decisions D1–D9
-  accepted; amendments A1–A8 are part of the plan; baseline verified:
-  438 tests green (core 186 / crypto 151 / react 101). Work proceeds
-  as ~12 coherent PRs (PR map in §5 of the plan); `main` stays green
+  draft v2.0 after a code audit at `0b73599`; v3.1 per architect
+  review: no-compat mandate — no migration guides, `subjectWallet`/
+  D8 → separate `@me2em/solano` TZ, engines >=22). Decisions D1–D9
+  accepted (D8 deferred out of core scope); amendments A1–A9 are
+  part of the plan; baseline verified: 438 tests green (core 186 /
+  crypto 151 / react 101). Work proceeds as ~11 coherent PRs
+  (PR map in §5); `main` stays green
   after every merge (same-PR consumer rule A6). Derivation freeze:
   after the 64-byte seed PR, no derivation-affecting change before
   v1.0.0 (§4). Release gated on external audit or bug bounty (D7).
