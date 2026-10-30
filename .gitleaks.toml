@@ -22,4 +22,10 @@ paths = [
   '''packages/crypto/test/.*''',
   '''packages/core/test/.*''',
   '''packages/react/test/.*''',
+  # Published BIP39 test vectors ("abandon … about" / "abandon … art")
+  # are standard, synthetic test material — see specs/v1.0.md §10.
+  '''specs/test-vectors.json''',
+  # Secret-scanning runbook: documents the fixture patterns themselves
+  # (e.g. "new Uint8Array(32).fill(0x42)") as examples.
+  '''\.github/workflows/README\.md''',
 ]
