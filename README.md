@@ -1,4 +1,4 @@
-# 🌐 Me2em Protocol
+# 🌐 Me2eM Protocol
 
 **A decentralized, seed-derived identity and authorization protocol built on Ed25519 cryptography.**
 
@@ -9,13 +9,13 @@
 
 ---
 
-## 🎯 What is Me2em?
+## 🎯 What is Me2eM?
 
-Me2em is a **cryptographic identity protocol**: a set of formats, derivation rules, and verification procedures that let independent implementations establish authenticated, delegatable, end-to-end encrypted relationships — without ever persisting a private key.
+Me2eM is a **cryptographic identity protocol**: a set of formats, derivation rules, and verification procedures that let independent implementations establish authenticated, delegatable, end-to-end encrypted relationships — without ever persisting a private key.
 
 The protocol addresses a growing class of problems in identity and authorization. Today these include:
 
-| Problem | Me2em Solution |
+| Problem | Me2eM Solution |
 |---------|----------------|
 | **Context collision** — one profile for everything (work, personal, IoT, agents) | Multiple isolated `Handle`s per `Identity`, each with its own keypair |
 | **IoT scalability** — managing thousands of devices | Hierarchical derivation: `Identity` → `Handle` → `SubHandle` (MAX_DEPTH = 2), fully offline |
@@ -56,7 +56,7 @@ Identity (Root — from seed phrase, private key stays in the vault)
 
 ## 📖 Terminology
 
-Protocol terms are **domain-neutral** — each use case assigns them its own meaning.
+Protocol terms are **domain-neutral** — each use case assigns them its own meaning. The eight core terms:
 
 | Term | Definition |
 |------|------------|
@@ -69,25 +69,28 @@ Protocol terms are **domain-neutral** — each use case assigns them its own mea
 | **Transient material** | Key bytes existing only in RAM at the moment of use. |
 | **Ephemeral material** | TTL-bound rotating material (SPK/OTK, cache keys, session tokens). |
 
-**Domain interpretations** — the same primitives, read through different lenses:
+The **normative glossary** — full definitions, attestation grants, verification modes, crypto & react terms, wire limits, and domain interpretations per use case — lives in [`GLOSSARY.md`](./GLOSSARY.md).
 
-| Use case | Handle is… | SubHandle is… |
-|----------|------------|----------------|
-| **AI Agent Delegation** (UC-1) | An AI agent acting on behalf of a user | — (the agent signs sessions directly) |
-| **IoT Device Hierarchy** (UC-2) | A physical device | A component of that device |
-| **Multi-Context Identity** (UC-3) | A user persona (work, personal) | Delegated access within a persona |
-| **Multi-App SSO** (UC-4) | A per-app persona of the user | — |
-| **Deterministic Password Manager** (UC-5) | A service context | — |
-| **E2EE Messaging** (UC-6) | The user's messaging identity | An optional device identity |
+---
 
-Full glossary and the method-to-relationship map: see the
-[Use Cases section](#-use-cases) and each package README.
+## 🔤 Brand & Naming
+
+The writing canon is **Me2eM**, and only two forms exist across the entire project:
+
+| Form | Where it applies |
+|------|------------------|
+| **Me2eM** | Everything human-facing: prose, headings, logo, footer, meta tags, social media. The brand does not follow sentence position: just as "iPhone" stays "iPhone" at the start of a line, "Me2eM" never becomes "Me2em". |
+| **me2em** | Machine contexts only, where casing is technically constrained: npm, code identifiers, domains, URLs, CLI. |
+
+`Me2em` is a forbidden typo form: three coexisting spellings on a site on its way to being trilingual (where the Latin brand is not translated in ZH at all) is guaranteed chaos.
+
+The canon governs human-facing text only. Existing code identifiers (e.g. `Me2emProvider`, `useMe2emContext`) are code artifacts — machine text is not translated, so they are not renamed.
 
 ---
 
 ## 📦 Repository Structure
 
-This is a **pnpm monorepo** containing the Me2em protocol implementation and documentation.
+This is a **pnpm monorepo** containing the Me2eM protocol implementation and documentation.
 
 ```
 me2em-protocol/
@@ -122,6 +125,7 @@ me2em-protocol/
 │       └── test/                # 101 tests
 │
 ├── BACKLOG.md                   # Development backlog (advisory)
+├── GLOSSARY.md                  # Normative glossary
 ├── specs/draft/                 # Archived pre-attestation spec drafts
 ├── README.md                    # This file
 ├── CONTRIBUTING.md              # How to contribute
@@ -250,7 +254,7 @@ function CreateIdentityScreen() {
 }
 ```
 
-*Note: Me2em never persists your seed. The seed phrase exists in two places only — your paper and transient memory during login. Browser storage holds only encrypted caches of derived material.*
+*Note: Me2eM never persists your seed. The seed phrase exists in two places only — your paper and transient memory during login. Browser storage holds only encrypted caches of derived material.*
 
 📖 **Deeper scenarios:** [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) — Satellite Capacity Marketplace, Drone Fleet Management, Multi-App SSO, Deterministic Password Manager, E2EE Messenger.
 
@@ -260,9 +264,9 @@ function CreateIdentityScreen() {
 
 | Package | Status | Description |
 |---------|--------|-------------|
-| [`@me2em/core`](./packages/core) | 🧪 **alpha (v0.7.0-alpha.1)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
+| [`@me2em/core`](./packages/core) | 🧪 **alpha (v0.7.0-alpha.2)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
 | [`@me2em/crypto`](./packages/crypto) | 🧪 **alpha (v0.1.0-alpha.1)** | Protocol crypto: canonical X3DH, pre-keys, E2EE channels with epoch rotation, envelopes, Argon2id |
-| [`@me2em/react`](./packages/react) | 🧪 **alpha (v0.1.0-alpha.1)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
+| [`@me2em/react`](./packages/react) | 🧪 **alpha (v0.1.0-alpha.2)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
 | `@me2em/messenger` | 🚧 Planned (0.9) | Vertical: E2EE chats, groups with epoch key rotation |
 | `@me2em/iot` | 💤 Deferred | Vertical: managed attested devices (EV, drones) |
 | `@me2em/server` | 🚧 Planned | Reference NestJS backend: verification middleware, revocation store |
@@ -379,6 +383,8 @@ pnpm --filter @me2em/react test
 | **Use Cases Guide** | [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) |
 | **Development Backlog** | [`BACKLOG.md`](./BACKLOG.md) |
 | **Changelog (core)** | [`packages/core/CHANGELOG.md`](./packages/core/CHANGELOG.md) |
+| **Changelog (react)** | [`packages/react/CHANGELOG.md`](./packages/react/CHANGELOG.md) |
+| **Glossary (normative)** | [`GLOSSARY.md`](./GLOSSARY.md) |
 | **API Reference** | [core.me2em.com](https://core.me2em.com) · [crypto.me2em.com](https://crypto.me2em.com) · [react.me2em.com](https://react.me2em.com) |
 
 ---
@@ -436,7 +442,7 @@ Implementation-independent protocol specifications (derivation formulas, token f
 This project is licensed under the **Apache License 2.0** — see the [`LICENSE`](./LICENSE) file for details.
 
 ```
-Copyright 2026 Me2em Organization
+Copyright 2026 Me2eM Organization
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -449,7 +455,7 @@ You may obtain a copy of the License at
 
 ## 🙏 Acknowledgments
 
-Me2em builds on the shoulders of giants:
+Me2eM builds on the shoulders of giants:
 
 - [`@noble/curves`](https://github.com/paulmillr/noble-curves) — Audited Ed25519/X25519 implementations
 - [`@noble/ed25519`](https://github.com/paulmillr/noble-ed25519) — Ed25519 (legacy sync path)

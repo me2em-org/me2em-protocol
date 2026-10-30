@@ -4,7 +4,7 @@
 
 # @me2em/crypto
 
-Cryptographic mechanisms for the Me2em protocol: E2EE channels, X3DH key exchange, purpose-based key derivation, and envelope patterns for offline recipients and media chunk encryption.
+Cryptographic mechanisms for the Me2eM protocol: E2EE channels, X3DH key exchange, purpose-based key derivation, and envelope patterns for offline recipients and media chunk encryption.
 
 ## Status
 
@@ -199,4 +199,4 @@ See [packages/core README](../../packages/core/README.md) for the core package.
 
 Apache License 2.0 — see [LICENSE](../../LICENSE).
 
-© 2026 Me2em Organization. Built for privacy, openness, and user sovereignty.
+© 2026 Me2eM Organization. Built for privacy, openness, and user sovereignty.

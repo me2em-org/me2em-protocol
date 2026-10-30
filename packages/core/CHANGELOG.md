@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0-alpha.2
+
+### Fixed
+- The `wordlist` export announced in 0.7.0-alpha.1 was missing from the
+  published artifact — consumer builds failed with
+  `[MISSING_EXPORT] "wordlist"`. The re-export from
+  `@scure/bip39/wordlists/english` (official 2048-entry list) is now
+  verifiably present in `dist/`.
+
+### Dependencies
+- Added `@scure/bip39: ^1.3.0` to `dependencies` so the `wordlist`
+  re-export resolves for consumers.
+
 ## 0.7.0-alpha.1
 
 ### Added

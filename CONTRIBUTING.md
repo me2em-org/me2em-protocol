@@ -1,10 +1,10 @@
 # Contributing to me2em-protocol
 
-Thank you for your interest in contributing to Me2em! This document outlines how to contribute to the protocol reference implementation, our architecture, and release processes.
+Thank you for your interest in contributing to Me2eM! This document outlines how to contribute to the protocol reference implementation, our architecture, and release processes.
 
 ## 🗂️ Project Structure & Architecture
 
-This repository is a `pnpm` workspace monorepo containing the core cryptographic primitives of the Me2em protocol. 
+This repository is a `pnpm` workspace monorepo containing the core cryptographic primitives of the Me2eM protocol. 
 
 > **Note:** The main marketing website, blog, and high-level guides are hosted in a **separate repository**: [`me2em-org/me2em-website`](https://github.com/me2em-org/me2em-website) (built with Astro). This repository is strictly for the protocol implementation and its API reference.
 
@@ -115,7 +115,7 @@ Before creating a new issue:
 
 ## 🔐 Cryptography Guidelines
 
-Me2em is a security-critical project. When working with crypto:
+Me2eM is a security-critical project. When working with crypto:
 
 ✅ **Do:**
 - Use established, audited libraries (e.g., `@noble/ed25519`, `@noble/hashes`, Web Crypto API).
@@ -142,4 +142,4 @@ Me2em is a security-critical project. When working with crypto:
 4. Once approved, the PR is merged by a maintainer.
 
 ---
-🙏 **Thank You!** Your contributions make Me2em better, more secure, and more accessible for everyone. Welcome to the community! 🎉
+🙏 **Thank You!** Your contributions make Me2eM better, more secure, and more accessible for everyone. Welcome to the community! 🎉

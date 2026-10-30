@@ -1,6 +1,6 @@
 ## 📦 Core Cryptographic Primitives
 
-Core primitives for the Me2em authorization protocol: hierarchical
+Core primitives for the Me2eM authorization protocol: hierarchical
 deterministic identities (`Identity` → `Handle` → `SubHandle`), stateless
 signed sessions, and parent-signed **attestation chains** for delegatable,
 externally verifiable authorization — all on Ed25519.
@@ -57,7 +57,7 @@ different lenses:
 | **E2EE Messaging** (UC-6) | The user's messaging identity | An optional device identity |
 
 Full glossary (including Channel and material-class terms):
-see the [root README](../../README.md).
+see the root [GLOSSARY.md](../../GLOSSARY.md).
 
 ---
 
@@ -449,4 +449,4 @@ advisory and not part of the shipped API contract.
 
 Apache License 2.0 — see [LICENSE](../../LICENSE).
 
-© 2026 Me2em Organization. Built for privacy, openness, and user sovereignty.
+© 2026 Me2eM Organization. Built for privacy, openness, and user sovereignty.
