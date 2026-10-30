@@ -65,7 +65,7 @@ export interface SessionPayload {
 /**
  * Interface for application-side revocation checking.
  *
- * The Me2em protocol does not prescribe a storage backend for revocation.
+ * The Me2eM protocol does not prescribe a storage backend for revocation.
  * Applications implement this interface using their preferred store
  * (Redis, PostgreSQL, in-memory Set, etc.) and pass it to
  * {@link Session.verifyStateless}.

@@ -10,7 +10,7 @@
 import { normalizeName } from '../canonical-name.js';
 
 /**
- * Deterministic derivation paths for the Me2em protocol.
+ * Deterministic derivation paths for the Me2eM protocol.
  *
  * All HKDF info strings used to derive Identity, Handle, and SubHandle keys
  * are centralized here. This guarantees that:

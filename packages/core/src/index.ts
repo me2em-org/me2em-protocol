@@ -9,7 +9,7 @@ export * as crypto from './crypto/index.js';
  * @module @me2em/core
  * @packageDocumentation
  * 
- * Core cryptographic primitives for the Me2em authorization protocol.
+ * Core cryptographic primitives for the Me2eM authorization protocol.
  * 
  * This package provides the foundation for decentralized, multi-context 
  * identity management and secure, stateless authentication.

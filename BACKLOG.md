@@ -79,13 +79,6 @@ development, not part of the shipped API contract.
   versions stabilize, re-point `latest` (`npm dist-tag add
   @me2em/core@<ver> latest`) so a plain `npm install @me2em/core`
   resolves to the current line.
-- **BL-38 · open · Brand sweep in code comments (DR-5).** Documentation
-  and package descriptions are swept (2026-10-30). Per DR-5, code
-  identifiers are machine text and are NOT renamed — `Me2emProvider`,
-  `Me2emContext`, `useMe2emContext` stay as-is. Remaining scope is
-  prose only: JSDoc/TSDoc comments across core/crypto/react, the test
-  fixture `Hello, Me2em!` and the suite name `Me2em Core
-  Functionality`. specs/draft/ archives stay untouched.
 
 ## P3 — Protocol Extensions (0.8+)
 
@@ -179,6 +172,12 @@ BL-25 (publish pipeline fixed).
 
 **0.7.0-alpha.1:** BL-04 (BIP39 passphrase, seed.spec.ts).
 
+**2026-10-30 (brand, DR-5):** BL-38 (code-comment sweep: 14 lines
+across core/crypto src and test — JSDoc/TSDoc prose, the test fixture
+`Hello, Me2em!`, the suite name `Me2em Core Functionality`; react
+identifiers kept as-is per the machine-text carve-out; historical
+quotes in this entry are intentional).
+
 **crypto-0.1.0 (D1–D5):**
 - **BL-26 · done · Argon2id in @me2em/crypto.** kdf/argon2 with
   INTERACTIVE/SENSITIVE profiles, verifyArgon2, NFKC normalization.
@@ -244,9 +243,9 @@ BL-25 (publish pipeline fixed).
   Brand & Naming. The rough note formerly appended to this file was
   removed; the documentation sweep (all Markdown, package.json
   descriptions, BACKLOG header) is complete as of 2026-10-30.
-  Remaining: code comments and test strings — BL-38 (code identifiers
-  are machine text and are not renamed); archived drafts in
-  specs/draft/ are left as-is.
+  Code comments and test strings were swept the same day (BL-38,
+  closed). Code identifiers are machine text and are not renamed;
+  archived drafts in specs/draft/ are left as-is.
 
 ## Package Roadmap (strategy)
 

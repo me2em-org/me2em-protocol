@@ -11,7 +11,7 @@ import { DERIVATION_PATHS } from '../src/crypto/derivation-paths.js';
 
 const testSeed = new Uint8Array(32).fill(42);
 
-describe('Me2em Core Functionality', () => {
+describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
   // Identity & Handle Derivation (existing tests, unchanged)
   // ---------------------------------------------------------------------------

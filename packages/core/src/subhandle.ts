@@ -1,6 +1,6 @@
 // subhandle.ts
 //
-// SubHandle is a leaf node in the Me2em derivation tree.
+// SubHandle is a leaf node in the Me2eM derivation tree.
 // With MAX_DEPTH = 2, a SubHandle CANNOT derive children.
 // It inherits from Handle for polymorphism in Session handling.
 
@@ -68,7 +68,7 @@ function extractDisplayFields(
 }
 
 /**
- * Represents a context-isolated child Handle in the Me2em hierarchy.
+ * Represents a context-isolated child Handle in the Me2eM hierarchy.
  *
  * A SubHandle is always derived from a parent {@link Handle} and represents
  * a leaf node in the derivation tree (MAX_DEPTH = 2). It inherits all
