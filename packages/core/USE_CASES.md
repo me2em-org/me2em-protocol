@@ -298,7 +298,7 @@ Identity: user seed (on paper / in the vault app)
 The seed never leaves the client; derivation happens in the browser:
 
 ```typescript
-const identity = await Identity.fromSeed(await get32ByteSeedFromMnemonic(phrase));
+const identity = await Identity.fromSeed(await get64ByteSeedFromMnemonic(phrase));
 const handle = await identity.deriveHandle('taxi');
 const session = await Session.create(handle, {
   audience: 'taxi-app.example',

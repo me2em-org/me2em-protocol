@@ -13,7 +13,7 @@ import {
   type SubHandleMetadata,
 } from '../src/index.js';
 
-const testSeed = new Uint8Array(32).fill(42);
+const testSeed = new Uint8Array(64).fill(42);
 
 /**
  * Helper: creates a SubHandle via Handle.deriveSubHandle for use in tests.

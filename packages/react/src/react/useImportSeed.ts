@@ -2,7 +2,7 @@
 import { useReducer, useCallback, type Reducer } from 'react';
 import {
   validateSeedPhrase,
-  get32ByteSeedFromMnemonic,
+  get64ByteSeedFromMnemonic,
   type Identity,
 } from '@me2em/core';
 import {
@@ -34,7 +34,7 @@ export function useImportSeed(): UseImportSeedResult {
         return;
       }
       try {
-        const seed = await get32ByteSeedFromMnemonic(words, passphrase ?? '');
+        const seed = await get64ByteSeedFromMnemonic(words, passphrase ?? '');
         dispatch({ type: 'IMPORT', seed });
         await activateIdentity(seed);
       } catch (err) {

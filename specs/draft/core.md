@@ -9,7 +9,7 @@
 ## 2. Identity Derivation
 ```
 RootPrivateKey = HKDF-SHA256(
-  InputKeyMaterial = Seed (32 bytes)
+  InputKeyMaterial = Seed (64 bytes)
   Info = "me2em/identity/v1/root"
   Length = 32
 )

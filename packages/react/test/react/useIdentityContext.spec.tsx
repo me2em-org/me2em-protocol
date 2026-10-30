@@ -6,7 +6,7 @@ import { useMe2emContext } from '../../src/react/context.js';
 import { useIdentityContext } from '../../src/react/useIdentityContext.js';
 import { IdentityContextIDBStorage } from '../../src/headless/identity-context-storage.js';
 import { deriveCacheKey } from '../../src/headless/context-crypto.js';
-import { get32ByteSeedFromMnemonic, Identity } from '@me2em/core';
+import { get64ByteSeedFromMnemonic, Identity } from '@me2em/core';
 import type { IdentityContextData } from '../../src/headless/identity-context-types.js';
 
 const MNEMONIC =
@@ -22,7 +22,7 @@ async function setupIdentity(
   storage: IdentityContextIDBStorage,
   mnemonic: string
 ): Promise<string> {
-  const seed = await get32ByteSeedFromMnemonic(mnemonic);
+  const seed = await get64ByteSeedFromMnemonic(mnemonic);
   const salt = new Uint8Array(32);
   const key = await deriveCacheKey(seed, salt);
   const identity = await Identity.fromSeed(seed);
@@ -70,7 +70,7 @@ describe('useIdentityContext', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 
@@ -106,7 +106,7 @@ describe('useIdentityContext', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 
@@ -148,7 +148,7 @@ describe('useIdentityContext', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 
@@ -186,7 +186,7 @@ describe('useIdentityContext', () => {
     });
 
     await act(async () => {
-      const seed = await get32ByteSeedFromMnemonic(MNEMONIC);
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
       await result.current.ctx.activateIdentity(seed);
     });
 

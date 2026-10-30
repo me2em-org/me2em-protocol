@@ -23,9 +23,11 @@ export * as crypto from './crypto/index.js';
  * 
  * @example Basic usage
  * ```typescript
- * import { Identity } from '@me2em/core';
- * 
- * const identity = await Identity.fromSeed('your twelve word mnemonic phrase here...');
+ * import { Identity, generateSeedPhrase, get64ByteSeedFromMnemonic } from '@me2em/core';
+ *
+ * const phrase = generateSeedPhrase(128); // 12 words (256 → 24 words)
+ * const seed = await get64ByteSeedFromMnemonic(phrase); // 64-byte BIP39 seed
+ * const identity = await Identity.fromSeed(seed);
  * const handle = await identity.deriveHandle('user@example.com');
  * const signature = await handle.sign(new TextEncoder().encode('data'));
  * ```
@@ -34,7 +36,7 @@ export {
   generateSeedPhrase,
   normalizeSeedPhrase,
   validateSeedPhrase,
-  get32ByteSeedFromMnemonic,
+  get64ByteSeedFromMnemonic,
   type SeedStrength,
   type SeedValidationResult
 } from './seed.js';

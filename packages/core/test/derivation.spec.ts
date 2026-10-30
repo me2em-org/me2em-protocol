@@ -4,12 +4,12 @@ import {
   Handle,
   SubHandle,
   generateSeedPhrase,
-  get32ByteSeedFromMnemonic,
+  get64ByteSeedFromMnemonic,
   validateSeedPhrase,
 } from '../src/index.js';
 import { DERIVATION_PATHS } from '../src/crypto/derivation-paths.js';
 
-const testSeed = new Uint8Array(32).fill(42);
+const testSeed = new Uint8Array(64).fill(42);
 
 describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
@@ -310,11 +310,11 @@ describe('Me2eM Core Functionality', () => {
       expect(result.error).toContain('must be 12 or 24 words');
     });
 
-    it('should convert mnemonic to deterministic 32-byte seed', async () => {
+    it('should convert mnemonic to deterministic 64-byte BIP39 seed', async () => {
       const phrase = generateSeedPhrase(128);
-      const seedBytes = await get32ByteSeedFromMnemonic(phrase);
+      const seedBytes = await get64ByteSeedFromMnemonic(phrase);
 
-      expect(seedBytes.length).toBe(32);
+      expect(seedBytes.length).toBe(64);
       expect(seedBytes).toBeInstanceOf(Uint8Array);
 
       const identity = await Identity.fromSeed(seedBytes);
@@ -325,8 +325,8 @@ describe('Me2eM Core Functionality', () => {
       const phraseArray = generateSeedPhrase(128);
       const phraseString = phraseArray.join(' ');
 
-      const seed1 = await get32ByteSeedFromMnemonic(phraseArray);
-      const seed2 = await get32ByteSeedFromMnemonic(phraseString);
+      const seed1 = await get64ByteSeedFromMnemonic(phraseArray);
+      const seed2 = await get64ByteSeedFromMnemonic(phraseString);
 
       expect(seed1).toEqual(seed2);
     });

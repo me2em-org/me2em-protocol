@@ -17,7 +17,7 @@ Record in [BACKLOG.md](./BACKLOG.md).
 
 | Term | Definition |
 |------|------------|
-| **Identity** | Root cryptographic identity derived from a seed phrase (BIP39, optionally with passphrase) or 32 raw bytes. Constant forever; every other key in the hierarchy derives from it. |
+| **Identity** | Root cryptographic identity derived from a seed phrase (BIP39, optionally with passphrase) or 64 raw bytes. Constant forever; every other key in the hierarchy derives from it. |
 | **Handle** | A derived, attested, named key representing a distinct identity context — a persona, a device, an app persona. |
 | **SubHandle** | A child of a Handle, always a leaf (MAX_DEPTH = 2). Derived deterministically from the Handle key; cannot derive children. |
 | **Attestation** | A parent-signed statement binding a child key to a name and a grant. |

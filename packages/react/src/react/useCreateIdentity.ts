@@ -6,7 +6,7 @@ import {
 } from 'react';
 import {
   generateSeedPhrase,
-  get32ByteSeedFromMnemonic,
+  get64ByteSeedFromMnemonic,
   type SeedStrength,
   type Identity,
 } from '@me2em/core';
@@ -37,7 +37,7 @@ export function useCreateIdentity(): UseCreateIdentityResult {
   const generate = useCallback(
     (opts?: { strength?: SeedStrength }) => {
       const words = generateSeedPhrase(opts?.strength ?? 128);
-      get32ByteSeedFromMnemonic(words).then((derivedSeed) => {
+      get64ByteSeedFromMnemonic(words).then((derivedSeed) => {
         dispatch({ type: 'GENERATE', words, seed: derivedSeed });
       }).catch(() => {
         dispatch({ type: 'FAIL', message: 'Failed to generate seed' });

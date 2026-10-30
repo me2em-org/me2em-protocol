@@ -184,11 +184,11 @@ One scenario, three packages, end to end: a user with two personas (work and per
 ### Using `@me2em/core` — identity, handles, sessions
 
 ```typescript
-import { Identity, Session, generateSeedPhrase, get32ByteSeedFromMnemonic } from '@me2em/core';
+import { Identity, Session, generateSeedPhrase, get64ByteSeedFromMnemonic } from '@me2em/core';
 
-// 1. Identity from a seed phrase (or 32 raw bytes)
+// 1. Identity from a seed phrase (or 64 raw bytes)
 const phrase = generateSeedPhrase(128);            // 12 words — user writes them down
-const seed = await get32ByteSeedFromMnemonic(phrase);
+const seed = await get64ByteSeedFromMnemonic(phrase);
 const identity = await Identity.fromSeed(seed);
 
 // 2. Two personas: cryptographically isolated contexts
@@ -275,7 +275,7 @@ function CreateIdentityScreen() {
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| `Identity` | ✅ | Root identity from 32-byte seed (or BIP39 phrase) |
+| `Identity` | ✅ | Root identity from 64-byte seed (or BIP39 phrase) |
 | `Handle` | ✅ | Contextual Ed25519 keypair |
 | `SubHandle` | ✅ | Hierarchical leaf node (MAX_DEPTH = 2) |
 | `Session` | ✅ | Stateless tokens — `verifyStateless` (direct) + `verifyAttested` (chain) |
@@ -339,6 +339,27 @@ DERIVATION_PATHS.p2pChannelV2   // "me2em/p2p-channel/v2" (peer-key bound)
 ```
 
 ⚠️ **Changing any of these strings is a BREAKING CHANGE** and requires a new protocol version.
+
+---
+
+## 📐 Standards Compliance
+
+Me2eM does not invent cryptographic primitives: every mechanism is built on an established, peer-reviewed standard, used with its documented parameters. This table is the ecosystem-wide mapping of *standard → role → package*; new mechanisms must land here together with their standard.
+
+| Standard / Spec | Role in Me2eM | Packages |
+|---|---|---|
+| **BIP39** | Mnemonic seed phrases → 64-byte seed (PBKDF2-HMAC-SHA512, 2048 iterations); optional "25th word" passphrase | core |
+| **Ed25519** (RFC 8032) | All signatures: attestations, sessions, raw signing | core, crypto |
+| **X25519** (RFC 7748) | ECDH for shared secrets and channel keys; Ed25519↔X25519 conversion | core, crypto |
+| **HKDF** (RFC 5869) | All key derivation (HKDF-SHA256) with domain-separated `me2em/…/v1` info strings | core, crypto |
+| **Argon2id** (RFC 9106) | Password-based KDF, `INTERACTIVE`/`SENSITIVE` profiles | crypto |
+| **X3DH** (Signal) | Asynchronous key establishment with offline recipients: `PreKeyBundle` (SPK + OTK), signed pre-keys, key wrapping | crypto |
+| **AES-GCM** (NIST SP 800-38D) | AEAD for E2EE channels, key envelopes, and the identity context cache | crypto, react |
+| **Base64URL** (RFC 4648 §5) | Token and payload encoding | core, crypto |
+| **Unicode NFKC** (UAX #15) | Canonical normalization of names, passphrases, and derivation contexts | core |
+| **BIP32 / SLIP-0010** | Hierarchical deterministic derivation below the root identity — *planned* future track | core |
+
+Any deviation from a standard's parameters is a protocol-level decision, recorded in the package CHANGELOG and in the protocol specifications ([Protocol Specifications](#-protocol-specifications)).
 
 ---
 
