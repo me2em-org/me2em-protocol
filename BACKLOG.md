@@ -129,16 +129,20 @@ development, not part of the shipped API contract.
   raised: BL-27 ties attestation revocation to group epoch rotation —
   namespace confusion there is dangerous. Convention first
   (`att:` / `sess:` prefixes), split interfaces on demand.
-- **BL-20 · open · Real protocol test vectors.**
-  Computed vectors for identity/handle/subhandle derivation, name
-  normalization, session sign/verify, attestation determinism — plus
-  X3DH/channel vectors for @me2em/crypto (RFC 5869 vectors already
-  live in crypto tests; extend the pattern).
-- **BL-21 · open · Rewrite specs/core.md against 0.7.0.**
-  Implementation-independent spec: derivation formulas, canonical
-  names, session/attestation formats, both verification modes,
-  revocation semantics. Prerequisite for v1.0 and third-party
-  implementations.
+- **BL-20 · done (PR-3) · Real protocol test vectors.**
+  `specs/test-vectors.json` — computed through the public runtime API by
+  `packages/core/scripts/generate-vectors.ts` (seed, identity/handle/subhandle
+  derivation, passwords, channel keys, shared secrets, byte-exact
+  attestation tokens, pinned session tokens) and enforced by the golden
+  test `packages/core/test/vectors.spec.ts`. X3DH/channel vectors for
+  @me2em/crypto remain future work (RFC 5869 vectors already live in
+  crypto tests).
+- **BL-21 · done (PR-3) · Rewrite specs/core.md against 0.7.0.**
+  Shipped as `specs/v1.0.md` (implementation-independent: derivation
+  formulas and info strings, canonicalization, token formats, payload
+  schemas, both verification modes with error levels, limits
+  2048/4096/±30s, issuance/Signer contract). Draft archived to
+  `specs/archive/draft-core.md` with a deprecation pointer.
 - **BL-22 · open · OpenAPI reference server spec.**
   Real flow: POST /auth/challenge, /auth/verify, /attestations,
   /backup/envelope, /prekeys/* (X3DH), revocation endpoints. Do

@@ -1,3 +1,8 @@
+<!-- ARCHIVED 2026-10-31 (LTS program PR-3): superseded by specs/v1.0.md.
+     This pre-0.6 draft (server-issued sessions, registry-based key lookup)
+     is preserved for history only and is incompatible with @me2em/core
+     0.6.0+. Real test vectors live in specs/test-vectors.json. -->
+
 # Me2em Protocol Specification v0.1
 
 ## 1. Cryptographic Primitives
