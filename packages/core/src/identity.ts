@@ -7,6 +7,8 @@ import { SubHandle, type SubHandleMetadata } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { normalizeName } from './canonical-name.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
+import { DisposedError } from './disposed-error.js';
+import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 function parseHexSeed(hex: string): Uint8Array {
   if (!/^[0-9a-fA-F]{128}$/.test(hex)) {
@@ -34,12 +36,14 @@ function parseHexSeed(hex: string): Uint8Array {
  * @category Core Primitives
  */
 export class Identity {
-  private readonly privateKey: Uint8Array;
-  private readonly publicKey: Uint8Array;
+  #privateKey: Uint8Array;
+  #publicKey: Uint8Array;
+  #disposed = false;
 
   private constructor(privateKey: Uint8Array) {
-    this.privateKey = privateKey;
-    this.publicKey = ed.getPublicKey(privateKey);
+    // Defensive copy: the caller keeps no reference to the stored bytes.
+    this.#privateKey = new Uint8Array(privateKey);
+    this.#publicKey = ed.getPublicKey(this.#privateKey);
   }
 
   /**
@@ -97,11 +101,12 @@ export class Identity {
    * ```
    */
   async deriveHandle(name: string, metadata?: HandleMetadata): Promise<Handle> {
+    this.#assertNotDisposed();
     name = normalizeName(name);
     const info = new TextEncoder().encode(DERIVATION_PATHS.handle(name));
     const handleKey = hkdf(
       sha256,
-      this.privateKey,
+      this.#privateKey,
       new Uint8Array(0),
       info,
       32
@@ -142,6 +147,7 @@ export class Identity {
     subName: string,
     metadata?: SubHandleMetadata
   ): Promise<SubHandle> {
+    this.#assertNotDisposed();
     handleName = normalizeName(handleName);
     const subNameNorm = normalizeName(subName);
 
@@ -149,7 +155,7 @@ export class Identity {
     const handleInfo = new TextEncoder().encode(DERIVATION_PATHS.handle(handleName));
     const handleKey = hkdf(
       sha256,
-      this.privateKey,
+      this.#privateKey,
       new Uint8Array(0),
       handleInfo,
       32
@@ -200,10 +206,11 @@ export class Identity {
     grant: AttestationGrant,
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
   ): Promise<Attestation> {
+    this.#assertNotDisposed();
     const normalized = normalizeName(name);
     const handle = await this.deriveHandle(normalized);
     return Attestation.issue(
-      this.privateKey,
+      this.#privateKey,
       handle.getPublicKey(),
       normalized,
       grant,
@@ -214,9 +221,46 @@ export class Identity {
   /**
    * Retrieves the public key of the root Identity.
    *
+   * The returned array is a defensive copy — mutating it does not affect
+   * the Identity.
+   *
    * @returns A Uint8Array containing the 32-byte Ed25519 public key.
    */
   getPublicKey(): Uint8Array {
-    return this.publicKey;
+    return new Uint8Array(this.#publicKey);
+  }
+
+  /**
+   * Permanently destroys this Identity's key material.
+   *
+   * The private key bytes are zeroized; afterwards every capability method
+   * ({@link deriveHandle}, {@link deriveSubHandle}, {@link attestHandle})
+   * throws a {@link DisposedError}. Informational getters
+   * ({@link getPublicKey}) keep working — public keys are not secrets.
+   *
+   * Calling `dispose()` more than once is a no-op (idempotent).
+   */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#privateKey.fill(0);
+    this.#privateKey = new Uint8Array(0);
+    this.#disposed = true;
+  }
+
+  #assertNotDisposed(): void {
+    if (this.#disposed) throw new DisposedError('Identity');
+  }
+
+  /**
+   * Redacted serialization contract: `JSON.stringify(identity)` exposes
+   * only the object kind and the public identifier — never key material
+   * or seed-derived state.
+   */
+  toJSON(): { kind: string; id: string } {
+    return { kind: 'Identity', id: base64urlEncode(this.#publicKey) };
+  }
+
+  [INSPECT_SYMBOL](): string {
+    return `Identity(id=${base64urlEncode(this.#publicKey).slice(0, 8)}…)`;
   }
 }
