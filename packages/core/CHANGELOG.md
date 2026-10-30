@@ -28,8 +28,8 @@
   `scripts/generate-vectors.ts` (`pnpm --filter @me2em/core vectors`)
   through the public runtime API. Golden test `test/vectors.spec.ts`
   re-computes every row — any deviation is a protocol break.
-  Normative spec: `specs/v1.0.md`; draft archived to
-  `specs/archive/draft-core.md`.
+  Normative spec: `specs/v1.0.md`; pre-attestation draft removed from
+  the working tree (DR-7 — git history retains it).
 - Official BIP39 test vectors in `test/seed.spec.ts` (12-word and 24-word
   mnemonics, empty and non-empty passphrase), cross-verified against an
   independent PBKDF2-HMAC-SHA512 implementation.

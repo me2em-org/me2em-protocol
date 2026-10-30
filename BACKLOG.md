@@ -262,6 +262,20 @@ quotes in this entry are intentional).
   after every merge (same-PR consumer rule A6). Derivation freeze:
   after the 64-byte seed PR, no derivation-affecting change before
   v1.0.0 (§4). Release gated on external audit or bug bounty (D7).
+- **DR-7 (2026-10-31)** — Specs tree hygiene (rides in PR-3):
+  `specs/archive/` and `specs/draft/` are removed from the working
+  tree. Working-tree rule: only live artifacts — the normative spec
+  (`specs/v1.0.md`), machine-checkable vectors
+  (`specs/test-vectors.json`), active docs. The pre-0.6 draft
+  (server-issued sessions, registry-based lookup) is dead
+  architecture, incompatible with core 0.6+; everything still
+  normative in it is captured by `specs/v1.0.md` and
+  `derivation-paths.ts`. The 9-line OpenAPI stub under
+  `specs/draft/openapi/` was not a spec — BL-22 will be written
+  fresh with `@me2em/server`. Git history, not the tree, retains
+  the drafts (retrievable at `e0f4dc5`). This supersedes the
+  archive disposition of D9/PLAN-LTS as the final one; those
+  records remain untouched as history.
 
 ## Package Roadmap (strategy)
 
