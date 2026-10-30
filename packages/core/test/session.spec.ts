@@ -530,6 +530,18 @@ describe('Handle.deriveSharedSecret', () => {
     await expect(handle.deriveSharedSecret(new Uint8Array(64))).rejects.toThrow(/32 bytes/);
   });
 
+  it('self-secret: deriving with own public key works (sorted binding, return 0 path)', async () => {
+    const identity = await Identity.fromSeed(testSeed);
+    const handle = await identity.deriveHandle('self-secret');
+
+    const selfSecret = await handle.deriveSharedSecret(handle.getPublicKey());
+    const selfSecret2 = await handle.deriveSharedSecret(handle.getPublicKey());
+
+    expect(selfSecret).toBeInstanceOf(Uint8Array);
+    expect(selfSecret.length).toBe(32);
+    expect(selfSecret).toEqual(selfSecret2); // deterministic
+  });
+
   it('binds peer keys: A↔B secret differs from A↔C (unknown key-share protection)', async () => {
     const identityA = await Identity.fromSeed(testSeed);
     const identityB = await Identity.fromSeed(new Uint8Array(64).fill(99));

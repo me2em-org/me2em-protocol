@@ -8,8 +8,7 @@ import {
   validateSeedPhrase,
 } from '../src/index.js';
 import { DERIVATION_PATHS } from '../src/crypto/derivation-paths.js';
-
-const testSeed = new Uint8Array(64).fill(42);
+import { TEST_SEED, createTestHandle } from './test-utils.js';
 
 describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
@@ -17,11 +16,11 @@ describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
   describe('Identity & Handle Derivation', () => {
     it('should derive same HandleId from same seed + name', async () => {
-      const identity1 = await Identity.fromSeed(testSeed);
+      const identity1 = await Identity.fromSeed(TEST_SEED);
       const handle1a = await identity1.deriveHandle('work');
       const handle1b = await identity1.deriveHandle('private');
 
-      const identity2 = await Identity.fromSeed(testSeed);
+      const identity2 = await Identity.fromSeed(TEST_SEED);
       const handle2a = await identity2.deriveHandle('work');
 
       expect(handle1a.getId()).toBe(handle2a.getId());
@@ -29,7 +28,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should attach and retrieve metadata', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const metadata = { displayName: 'Alice', role: 'admin' };
       const handle = await identity.deriveHandle('work', metadata);
 
@@ -86,8 +85,7 @@ describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
   describe('Handle.deriveSubHandle', () => {
     it('should derive a SubHandle with correct path', async () => {
-      const identity = await Identity.fromSeed(testSeed);
-      const handle = await identity.deriveHandle('station-001');
+      const { handle } = await createTestHandle('station-001');
       const sub = await handle.deriveSubHandle('connector-1');
 
       expect(sub).toBeInstanceOf(SubHandle);
@@ -97,11 +95,11 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should produce identical SubHandle from same name (deterministic)', async () => {
-      const identity1 = await Identity.fromSeed(testSeed);
+      const identity1 = await Identity.fromSeed(TEST_SEED);
       const handle1 = await identity1.deriveHandle('station-001');
       const sub1 = await handle1.deriveSubHandle('connector-1');
 
-      const identity2 = await Identity.fromSeed(testSeed);
+      const identity2 = await Identity.fromSeed(TEST_SEED);
       const handle2 = await identity2.deriveHandle('station-001');
       const sub2 = await handle2.deriveSubHandle('connector-1');
 
@@ -110,8 +108,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should produce different SubHandles for different names', async () => {
-      const identity = await Identity.fromSeed(testSeed);
-      const handle = await identity.deriveHandle('station-001');
+      const { handle } = await createTestHandle('station-001');
       const sub1 = await handle.deriveSubHandle('connector-1');
       const sub2 = await handle.deriveSubHandle('connector-2');
 
@@ -120,16 +117,14 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should normalize names to lowercase', async () => {
-      const identity = await Identity.fromSeed(testSeed);
-      const handle = await identity.deriveHandle('Station-001');
+      const { handle } = await createTestHandle('Station-001');
       const sub = await handle.deriveSubHandle('Connector-1');
 
       expect(sub.getPath()).toEqual(['station-001', 'connector-1']);
     });
 
     it('should carry SubHandleMetadata when provided', async () => {
-      const identity = await Identity.fromSeed(testSeed);
-      const handle = await identity.deriveHandle('station-001');
+      const { handle } = await createTestHandle('station-001');
       const sub = await handle.deriveSubHandle('connector-1', {
         allowedAudiences: ['ev-app.com'],
         allowedScopes: ['charge:start'],
@@ -148,7 +143,7 @@ describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
   describe('Identity.deriveSubHandle', () => {
     it('should derive a SubHandle atomically from Identity', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const sub = await identity.deriveSubHandle('station-001', 'connector-1');
 
       expect(sub).toBeInstanceOf(SubHandle);
@@ -158,7 +153,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should produce identical SubHandle as Handle.deriveSubHandle (CRYPTOGRAPHIC CONSISTENCY)', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
 
       // Method 1: via Handle (autonomous)
       const handle = await identity.deriveHandle('station-001');
@@ -177,7 +172,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should produce different SubHandles for different handle names', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const sub1 = await identity.deriveSubHandle('station-001', 'connector-1');
       const sub2 = await identity.deriveSubHandle('station-002', 'connector-1');
 
@@ -185,7 +180,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should produce different SubHandles for different sub names', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const sub1 = await identity.deriveSubHandle('station-001', 'connector-1');
       const sub2 = await identity.deriveSubHandle('station-001', 'connector-2');
 
@@ -193,14 +188,14 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should normalize names to lowercase', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const sub = await identity.deriveSubHandle('Station-001', 'Connector-1');
 
       expect(sub.getPath()).toEqual(['station-001', 'connector-1']);
     });
 
     it('should carry SubHandleMetadata when provided', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const sub = await identity.deriveSubHandle('station-001', 'connector-1', {
         allowedAudiences: ['ev-app.com'],
         maxSessionTtl: 3600,
@@ -217,7 +212,7 @@ describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
   describe('MAX_DEPTH = 2 enforcement', () => {
     it('should make SubHandle always a leaf (depth === 2)', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const sub = await identity.deriveSubHandle('station-001', 'connector-1');
 
       expect(sub.getDepth()).toBe(2);
@@ -225,7 +220,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should throw an error if deriveSubHandle is called on a SubHandle (leaf by design)', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const sub = await identity.deriveSubHandle('station-001', 'connector-1');
 
       // SubHandle is a leaf (depth = 2), so derivation must be blocked
@@ -240,7 +235,7 @@ describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
   describe('Handle.derivePassword', () => {
     it('should deterministically derive the same password', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const handle = await identity.deriveHandle('google');
 
       const pwd1 = handle.derivePassword('google', 16);
@@ -252,7 +247,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should derive different passwords for different contexts', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const handle = await identity.deriveHandle('google');
 
       const pwdGoogle = handle.derivePassword('google');
@@ -267,7 +262,7 @@ describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
   describe('Handle.deriveChannelKey', () => {
     it('should deterministically derive a 32-byte channel key', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const handle = await identity.deriveHandle('drone-001');
 
       const key1 = handle.deriveChannelKey('telemetry-v1');
@@ -279,7 +274,7 @@ describe('Me2eM Core Functionality', () => {
     });
 
     it('should derive different keys for different contexts', async () => {
-      const identity = await Identity.fromSeed(testSeed);
+      const identity = await Identity.fromSeed(TEST_SEED);
       const handle = await identity.deriveHandle('drone-001');
 
       const keyTelemetry = handle.deriveChannelKey('telemetry');

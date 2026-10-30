@@ -2,43 +2,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   Attestation,
-  AttestationError,
   ATTESTATION_TYPE,
   ATTESTATION_MAX_PAYLOAD,
 } from '../src/index.js';
 import { base64urlEncode } from '../src/util.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
-
-/**
- * For async throwers: rejections of async functions (including
- * sync-thrown errors inside their async bodies).
- */
-async function expectAttestationError(
-  promise: Promise<unknown>, code: string, level: string
-) {
-  try { await promise; expect.unreachable('should have thrown'); }
-  catch (e) {
-    expect(e).toBeInstanceOf(AttestationError);
-    expect((e as AttestationError).code).toBe(code);
-    expect((e as AttestationError).level).toBe(level);
-  }
-}
-
-/**
- * For SYNC throwers only (e.g. Attestation.decode). Async functions
- * never throw synchronously — their rejections require
- * expectAttestationError.
- */
-function expectAttestationErrorSync(
-  fn: () => unknown, code: string, level: string
-) {
-  try { fn(); expect.unreachable('should have thrown'); }
-  catch (e) {
-    expect(e).toBeInstanceOf(AttestationError);
-    expect((e as AttestationError).code).toBe(code);
-    expect((e as AttestationError).level).toBe(level);
-  }
-}
+import {
+  expectAttestationError,
+  expectAttestationErrorSync,
+} from './test-utils.js';
 
 describe('Attestation: roundtrip issue → decode', () => {
   it('all payload fields match; subjectName normalized', async () => {
@@ -381,6 +353,58 @@ describe('Attestation: subjectPublicKey length', () => {
         { scopes: ['read'], maxSessionTtl: 3600 }
       )
     ).rejects.toThrow(/32 bytes/);
+  });
+});
+
+describe('Attestation.issue: grant validation contract', () => {
+  it('grant.scopes not an array → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    await expectAttestationError(
+      Attestation.issue(
+        signerKey, signerKey, 'test',
+        { scopes: 'read' as unknown as string[], maxSessionTtl: 3600 }
+      ),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('grant.maxSessionTtl = 0 → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    await expectAttestationError(
+      Attestation.issue(
+        signerKey, signerKey, 'test',
+        { scopes: ['read'], maxSessionTtl: 0 }
+      ),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('grant.audiences not an array → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    await expectAttestationError(
+      Attestation.issue(
+        signerKey, signerKey, 'test',
+        {
+          scopes: ['read'], maxSessionTtl: 3600,
+          audiences: 'app' as unknown as string[],
+        }
+      ),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('grant.subNamePatterns not an array → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    await expectAttestationError(
+      Attestation.issue(
+        signerKey, signerKey, 'test',
+        {
+          scopes: ['read'], maxSessionTtl: 3600,
+          subNamePatterns: 'connector-*' as unknown as string[],
+        }
+      ),
+      'MALFORMED', 'FORMAT'
+    );
   });
 });
 

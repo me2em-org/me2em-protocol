@@ -75,7 +75,7 @@ jobs:
         run: pnpm -r typecheck
 
       - name: Test
-        run: pnpm -r test
+        run: pnpm -r test:coverage
 
       # Legacy-файлы вне пакетов не покрыты линт-конфигом —
       # не блокер, чистка отдельным треком

@@ -284,9 +284,12 @@ export class Handle {
     const myPrivBytes = this.privateKey;
     const otherPubBytes = otherPublicKey;
 
+    /* v8 ignore start -- defensive: the constructor already validates the
+       key length implicitly (ed25519.getPublicKey throws RangeError). */
     if (myPrivBytes.length !== 32) {
       throw new Error('Handle private key must be 32 bytes');
     }
+    /* v8 ignore stop */
     if (otherPubBytes.length !== 32) {
       throw new Error('Public key must be 32 bytes');
     }

@@ -36,6 +36,11 @@
 - 12-vs-24-word seed equivalence tests: both strengths produce a 64-byte
   seed; different strengths derive different (but deterministic) identities.
 
+### Changed
+- `engines.node` floor raised to `>=22.0.0` (A2): Node 18/20 are EOL, CI
+  pins Node 22 (LTS maintenance to 2027-04). Applied workspace-wide — root,
+  `@me2em/core`, `@me2em/crypto`, `@me2em/react`.
+
 ### Fixed
 - `index.ts` module JSDoc example passed a mnemonic string directly to
   `Identity.fromSeed` (would throw at runtime); the example now derives
