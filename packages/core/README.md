@@ -298,8 +298,8 @@ class Handle {
   getPath(): string[] | undefined;    // undefined for Handle, path for SubHandle
   sign(data: Uint8Array): Promise<Uint8Array>;
   static verify(sig: Uint8Array, data: Uint8Array, pub: Uint8Array): Promise<boolean>;
-  derivePassword(context: string, length?: number): string;   // base64url secret
-  deriveChannelKey(context: string): Uint8Array;              // 32-byte AES key
+  derivePassword(context: string, options?: { revision?: number; byteLength?: number }): string;   // base64url secret
+  deriveChannelKey(context: string, options?: { revision?: number }): Uint8Array;             // 32-byte AES key
   deriveSharedSecret(otherPublicKey: Uint8Array): Promise<Uint8Array>; // X25519 + HKDF
   deriveSubHandle(name: string, metadata?: SubHandleMetadata): Promise<SubHandle>;
   attestSubHandle(subName: string, grant: AttestationGrant,
@@ -410,10 +410,37 @@ class AttestationError extends Error {
 
 ### Name normalization
 
-All derivation inputs are canonicalized: `NFKC → lowercase → trim`,
-then validated against `/^[a-z0-9][a-z0-9._@-]{0,62}$/`. Names with `/`,
-non-ASCII letters, or > 64 chars **throw**. Identical inputs always
-produce identical keys across platforms and entry points.
+All derivation inputs are canonicalized: `NFKC → lowercase → trim`.
+Names are then validated against `/^[a-z0-9][a-z0-9._@-]{0,62}$/`; names
+with `/`, non-ASCII letters, or > 64 chars **throw**. Password/channel
+contexts use the same canonical form without the character-set pattern
+(a context is a caller-defined label, not a wire identifier) but MUST
+NOT be empty after canonicalization. Identical inputs always produce
+identical keys across platforms and entry points.
+
+### Secret revision model (rotation)
+
+`derivePassword` and `deriveChannelKey` take a `revision` (positive
+integer, default `1`). Revision 1 is the initial secret — byte-identical
+to the frozen v1.0 derivation. Revision `N ≥ 2` derives a secret that is
+cryptographically independent of revision 1 for the same context: the
+sanctioned rotation path when a credential leaks, without changing the
+context string. Both parties of a channel MUST bump the revision in
+lockstep.
+
+```typescript
+const github = handle.derivePassword('github');                  // revision 1
+const rotated = handle.derivePassword('github', { revision: 2 }); // after a breach
+const long   = handle.derivePassword('github', { byteLength: 32 });
+const channel = handle.deriveChannelKey('telemetry-v1', { revision: 2 }); // both peers!
+```
+
+Info strings: `me2em/secret/v1` → `me2em/secret/v1/rN`,
+`me2em/channel/v1` → `me2em/channel/v1/rN` (centralized in
+`DERIVATION_PATHS.password(revision?)` / `.channel(revision?)`).
+`byteLength` accepts an integer in `[1, 8160]` (RFC 5869 bound); the
+output is prefix-stable — the first `n` bytes of a longer derivation
+equal the `n`-byte derivation.
 
 ## 🎯 Core Use Cases
 

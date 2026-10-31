@@ -3,6 +3,30 @@
 ## [Unreleased] → will ship in 0.8.0
 
 ### BREAKING
+- **Derivation API is options-object: `derivePassword(context,
+  { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })`
+  (PR-8, §7 / D3).** The positional forms
+  `derivePassword(context, length?)` and the bare `length` argument are
+  gone — `length` becomes the `byteLength` option (same default, 16;
+  same output bytes for the same numbers). There is no legacy shim
+  (A1: a legacy path preserves nothing after the 64-byte-seed change,
+  and A9 mandates no compatibility surface) — re-derive at the call
+  sites: `derivePassword('github', 16)` →
+  `derivePassword('github', { byteLength: 16 })`. New validation
+  (thrown as `AttestationError` `MALFORMED`/`FORMAT`, the
+  `Session.create` ttl pattern): `revision` must be a positive integer,
+  `byteLength` an integer in `[1, 8160]` (RFC 5869: 255 × SHA-256
+  output); a context that is empty after canonicalization is rejected.
+  Non-string contexts remain `TypeError` (API misuse).
+- **Contexts are NFKC-canonicalized (PR-8).** Password/channel contexts
+  were `lowercase → trim`; they are now `NFKC → lowercase → trim` and
+  MUST NOT be empty after canonicalization (specs/v1.0.md §1). For
+  every context that contains only ASCII this changes nothing — the
+  golden vectors keep their byte values. Contexts with non-NFKC-normal
+  characters (e.g. the fullwidth `ＧitHub`, which previously salted as
+  `ｇithub`) now derive the canonical secret; a vector row pins the
+  fullwidth form equal to `github`. Re-derive if you relied on
+  non-canonical context bytes.
 - **Unified error model (PR-7, §7: "All errors are `AttestationError` with
   `code`/`level`").** Every failure in the package — token parsing, session
   creation, `Session.verifyStateless`, derivation and lifecycle checks — now
@@ -81,6 +105,22 @@
   standard seed.
 
 ### Added
+- **Derivation revision model (PR-8, D3) — the sanctioned rotation path.**
+  `derivePassword` and `deriveChannelKey` accept `revision` (positive
+  integer, default `1`). Revision `1` is byte-identical to the frozen
+  v1.0 derivation; revision `N ≥ 2` derives a secret that is
+  cryptographically independent of revision 1 for the same context —
+  rotate a leaked credential or a compromised channel without changing
+  the context string (`{ revision: 2 }`). Info strings:
+  `me2em/secret/v1/rN`, `me2em/channel/v1/rN` — built by the new
+  centralized `DERIVATION_PATHS.password(revision?)` /
+  `DERIVATION_PATHS.channel(revision?)` (the single source of truth the
+  spec freeze rule rests on). Vectors pin revision 1, revision 2 and
+  the NFKC context rows (`specs/test-vectors.json` extended, existing
+  rows byte-identical). Conformance suite: `test/revisions.spec.ts`
+  (default ≡ revision-1 byte-parity, revision independence, manual-HKDF
+  end-to-end through `DERIVATION_PATHS`, options validation, NFKC
+  contexts).
 - **Hardening slice (PR-7).** In detail: base64url is implemented on the
   audited `@scure/base` codec (A3) with a source-scan test that keeps
   `btoa`/`atob` out of `src/`; `crypto.randomUUID` gains a

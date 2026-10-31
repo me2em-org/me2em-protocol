@@ -543,13 +543,13 @@ describe('SubHandle', () => {
 
     it('should derive a password', async () => {
       const { sub } = await createTestSubHandle();
-      const pwd = sub.derivePassword('github', 16);
+      const pwd = sub.derivePassword('github', { byteLength: 16 });
 
       expect(pwd.length).toBeGreaterThan(0);
       expect(pwd).toMatch(/^[A-Za-z0-9_-]+$/);
 
       // Deterministic
-      const pwd2 = sub.derivePassword('github', 16);
+      const pwd2 = sub.derivePassword('github', { byteLength: 16 });
       expect(pwd).toBe(pwd2);
     });
 

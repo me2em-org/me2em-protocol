@@ -3,7 +3,7 @@ import { ed } from './crypto/init.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';
-import { normalizeName } from './canonical-name.js';
+import { normalizeName, normalizeContext } from './canonical-name.js';
 import type { SubHandleMetadata, SubHandle } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
@@ -28,6 +28,101 @@ export interface HandleMetadata {
   avatar?: string;
   /** Arbitrary additional fields. */
   [key: string]: unknown;
+}
+
+/**
+ * Options for {@link Handle.derivePassword}.
+ *
+ * All fields are optional; the defaults reproduce the frozen v1.0
+ * derivation exactly (specs/v1.0.md §3).
+ *
+ * @category Types
+ */
+export interface DerivePasswordOptions {
+  /**
+   * Positive integer revision of the secret (default `1`).
+   *
+   * Revision `1` — the initial secret — is byte-identical to the
+   * pre-revision derivation. Revision `N ≥ 2` derives a secret that is
+   * cryptographically independent of revision 1 for the same context:
+   * the sanctioned rotation path when a credential leaks, without
+   * changing the context string.
+   */
+  revision?: number;
+  /**
+   * Length of the derived raw bytes in `[1, 8160]` (default `16` —
+   * ≈ 22 base64url chars). Upper bound is the RFC 5869 HKDF-SHA256
+   * limit (`255 × 32`); note the output is prefix-stable, so the first
+   * `n` bytes of a longer derivation equal the `n`-byte derivation.
+   */
+  byteLength?: number;
+}
+
+/**
+ * Options for {@link Handle.deriveChannelKey}.
+ *
+ * All fields are optional; the defaults reproduce the frozen v1.0
+ * derivation exactly (specs/v1.0.md §3).
+ *
+ * @category Types
+ */
+export interface DeriveChannelKeyOptions {
+  /**
+   * Positive integer revision of the channel key (default `1`).
+   *
+   * Revision `N ≥ 2` derives a key that is independent of revision 1 for
+   * the same context — rotate a compromised channel by bumping the
+   * revision on **both** peers in lockstep.
+   */
+  revision?: number;
+}
+
+/** Default {@link Handle.derivePassword} output length (bytes). */
+const DEFAULT_PASSWORD_BYTES = 16;
+
+/** Upper HKDF-SHA256 output bound per RFC 5869: 255 × 32 bytes. */
+const MAX_HKDF_BYTES = 255 * 32;
+
+/**
+ * Revision-domain guard shared by {@link Handle.derivePassword} and
+ * {@link Handle.deriveChannelKey}. An omitted revision is the default
+ * (`1`); anything that is not a positive integer is rejected as
+ * `MALFORMED`/`FORMAT` (same pattern as `Session.create` ttl).
+ */
+function assertRevision(revision: number | undefined): void {
+  if (
+    revision !== undefined &&
+    (typeof revision !== 'number' ||
+      !Number.isInteger(revision) ||
+      revision < 1)
+  ) {
+    throw new AttestationError(
+      'MALFORMED',
+      'FORMAT',
+      `revision must be a positive integer, got: ${String(revision)}`
+    );
+  }
+}
+
+/**
+ * Output-length guard for {@link Handle.derivePassword}: an integer in
+ * `[1, 8160]`. Pre-checking here keeps the failure an
+ * {@link AttestationError} instead of the raw `Error` @noble/hashes
+ * would throw beyond the RFC 5869 bound.
+ */
+function assertByteLength(byteLength: number): void {
+  if (
+    typeof byteLength !== 'number' ||
+    !Number.isInteger(byteLength) ||
+    byteLength < 1 ||
+    byteLength > MAX_HKDF_BYTES
+  ) {
+    throw new AttestationError(
+      'MALFORMED',
+      'FORMAT',
+      `byteLength must be an integer in [1, ${MAX_HKDF_BYTES}] (RFC 5869: 255 × SHA-256 output), got: ${String(byteLength)}`
+    );
+  }
 }
 
 /**
@@ -246,20 +341,38 @@ export class Handle implements Signer {
    *
    * The private key **never leaves this class**, ensuring maximum security.
    *
+   * The `context` is canonicalized NFKC → lowercase → trim before use
+   * (`'  GitHub '`, `'github'` and `'ＧitHub'` yield the same secret).
+   *
+   * **Revision model (since 0.8.0, D3):** `options.revision` (positive
+   * integer, default `1`) selects an independent secret for the same
+   * context — revision 1 is the initial secret, revision 2, 3, … are for
+   * rotation (e.g. after a breach). Revision 1 is byte-identical to the
+   * pre-revision v1.0 derivation.
+   *
    * @param context - A unique identifier for the service (e.g., `'google'`, `'github'`).
-   * @param length - Length of the derived raw bytes (default: 16 bytes ≈ 22 chars base64url).
+   * @param options - Derivation options.
    * @returns A URL-safe base64 string suitable for use as a strong password.
+   * @throws AttestationError `MALFORMED`/`FORMAT` if `revision` is not a
+   *   positive integer, `byteLength` is not an integer in `[1, 8160]`, or
+   *   the context is empty after canonicalization.
    *
    * @example
    * ```ts
-   * const githubPassword = handle.derivePassword('github', 20);
+   * const githubPassword = handle.derivePassword('github', { byteLength: 20 });
+   * // after rotating the GitHub credential:
+   * const rotated = handle.derivePassword('github', { revision: 2 });
    * ```
    */
-  derivePassword(context: string, length: number = 16): string {
+  derivePassword(context: string, options: DerivePasswordOptions = {}): string {
     this.#assertNotDisposed();
-    const salt = new TextEncoder().encode(`me2em/secret/${context.toLowerCase().trim()}`);
-    const info = new TextEncoder().encode('me2em/secret/v1');
-    const secretBytes = hkdf(sha256, this.#privateKey, salt, info, length);
+    assertRevision(options.revision);
+    const byteLength = options.byteLength ?? DEFAULT_PASSWORD_BYTES;
+    assertByteLength(byteLength);
+    const canonical = normalizeContext(context);
+    const salt = new TextEncoder().encode(`me2em/secret/${canonical}`);
+    const info = new TextEncoder().encode(DERIVATION_PATHS.password(options.revision ?? 1));
+    const secretBytes = hkdf(sha256, this.#privateKey, salt, info, byteLength);
     // Audited @scure/base codec (A3) — no hand-rolled btoa alphabet math.
     return base64urlEncode(secretBytes);
   }
@@ -274,21 +387,36 @@ export class Handle implements Signer {
    *
    * This enables zero-knowledge encrypted channels without key exchange protocols.
    *
+   * The `context` is canonicalized NFKC → lowercase → trim before use.
+   *
+   * **Revision model (since 0.8.0, D3):** `options.revision` (positive
+   * integer, default `1`) selects an independent 32-byte key for the same
+   * context — the sanctioned rotation path for a compromised channel
+   * without changing the context string. Revision 1 is byte-identical to
+   * the pre-revision v1.0 derivation.
+   *
    * @param context - Channel identifier for domain separation (e.g., `'drone-001'`).
-   *   Both parties **MUST** use the same context.
+   *   Both parties **MUST** use the same context **and** the same revision.
+   * @param options - Derivation options.
    * @returns A 32-byte Uint8Array suitable for AES-256-GCM encryption.
+   * @throws AttestationError `MALFORMED`/`FORMAT` if `revision` is not a
+   *   positive integer or the context is empty after canonicalization.
    *
    * @example
    * ```ts
    * // AES-GCM helpers are application-side; the protocol provides
    * // only the key:
    * const channelKey = droneHandle.deriveChannelKey('telemetry-v1');
+   * // after rotating the channel (both sides migrate in lockstep):
+   * const rotatedKey = droneHandle.deriveChannelKey('telemetry-v1', { revision: 2 });
    * ```
    */
-  deriveChannelKey(context: string): Uint8Array {
+  deriveChannelKey(context: string, options: DeriveChannelKeyOptions = {}): Uint8Array {
     this.#assertNotDisposed();
-    const salt = new TextEncoder().encode(`me2em/channel/${context.toLowerCase().trim()}`);
-    const info = new TextEncoder().encode('me2em/channel/v1');
+    assertRevision(options.revision);
+    const canonical = normalizeContext(context);
+    const salt = new TextEncoder().encode(`me2em/channel/${canonical}`);
+    const info = new TextEncoder().encode(DERIVATION_PATHS.channel(options.revision ?? 1));
     return hkdf(sha256, this.#privateKey, salt, info, 32);
   }
 

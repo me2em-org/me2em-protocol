@@ -47,10 +47,45 @@ export const DERIVATION_PATHS = {
     `me2em/subhandle/v1/${normalizeName(handleName)}/${normalizeName(subName)}`,
 
   /**
-   * Versioned info string for peer-to-peer channel key derivation.
+   * Info string for peer-to-peer channel key derivation.
    * v2 binds both peers' public keys into the derivation, preventing
    * unknown key-share attacks. The peer keys are appended in sorted
    * order so both parties derive the identical string.
    */
   p2pChannelV2: 'me2em/p2p-channel/v2',
+
+  /**
+   * Builds the info string for password (secret) derivation.
+   *
+   * Revision model (PR-8, D3): revision `1` — the initial revision — and
+   * an omitted revision both yield the frozen v1 info string, so the
+   * default derivation is byte-identical to the pre-revision protocol.
+   * Revision `N ≥ 2` appends a `/rN` path segment and derives a secret
+   * that is cryptographically independent of revision 1 for the same
+   * context — the sanctioned rotation path (specs/v1.0.md §3, PLAN-LTS
+   * §4 derivation-freeze rule).
+   *
+   * @param revision - Positive integer revision; default `1`.
+   * @returns The info string, e.g. `"me2em/secret/v1"` or `"me2em/secret/v1/r2"`.
+   *
+   * @since 0.8.0
+   */
+  password: (revision: number = 1): string =>
+    revision === 1 ? 'me2em/secret/v1' : `me2em/secret/v1/r${revision}`,
+
+  /**
+   * Builds the info string for channel-key derivation.
+   *
+   * Same revision model as {@link DERIVATION_PATHS.password}: revision
+   * `1`/omitted yields the frozen `"me2em/channel/v1"`; revision
+   * `N ≥ 2` yields `"me2em/channel/v1/rN"` — an independent key for
+   * rotating a compromised channel without changing the context.
+   *
+   * @param revision - Positive integer revision; default `1`.
+   * @returns The info string, e.g. `"me2em/channel/v1"` or `"me2em/channel/v1/r2"`.
+   *
+   * @since 0.8.0
+   */
+  channel: (revision: number = 1): string =>
+    revision === 1 ? 'me2em/channel/v1' : `me2em/channel/v1/r${revision}`,
 } as const;

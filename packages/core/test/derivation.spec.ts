@@ -232,15 +232,15 @@ describe('Me2eM Core Functionality', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Handle.derivePassword (existing tests, unchanged)
+  // Handle.derivePassword (options-object form, PR-8)
   // ---------------------------------------------------------------------------
   describe('Handle.derivePassword', () => {
     it('should deterministically derive the same password', async () => {
       const identity = await Identity.fromSeed(TEST_SEED);
       const handle = await identity.deriveHandle('google');
 
-      const pwd1 = handle.derivePassword('google', 16);
-      const pwd2 = handle.derivePassword('google', 16);
+      const pwd1 = handle.derivePassword('google', { byteLength: 16 });
+      const pwd2 = handle.derivePassword('google', { byteLength: 16 });
 
       expect(pwd1).toBe(pwd2);
       expect(pwd1.length).toBeGreaterThan(0);
@@ -259,7 +259,7 @@ describe('Me2eM Core Functionality', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Handle.deriveChannelKey (existing tests, unchanged)
+  // Handle.deriveChannelKey (options-object form, PR-8)
   // ---------------------------------------------------------------------------
   describe('Handle.deriveChannelKey', () => {
     it('should deterministically derive a 32-byte channel key', async () => {
