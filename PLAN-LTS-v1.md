@@ -37,7 +37,7 @@
 | D4 | Break `handle ↔ subhandle` cycle — variant C (static import) | ✅ accepted | `identity.ts` already imports `subhandle.js` statically, so ESM-cycle behavior is already exercised; variant A (factory) stays out of LTS |
 | D5 | Auto-init `@noble/ed25519` stays in `crypto/init.ts` | ✅ accepted | Documented as the single justified side effect; explicit `initEd25519()` optional for subpath imports |
 | D6 | `Session.fromVerified` → `@internal`, not exported from `index.ts` | ✅ accepted | Tests access it via test-utils, not the public surface |
-| D7 | External audit or bug bounty mandatory | ✅ accepted | LTS without it is marketing; see §9 (vendor search starts by PR-8) |
+| D7 | External audit or bug bounty mandatory | ✅ accepted | LTS without it is marketing; see §9 (vendor search starts at the developer's discretion) |
 | D8 | `subjectWallet?: string` in attestation payload (not in grant) | ⏸ deferred — out of LTS core scope | Per architect review 2026-10-30: wallet binding is designed in a separate TZ and shipped in `@me2em/solano`; plan tasks 2.3.* excluded from this program |
 | D9 | Spec is `specs/v1.0.md`; `specs/draft/core.md` archived | ✅ accepted | Draft vectors placeholder replaced by generated real vectors |
 
@@ -135,7 +135,7 @@ If capacity shrinks, these four PRs are the LTS floor; PR-10/PR-11 may defer to 
 |---|---|---|
 | Cloudflare Pages **Build watch paths** (§6.4) | anytime, one-time | dashboard-only; cuts most of the triple-redeploy noise |
 | CI coverage wiring + any `ci-security.yml` edit | with PR-4 | I supply the diff; push needs Workflows scope (A7) |
-| Audit vendor / bug bounty search (D7) | start by PR-8 | typical lead time 4–10 weeks; audit runs on the PR-11 code freeze |
+| Audit vendor / bug bounty search (D7) | at the developer's discretion | typical lead time 4–10 weeks; audit runs on the PR-11 code freeze — no fixed start deadline (amended 2026-11-01) |
 | Publish pair-checks per DR-4 checklist | RC + release | package + consumer on clean install |
 | `v1.0.0-rc.1` → `v1.0.0`, npm dist-tag `lts`, migration guide post | Stage 6–7 | release ops |
 
