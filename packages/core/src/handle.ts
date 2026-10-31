@@ -7,6 +7,8 @@ import { normalizeName } from './canonical-name.js';
 import type { SubHandleMetadata, SubHandle } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
+import { DisposedError } from './disposed-error.js';
+import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 /**
  * Metadata associated with a {@link Handle}.
@@ -38,13 +40,19 @@ export interface HandleMetadata {
  * (e.g., an IoT device deriving keys for its components). The private key
  * **never leaves the Handle** — derivation is performed internally using HKDF.
  *
+ * Handles own their lifecycle: {@link Handle.dispose} zeroizes the private
+ * key, after which every capability method throws a {@link DisposedError}.
+ * Serialization (`JSON.stringify`, console inspection) is redacted and never
+ * emits key material.
+ *
  * @category Core Primitives
  */
 export class Handle {
-  private readonly privateKey: Uint8Array;
-  private readonly publicKey: Uint8Array;
-  private readonly _name: string;
-  private readonly _metadata?: HandleMetadata;
+  #privateKey: Uint8Array;
+  #publicKey: Uint8Array;
+  #name: string;
+  #metadata: HandleMetadata | undefined;
+  #disposed = false;
 
   /**
    * Creates a new Handle instance.
@@ -53,14 +61,16 @@ export class Handle {
    * {@link Handle.deriveSubHandle}. Direct construction is discouraged.
    *
    * @param privateKey - The 32-byte Ed25519 private key for this handle.
+   *   Copied on input — later mutation of the caller's buffer has no effect.
    * @param name - The context name this handle represents.
    * @param metadata - Optional metadata associated with this handle.
+   *   Shallow-copied on input (nested values are not cloned).
    */
   constructor(privateKey: Uint8Array, name: string, metadata?: HandleMetadata) {
-    this.privateKey = privateKey;
-    this.publicKey = ed.getPublicKey(privateKey);
-    this._name = name;
-    this._metadata = metadata;
+    this.#privateKey = new Uint8Array(privateKey);
+    this.#publicKey = ed.getPublicKey(this.#privateKey);
+    this.#name = name;
+    this.#metadata = metadata ? { ...metadata } : undefined;
   }
 
   /**
@@ -70,10 +80,7 @@ export class Handle {
    * @returns A unique, URL-safe string identifier.
    */
   getId(): string {
-    return btoa(String.fromCharCode(...this.publicKey))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
+    return base64urlEncode(this.#publicKey);
   }
 
   /**
@@ -81,9 +88,11 @@ export class Handle {
    *
    * @param data - The data to be signed, as a Uint8Array.
    * @returns A Promise resolving to the Ed25519 signature as a Uint8Array.
+   * @throws {DisposedError} If the Handle has been disposed.
    */
   async sign(data: Uint8Array): Promise<Uint8Array> {
-    return ed.sign(data, this.privateKey);
+    this.#assertNotDisposed();
+    return ed.sign(data, this.#privateKey);
   }
 
   /**
@@ -104,17 +113,23 @@ export class Handle {
 
   /** @returns The context name associated with this Handle. */
   getName(): string {
-    return this._name;
+    return this.#name;
   }
 
-  /** @returns The metadata object associated with this Handle. */
+  /**
+   * @returns A shallow copy of the metadata object associated with this
+   *   Handle — mutating the returned object does not affect the Handle.
+   */
   getMetadata(): HandleMetadata | undefined {
-    return this._metadata;
+    return this.#metadata ? { ...this.#metadata } : undefined;
   }
 
-  /** @returns A Uint8Array containing the 32-byte Ed25519 public key. */
+  /**
+   * @returns A copy of the 32-byte Ed25519 public key — mutating the
+   *   returned array does not affect the Handle.
+   */
   getPublicKey(): Uint8Array {
-    return this.publicKey;
+    return new Uint8Array(this.#publicKey);
   }
 
   /** @returns The derivation path, or undefined for Handle (only SubHandle has a path). */
@@ -155,19 +170,20 @@ export class Handle {
    * ```
    */
   async deriveSubHandle(name: string, metadata?: SubHandleMetadata): Promise<SubHandle> {
+    this.#assertNotDisposed();
     const normalizedName = normalizeName(name);
     const info = new TextEncoder().encode(
-      DERIVATION_PATHS.subhandle(this._name, normalizedName)
+      DERIVATION_PATHS.subhandle(this.#name, normalizedName)
     );
     // The private key is used internally and never leaves this class.
     const subKey = hkdf(
       sha256,
-      this.privateKey,
+      this.#privateKey,
       new Uint8Array(0),
       info,
       32
     );
-    const path = [this._name, normalizedName];
+    const path = [this.#name, normalizedName];
     const { SubHandle: SubHandleClass } = await import('./subhandle.js');
     return new SubHandleClass(subKey, normalizedName, path, metadata);
   }
@@ -201,10 +217,11 @@ export class Handle {
     grant: AttestationGrant,
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
   ): Promise<Attestation> {
+    this.#assertNotDisposed();
     const normalized = normalizeName(subName);
     const sub = await this.deriveSubHandle(normalized);
     return Attestation.issue(
-      this.privateKey,
+      this.#privateKey,
       sub.getPublicKey(),
       normalized,
       grant,
@@ -228,9 +245,10 @@ export class Handle {
    * ```
    */
   derivePassword(context: string, length: number = 16): string {
+    this.#assertNotDisposed();
     const salt = new TextEncoder().encode(`me2em/secret/${context.toLowerCase().trim()}`);
     const info = new TextEncoder().encode('me2em/secret/v1');
-    const secretBytes = hkdf(sha256, this.privateKey, salt, info, length);
+    const secretBytes = hkdf(sha256, this.#privateKey, salt, info, length);
     return btoa(String.fromCharCode(...secretBytes))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
@@ -259,9 +277,10 @@ export class Handle {
    * ```
    */
   deriveChannelKey(context: string): Uint8Array {
+    this.#assertNotDisposed();
     const salt = new TextEncoder().encode(`me2em/channel/${context.toLowerCase().trim()}`);
     const info = new TextEncoder().encode('me2em/channel/v1');
-    return hkdf(sha256, this.privateKey, salt, info, 32);
+    return hkdf(sha256, this.#privateKey, salt, info, 32);
   }
 
   /**
@@ -281,7 +300,8 @@ export class Handle {
    * ```
    */
   async deriveSharedSecret(otherPublicKey: Uint8Array): Promise<Uint8Array> {
-    const myPrivBytes = this.privateKey;
+    this.#assertNotDisposed();
+    const myPrivBytes = this.#privateKey;
     const otherPubBytes = otherPublicKey;
 
     /* v8 ignore start -- defensive: the constructor already validates the
@@ -314,5 +334,46 @@ export class Handle {
       DERIVATION_PATHS.p2pChannelV2
     );
     return hkdf(sha256, rawSharedSecret, bound, info, 32);
+  }
+
+  /**
+   * Permanently destroys this Handle's key material.
+   *
+   * The private key bytes are zeroized; afterwards every capability method
+   * ({@link sign}, {@link deriveSubHandle}, {@link attestSubHandle},
+   * {@link derivePassword}, {@link deriveChannelKey},
+   * {@link deriveSharedSecret}) throws a {@link DisposedError}.
+   * Informational getters ({@link getName}, {@link getId},
+   * {@link getPublicKey}, {@link getMetadata}) keep working — they never
+   * touch key material.
+   *
+   * SubHandles inherit `dispose()`. Calling it more than once is a no-op
+   * (idempotent).
+   */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#privateKey.fill(0);
+    this.#disposed = true;
+  }
+
+  #assertNotDisposed(): void {
+    if (this.#disposed) throw new DisposedError('Handle');
+  }
+
+  /**
+   * Redacted serialization contract: `JSON.stringify(handle)` exposes only
+   * the object kind, the public identifier and the context name — never
+   * key material or metadata.
+   */
+  toJSON(): { kind: string; id: string; name: string } {
+    return {
+      kind: 'Handle',
+      id: base64urlEncode(this.#publicKey),
+      name: this.#name,
+    };
+  }
+
+  [INSPECT_SYMBOL](): string {
+    return `Handle(id=${base64urlEncode(this.#publicKey).slice(0, 8)}…, name=${JSON.stringify(this.#name)})`;
   }
 }

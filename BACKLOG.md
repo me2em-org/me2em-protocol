@@ -73,9 +73,12 @@ development, not part of the shipped API contract.
   configs (PR-4, A7): core 90/90, crypto 90/90, react ratcheted at
   82/71 — raise react to the 90/90 target with its next test slice
   (this item); the CI wiring diff is supplied to the architect in the
-  PR-4 description. Pending: lint config for root-level
-  legacy files (continue-on-error workaround), audit blocking policy
-  decision, branch protection after 2+ stable green runs.
+  PR-4 description (wired into `ci-security.yml` from PR-13, A7 done).
+  Pending: eslint flat config for the whole workspace — devDep eslint
+  v10 has NO `eslint.config.*` anywhere, so `pnpm -r lint` fails
+  uniformly (masked by `continue-on-error`; found during PR-5),
+  audit blocking policy decision, branch protection after 2+ stable
+  green runs.
 - **BL-37 · open · npm dist-tag maintenance.** `latest` for
   @me2em/core points at 0.4.1-alpha.1 and for @me2em/react at
   0.1.0-alpha.1, while new releases ship under the `alpha` tag. When

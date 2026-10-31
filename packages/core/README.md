@@ -285,8 +285,8 @@ class Identity {
 class Handle {
   getId(): string;                    // base64url of the public key
   getName(): string;                  // canonical (normalized) name
-  getMetadata(): HandleMetadata | undefined;
-  getPublicKey(): Uint8Array;
+  getMetadata(): HandleMetadata | undefined;   // defensive copy
+  getPublicKey(): Uint8Array;         // defensive copy
   getPath(): string[] | undefined;    // undefined for Handle, path for SubHandle
   sign(data: Uint8Array): Promise<Uint8Array>;
   static verify(sig: Uint8Array, data: Uint8Array, pub: Uint8Array): Promise<boolean>;
@@ -297,6 +297,7 @@ class Handle {
   attestSubHandle(subName: string, grant: AttestationGrant,
                   opts?: { ttlSeconds?, expiresAt?, jti?, now? }): Promise<Attestation>;
   validateSessionOptions(options: { audience: string; scopes: string[]; ttl: number }): void;
+  dispose(): void;                    // zeroize key; capability methods throw DisposedError
 }
 ```
 
@@ -304,13 +305,34 @@ class Handle {
 
 ```typescript
 class SubHandle extends Handle {
-  getPath(): string[];                // ['station-001', 'connector-ccs']
+  getPath(): string[];                // ['station-001', 'connector-ccs'] — a copy
   getPathString(): string;            // 'station-001/connector-ccs'
   getDepth(): number;                 // always 2
   isLeaf(): boolean;                  // always true
-  getSubMetadata(): SubHandleMetadata;
+  getSubMetadata(): SubHandleMetadata; // defensive copy of constraints
   validateSessionOptions(options: { audience: string; scopes: string[]; ttl: number }): void;
   // deriveSubHandle is overridden and ALWAYS throws (leaf node)
+}
+```
+
+### Object lifecycle (`dispose()`)
+
+`Identity` and `Handle` own true `#private` key material. `dispose()`
+zeroizes the private key and permanently revokes every capability method
+(`sign`, derivations, attestation issuance) — they then throw
+`DisposedError`. Informational getters (`getName`, `getId`,
+`getPublicKey`, metadata) keep working: public keys are not secrets.
+Serialization is redacted by design — `JSON.stringify(handle)` and
+`console.log(handle)` emit only `{ kind, id, name, path? }`, never key
+material. Defensive copies on inputs and getters mean caller-side
+mutation never reaches the stored keys.
+
+```typescript
+const handle = await identity.deriveHandle('station-001');
+try {
+  // ... use the handle ...
+} finally {
+  handle.dispose(); // key material zeroized; idempotent
 }
 ```
 
