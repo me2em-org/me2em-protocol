@@ -9,8 +9,19 @@
 //   3.2   — the derivation formulas live in crypto/derivation.ts and
 //           BOTH SubHandle entry points share `deriveSubHandleKey`;
 //           these tests pin the helpers byte-parity against the public
-//           methods (5.3.3 complements this in derivation.spec.ts).
-//   3.3.1 — no @noble import outside crypto/ (the wrapper boundary).
+//           methods — public keys AND deterministic Ed25519 signatures
+//           (the raw private key is a true `#`-private field with no
+//           accessor, so a byte-equal RFC 8032 signature over the same
+//           message is the strongest observable private-key pin)
+//           (5.3.3 complements this in derivation.spec.ts).
+//   3.3.1 — no @noble import outside crypto/ (the wrapper boundary),
+//           checked across EVERY import form (static, side-effect,
+//           dynamic import(), require(), export … from); the detector
+//           itself is pinned by a meta-test. Additionally pins the D5
+//           auto-init invariant: @noble/ed25519 is imported by
+//           crypto/init.ts alone, which configures the backend on
+//           module load — so any code path that can reach a crypto
+//           operation sees a configured backend in any import order.
 //   5.3.4 — P2P raw ECDH helper is symmetric.
 
 import { describe, it, expect } from 'vitest';
@@ -56,19 +67,57 @@ describe('PR-10 architecture pins (D4 / 3.2 / 3.3.1)', () => {
   });
 
   describe('3.3.1 — @noble imports only inside crypto/', () => {
-    it('no direct @noble import outside src/crypto', () => {
+    // Every syntactic form a @noble import can take. A scan that only
+    // matched `from '@noble/` would miss side-effect imports, require()
+    // and dynamic import() — the meta-test below pins the detector
+    // itself, so new import syntax cannot silently open a hole.
+    const NOBLE_IMPORT =
+      /from\s+['"]@noble\/|import\s+['"]@noble\/|require\s*\(\s*['"]@noble\/|import\s*\(\s*['"]@noble\//;
+
+    it('detector covers every import form (meta-pin)', () => {
+      const probe = (s: string) => NOBLE_IMPORT.test(s);
+      // static import … from / export … from — same `from` clause:
+      expect(probe("import { sha256 } from '@noble/hashes/sha2.js';")).toBe(true);
+      expect(probe("export { sha256 } from '@noble/hashes/sha2.js';")).toBe(true);
+      // side-effect import:
+      expect(probe("import '@noble/hashes/sha2.js';")).toBe(true);
+      // require():
+      expect(probe("require('@noble/hashes/sha2.js');")).toBe(true);
+      // dynamic import():
+      expect(probe("import('@noble/hashes/sha2.js');")).toBe(true);
+      // negative controls — wrapped imports and prose must not trip it:
+      expect(probe("import { hkdf } from './crypto/hkdf.js';")).toBe(false);
+      expect(probe("import { hkdf } from '../src/crypto/hkdf.js';")).toBe(false);
+      expect(probe('the @noble/hashes library is wrapped by crypto/hkdf.ts')).toBe(false);
+    });
+
+    it('no direct @noble import outside src/crypto (all import forms)', () => {
       const cryptoDir = join(SRC_DIR, 'crypto');
       const offenders = listTsFiles(SRC_DIR)
         .filter((f) => !f.startsWith(cryptoDir))
         .filter((f) =>
-          /from\s+'@noble\//.test(stripComments(readFileSync(f, 'utf8')))
+          NOBLE_IMPORT.test(stripComments(readFileSync(f, 'utf8')))
+        );
+      expect(offenders).toEqual([]);
+    });
+
+    it('@noble/ed25519 is imported by crypto/init.ts alone (auto-init invariant, D5)', () => {
+      // The backend must be reachable only through init.ts, whose module
+      // load configures it — that is what makes auto-init structural:
+      // every module touching Ed25519 imports the backend (and thereby
+      // the configuration) from init.ts.
+      const initFile = join(SRC_DIR, 'crypto', 'init.ts');
+      const offenders = listTsFiles(SRC_DIR)
+        .filter((f) => f !== initFile)
+        .filter((f) =>
+          /@noble\/ed25519/.test(stripComments(readFileSync(f, 'utf8')))
         );
       expect(offenders).toEqual([]);
     });
   });
 
   describe('3.2 — crypto.derivation* byte-parity with the public methods', () => {
-    it('deriveRootKey reproduces Identity.fromSeed exactly', async () => {
+    it('deriveRootKey reproduces Identity.fromSeed exactly (pubkey + signature parity)', async () => {
       const identity = await Identity.fromSeed(TEST_SEED);
       const rootKey = crypto.deriveRootKey(TEST_SEED);
 
@@ -76,9 +125,20 @@ describe('PR-10 architecture pins (D4 / 3.2 / 3.3.1)', () => {
       expect(Array.from(ed25519.getPublicKey(rootKey))).toEqual(
         Array.from(identity.getPublicKey())
       );
+      // Private-key byte-parity, behaviorally: `#privateKey` is a true
+      // private field with no accessor (encapsulation is a design
+      // property, not to be pierced for tests), so the raw bytes are not
+      // observable. RFC 8032 Ed25519 signing is deterministic, and
+      // `identity.sign` routes through the very same `ed.sign` backend as
+      // `crypto.sign` — byte-equal signatures over the same message prove
+      // byte-equal private keys.
+      const msg = new TextEncoder().encode('me2em arch-cycle root-key parity probe');
+      expect(Array.from(crypto.sign(msg, rootKey))).toEqual(
+        Array.from(await identity.sign(msg))
+      );
     });
 
-    it('deriveHandleKey reproduces Identity.deriveHandle exactly', async () => {
+    it('deriveHandleKey reproduces Identity.deriveHandle exactly (pubkey + signature parity)', async () => {
       const { identity, handle } = await createTestHandle('work');
       const rootKey = crypto.deriveRootKey(TEST_SEED);
       const handleKey = crypto.deriveHandleKey(rootKey, 'work');
@@ -86,6 +146,12 @@ describe('PR-10 architecture pins (D4 / 3.2 / 3.3.1)', () => {
       expect(handleKey.length).toBe(32);
       expect(Array.from(ed25519.getPublicKey(handleKey))).toEqual(
         Array.from(handle.getPublicKey())
+      );
+      // Deterministic-signature parity with the encapsulated key (see the
+      // root-key test for why this is the strongest private-key pin).
+      const msg = new TextEncoder().encode('me2em arch-cycle handle-key parity probe');
+      expect(Array.from(crypto.sign(msg, handleKey))).toEqual(
+        Array.from(await handle.sign(msg))
       );
       // Normalization parity: non-canonical name hits the same info string.
       const handleKeyNoisy = crypto.deriveHandleKey(rootKey, '  Work ');
@@ -95,7 +161,7 @@ describe('PR-10 architecture pins (D4 / 3.2 / 3.3.1)', () => {
       expect(identity).toBeInstanceOf(Identity);
     });
 
-    it('deriveSubHandleKey reproduces Handle.deriveSubHandle exactly', async () => {
+    it('deriveSubHandleKey reproduces Handle.deriveSubHandle exactly (pubkey + signature parity)', async () => {
       const { handle } = await createTestHandle('work');
       const rootKey = crypto.deriveRootKey(TEST_SEED);
       const handleKey = crypto.deriveHandleKey(rootKey, 'work');
@@ -105,6 +171,11 @@ describe('PR-10 architecture pins (D4 / 3.2 / 3.3.1)', () => {
       expect(sub).toBeInstanceOf(SubHandle);
       expect(Array.from(ed25519.getPublicKey(subKey))).toEqual(
         Array.from(sub.getPublicKey())
+      );
+      // Deterministic-signature parity with the encapsulated key.
+      const msg = new TextEncoder().encode('me2em arch-cycle subhandle-key parity probe');
+      expect(Array.from(crypto.sign(msg, subKey))).toEqual(
+        Array.from(await sub.sign(msg))
       );
     });
 

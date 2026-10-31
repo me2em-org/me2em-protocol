@@ -479,7 +479,15 @@ Redis `RevocationChecker`.
 - **Auto-init:** importing `@me2em/core` synchronously configures the
   Ed25519 backend (sha512 wiring for `@noble/ed25519`). There is no
   init call to remember and no async setup — the first sign/verify/derive
-  can run immediately after import.
+  can run immediately after import. The guarantee is structural, not
+  conventional: the package exposes a single entry point (the `exports`
+  map allows only `.` — deep subpath imports such as
+  `@me2em/core/crypto/*` are not part of the public API), and every
+  module that touches Ed25519 imports the backend from
+  `crypto/init.ts`, which configures it on module load. Any code path
+  that can reach a crypto operation therefore loads the configured
+  backend first, in any import order (pinned by `test/arch-cycle.spec.ts`;
+  see specs/v1.0.md §11 for the module-structure contract).
 
 ## 🛡️ Security Best Practices
 
