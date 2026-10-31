@@ -1,10 +1,8 @@
 // identity.ts
 import { ed } from './crypto/init.js';
-import { hkdf } from '@noble/hashes/hkdf.js';
-import { sha256 } from '@noble/hashes/sha2.js';
+import { deriveRootKey, deriveHandleKey, deriveSubHandleKey } from './crypto/derivation.js';
 import { Handle, type HandleMetadata } from './handle.js';
 import { SubHandle, type SubHandleMetadata } from './subhandle.js';
-import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { normalizeName } from './canonical-name.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 import { DisposedError } from './disposed-error.js';
@@ -75,14 +73,9 @@ export class Identity implements Signer {
       throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid seed: must be 64 bytes');
     }
 
-    const key = hkdf(
-      sha256,
-      seedBytes,
-      new Uint8Array(0),
-      new TextEncoder().encode(DERIVATION_PATHS.identity),
-      32
-    );
-    return new Identity(key);
+    // Single shared derivation (PR-10): crypto/derivation.ts is the only
+    // place the root key formula lives.
+    return new Identity(deriveRootKey(seedBytes));
   }
 
   /**
@@ -106,14 +99,9 @@ export class Identity implements Signer {
   async deriveHandle(name: string, metadata?: HandleMetadata): Promise<Handle> {
     this.#assertNotDisposed();
     name = normalizeName(name);
-    const info = new TextEncoder().encode(DERIVATION_PATHS.handle(name));
-    const handleKey = hkdf(
-      sha256,
-      this.#privateKey,
-      new Uint8Array(0),
-      info,
-      32
-    );
+    // Single shared derivation (PR-10): same formula as fromSeed's step,
+    // centralized in crypto/derivation.ts.
+    const handleKey = deriveHandleKey(this.#privateKey, name);
     return new Handle(handleKey, name, metadata);
   }
 
@@ -154,27 +142,13 @@ export class Identity implements Signer {
     handleName = normalizeName(handleName);
     const subNameNorm = normalizeName(subName);
 
-    // Step 1: derive the intermediate Handle key (never exposed)
-    const handleInfo = new TextEncoder().encode(DERIVATION_PATHS.handle(handleName));
-    const handleKey = hkdf(
-      sha256,
-      this.#privateKey,
-      new Uint8Array(0),
-      handleInfo,
-      32
-    );
-
-    // Step 2: derive the SubHandle key from the Handle key
-    const subInfo = new TextEncoder().encode(
-      DERIVATION_PATHS.subhandle(handleName, subNameNorm)
-    );
-    const subKey = hkdf(
-      sha256,
-      handleKey,
-      new Uint8Array(0),
-      subInfo,
-      32
-    );
+    // Single shared derivations (PR-10, 5.3.3): the intermediate Handle
+    // key and the SubHandle key come from crypto/derivation.ts — the
+    // exact functions Handle.deriveSubHandle uses, so both entry points
+    // are byte-identical by construction (pinned by test 5.3.3 and the
+    // golden vectors).
+    const handleKey = deriveHandleKey(this.#privateKey, handleName);
+    const subKey = deriveSubHandleKey(handleKey, handleName, subNameNorm);
 
     const path = [handleName, subNameNorm];
     return new SubHandle(subKey, subNameNorm, path, metadata);
