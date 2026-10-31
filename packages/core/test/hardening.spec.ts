@@ -160,8 +160,9 @@ describe('1.8.x — __proto__ pollution protection', () => {
       grant: { scopes: ['a'], maxSessionTtl: 1 }, iat: 1, exp: 2, jti: 'j',
     });
     // Inject an own "__proto__" key into the raw JSON text (JSON.stringify
-    // cannot emit it directly).
-    const hostile = legit.replace('{', '{"__proto__":{"polluted":true},');
+    // cannot emit it directly): splice the hostile key before the object
+    // body instead of a replace(), which would touch only the first match.
+    const hostile = `{"__proto__":{"polluted":true},${legit.slice(1)}`;
     return `${base64urlEncode(new TextEncoder().encode(hostile))}.${base64urlEncode(new Uint8Array(64))}`;
   }
 
