@@ -335,7 +335,7 @@ describe('verifyAttested: negative cases', () => {
     );
   });
 
-  it('16. PATH_MISMATCH: hPath длины 1', async () => {
+  it('16. MALFORMED: hPath длины 1 — структурная ошибка, отклоняется на FORMAT-слое (PR-7)', async () => {
     const handle = await identity.deriveHandle('station-001');
     const A = await identity.attestHandle('station-001', grantA);
     const sub = await handle.deriveSubHandle('connector-ccs');
@@ -355,9 +355,12 @@ describe('verifyAttested: negative cases', () => {
     const signatureB64 = base64urlEncode(signature);
     const token = `${payloadB64}.${signatureB64}`;
 
+    // PR-7: hPath должен быть массивом ровно из двух строк — это
+    // структурная ошибка токена (MALFORMED/FORMAT на шаге 1), а не
+    // PATH_MISMATCH на шаге 4.
     await expectCode(
       Session.verifyAttested(token, rootPub, [A.token], 'app.com'),
-      'PATH_MISMATCH', 'SESSION'
+      'MALFORMED', 'FORMAT'
     );
   });
 

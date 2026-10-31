@@ -8,6 +8,7 @@ import { normalizeName } from '../src/canonical-name.js';
 import {
   TEST_SEED,
   createTestHandle,
+  expectAttestationError,
   tamperPayload,
 } from './test-utils.js';
 
@@ -85,9 +86,10 @@ describe('tampered payload rejected', () => {
       payload.scp = ['read']; // Tamper
     });
 
-    await expect(
-      Session.verifyStateless(tamperedToken, identity, 'app')
-    ).rejects.toThrow(/signature/i);
+    await expectAttestationError(
+      Session.verifyStateless(tamperedToken, identity, 'app'),
+      'BAD_SIGNATURE', 'SESSION'
+    );
   });
 });
 
@@ -108,8 +110,9 @@ describe('iat is required', () => {
       delete payload.iat;
     });
 
-    await expect(
-      Session.verifyStateless(tokenNoIat, identity, 'app')
-    ).rejects.toThrow(/missing required fields/i);
+    await expectAttestationError(
+      Session.verifyStateless(tokenNoIat, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
   });
 });

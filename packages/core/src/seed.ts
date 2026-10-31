@@ -1,6 +1,7 @@
 // packages/core/src/seed.ts
 import { generateMnemonic, mnemonicToSeed, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { AttestationError } from './errors.js';
 
 /**
  * Seed strength in bits. 128 bits → 12 words, 256 bits → 24 words.
@@ -39,7 +40,11 @@ export type SeedStrength = 128 | 256;
  */
 export function generateSeedPhrase(strength: SeedStrength = 128): string[] {
   if (strength !== 128 && strength !== 256) {
-    throw new Error('Seed strength must be 128 (12 words) or 256 (24 words)');
+    throw new AttestationError(
+      'MALFORMED',
+      'FORMAT',
+      'Seed strength must be 128 (12 words) or 256 (24 words)'
+    );
   }
   const mnemonic = generateMnemonic(wordlist, strength);
   return mnemonic.split(' ');
@@ -163,7 +168,7 @@ export async function get64ByteSeedFromMnemonic(
   const words = normalizeSeedPhrase(seedPhrase);
   const validation = validateSeedPhrase(words);
   if (!validation.isValid) {
-    throw new Error(`Invalid seed phrase: ${validation.error}`);
+    throw new AttestationError('MALFORMED', 'FORMAT', `Invalid seed phrase: ${validation.error}`);
   }
   const mnemonic = words.join(' ');
   // Full 64-byte BIP39 seed (PBKDF2-HMAC-SHA512 output) — no post-hashing

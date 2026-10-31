@@ -8,12 +8,13 @@ import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { normalizeName } from './canonical-name.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 import { DisposedError } from './disposed-error.js';
+import { AttestationError } from './errors.js';
 import type { Signer } from './types.js';
 import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 function parseHexSeed(hex: string): Uint8Array {
   if (!/^[0-9a-fA-F]{128}$/.test(hex)) {
-    throw new Error('Seed string must be 128 hex characters');
+    throw new AttestationError('MALFORMED', 'FORMAT', 'Seed string must be 128 hex characters');
   }
   const out = new Uint8Array(64);
   for (let i = 0; i < 64; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
@@ -56,7 +57,8 @@ export class Identity implements Signer {
    *
    * @param seed - A 64-byte raw Uint8Array seed, or a hex-encoded string of 64 bytes.
    * @returns A Promise resolving to a new Identity instance.
-   * @throws {Error} If the provided seed is not exactly 64 bytes.
+   * @throws {AttestationError} `MALFORMED`/`FORMAT` if the provided seed
+   *   is not exactly 64 bytes (or the hex string is not 128 characters).
    *
    * @example
    * ```ts
@@ -70,7 +72,7 @@ export class Identity implements Signer {
       : seed;
 
     if (seedBytes.length !== 64) {
-      throw new Error('Invalid seed: must be 64 bytes');
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid seed: must be 64 bytes');
     }
 
     const key = hkdf(
@@ -207,8 +209,8 @@ export class Identity implements Signer {
    * @returns An attestation signed by the Identity root key (the
    *   Identity passes itself to `Attestation.issue` as the {@link Signer}).
    *   Store it with the Handle — it is a public artifact, not a secret.
-   * @throws {Error} If the name is not canonicalizable.
-   * @throws {AttestationError} If the grant is invalid.
+   * @throws {AttestationError} `MALFORMED`/`FORMAT` if the name is not
+   *   canonicalizable or the grant is invalid.
    *
    * @example
    * ```ts

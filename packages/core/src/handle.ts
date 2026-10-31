@@ -8,6 +8,7 @@ import type { SubHandleMetadata, SubHandle } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 import { DisposedError } from './disposed-error.js';
+import { AttestationError } from './errors.js';
 import type { Signer } from './types.js';
 import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
@@ -101,6 +102,10 @@ export class Handle implements Signer {
   /**
    * Verifies an Ed25519 signature against the provided data and public key.
    *
+   * A signature whose length differs from the 64-byte Ed25519 size is
+   * rejected with `false` before any crypto runs (PR-7 pre-check) — the
+   * method therefore never throws for short/long signatures.
+   *
    * @param signature - The signature to verify (Uint8Array).
    * @param data - The original data that was signed (Uint8Array).
    * @param publicKey - The public key to verify against (Uint8Array).
@@ -111,6 +116,9 @@ export class Handle implements Signer {
     data: Uint8Array,
     publicKey: Uint8Array
   ): Promise<boolean> {
+    if (signature.length !== 64) {
+      return false;
+    }
     return ed.verify(signature, data, publicKey);
   }
 
@@ -252,10 +260,8 @@ export class Handle implements Signer {
     const salt = new TextEncoder().encode(`me2em/secret/${context.toLowerCase().trim()}`);
     const info = new TextEncoder().encode('me2em/secret/v1');
     const secretBytes = hkdf(sha256, this.#privateKey, salt, info, length);
-    return btoa(String.fromCharCode(...secretBytes))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
+    // Audited @scure/base codec (A3) — no hand-rolled btoa alphabet math.
+    return base64urlEncode(secretBytes);
   }
 
   /**
@@ -310,11 +316,11 @@ export class Handle implements Signer {
     /* v8 ignore start -- defensive: the constructor already validates the
        key length implicitly (ed25519.getPublicKey throws RangeError). */
     if (myPrivBytes.length !== 32) {
-      throw new Error('Handle private key must be 32 bytes');
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Handle private key must be 32 bytes');
     }
     /* v8 ignore stop */
     if (otherPubBytes.length !== 32) {
-      throw new Error('Public key must be 32 bytes');
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Public key must be 32 bytes');
     }
 
     const x25519Priv = ed25519.utils.toMontgomerySecret(myPrivBytes);

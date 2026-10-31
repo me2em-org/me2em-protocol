@@ -8,7 +8,7 @@ import {
   validateSeedPhrase,
 } from '../src/index.js';
 import { DERIVATION_PATHS } from '../src/crypto/derivation-paths.js';
-import { TEST_SEED, createTestHandle } from './test-utils.js';
+import { TEST_SEED, createTestHandle, expectAttestationError } from './test-utils.js';
 
 describe('Me2eM Core Functionality', () => {
   // ---------------------------------------------------------------------------
@@ -224,9 +224,10 @@ describe('Me2eM Core Functionality', () => {
       const sub = await identity.deriveSubHandle('station-001', 'connector-1');
 
       // SubHandle is a leaf (depth = 2), so derivation must be blocked
-      await expect(
-        sub.deriveSubHandle('invalid-child')
-      ).rejects.toThrow(/maximum depth.*reached|marked as leaf/i);
+      await expectAttestationError(
+        sub.deriveSubHandle('invalid-child'),
+        'MAX_DEPTH_EXCEEDED', 'FORMAT'
+      );
     });
   });
 

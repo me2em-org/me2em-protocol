@@ -85,6 +85,16 @@ development, not part of the shipped API contract.
   versions stabilize, re-point `latest` (`npm dist-tag add
   @me2em/core@<ver> latest`) so a plain `npm install @me2em/core`
   resolves to the current line.
+- **BL-39 · open · Audit vendor / bug bounty search (D7, PLAN-LTS §9).**
+  The search starts **at the developer's discretion** — there is no
+  fixed PR deadline (amended 2026-11-01 per architect: the old
+  "start by PR-8" milestone is dropped). Planning facts, not
+  deadlines: typical lead time is 4–10 weeks and the external audit
+  runs on the PR-11 code freeze, so an early start simply leaves more
+  runway. This is the release gate: external audit or bug bounty
+  (D7) before v1.0.0 (see the DR-6 entry). Architect-owned track
+  (PLAN-LTS §9, outside agent scope); tracked here so the track is
+  not lost between PRs.
 
 ## P3 — Protocol Extensions (0.8+)
 

@@ -4,6 +4,13 @@
 // after the object has been disposed. Informational getters (name, path,
 // public key, metadata) deliberately keep working after dispose() — only
 // capabilities are revoked.
+//
+// Since PR-7 the class extends {@link AttestationError} with the
+// `DISPOSED` code (level `FORMAT`), so the whole package surface is
+// catchable as a single error type while `instanceof DisposedError`
+// keeps working for targeted handling.
+
+import { AttestationError } from './errors.js';
 
 /**
  * Thrown when a method that requires key material is called on an
@@ -13,10 +20,12 @@
  * The private key bytes are zeroized by `dispose()`; calling a capability
  * method afterwards is always a programming error, never a recoverable
  * state — match on `e.name === 'DisposedError'` (or `instanceof`).
+ * As an {@link AttestationError} subclass it carries `code === 'DISPOSED'`
+ * and `level === 'FORMAT'`.
  *
  * @category Errors
  */
-export class DisposedError extends Error {
+export class DisposedError extends AttestationError {
   /** Name of the disposed class, e.g. `'Identity'`, `'Handle'`, `'SubHandle'`. */
   public readonly className: string;
 
@@ -25,7 +34,11 @@ export class DisposedError extends Error {
    *   exposed as {@link DisposedError.className}.
    */
   constructor(className: string) {
-    super(`${className} has been disposed; its key material has been zeroized`);
+    super(
+      'DISPOSED',
+      'FORMAT',
+      `${className} has been disposed; its key material has been zeroized`
+    );
     this.name = 'DisposedError';
     this.className = className;
   }
