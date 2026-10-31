@@ -202,12 +202,16 @@ export class Identity implements Signer {
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
   ): Promise<Attestation> {
     this.#assertNotDisposed();
-    const normalized = normalizeName(name);
-    const handle = await this.deriveHandle(normalized);
+    // Single normalization (PR-11, 3.6): deriveHandle canonicalizes the
+    // name (NFKC → lowercase → trim) and the returned Handle carries the
+    // canonical name — pre-normalizing here ran the same name through
+    // normalizeName twice. Attestation.issue applies its own defensive
+    // canonicalization on top (its public contract).
+    const handle = await this.deriveHandle(name);
     return Attestation.issue(
       this,
       handle.getPublicKey(),
-      normalized,
+      handle.getName(),
       grant,
       opts ?? {}
     );

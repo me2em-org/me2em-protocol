@@ -3,6 +3,18 @@
 ## [Unreleased] → will ship in 0.8.0
 
 ### BREAKING
+- **The `Session` constructor is private (PR-11, D6).** Direct
+  `new Session(handleId, handleName, …)` no longer type-checks — a
+  Session is either issued by `Session.create` or obtained from
+  `Session.verifyStateless` / `Session.verifyAttested`, which closes the
+  last gap that allowed fabricating a verified-looking session object
+  outside the library (`Identity` and `Handle` constructors have been
+  private since the encapsulation PR; `Session` was the outlier).
+  Reconstruction of an already-verified session in tests and tooling
+  goes through the `@internal` `Session.fromVerified` factory — not
+  public API, reached via test-utils. Note for plain-JS callers: TS
+  privacy is compile-time; a fabricated instance still carries no valid
+  token and fails every verification path.
 - **Derivation API is options-object: `derivePassword(context,
   { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })`
   (PR-8, §7 / D3).** The positional forms
@@ -207,6 +219,21 @@
   seed; different strengths derive different (but deterministic) identities.
 
 ### Changed
+- **`Session.verifyAttested` split into five private stages (PR-11,
+  3.4/3.6).** The ~210-line monolith is now
+  `#verifyChainStructure` → `#verifyRootAttestation` →
+  `#verifyHandleAttestation` → `#verifySessionAgainstGrant` →
+  `#verifySessionSignature` (audience/time checks and the session
+  revocation step remain in the orchestrator). Check order, error codes
+  and error levels are byte-identical to the pre-split flow — pinned by
+  the untouched attested-session (28), error-table (8) and fuzz (4)
+  suites. No behavioral change.
+- **`attestSubHandle` / `attestHandle` canonicalize the subject name
+  exactly once (PR-11, 3.6).** Both issuers pre-normalized the name and
+  then called `deriveSubHandle` / `deriveHandle`, which canonicalize
+  again (`Attestation.issue` applies its own defensive pass on top —
+  its public contract, unchanged). `normalizeName` is idempotent, so
+  issued attestations are byte-identical; the redundant pass is gone.
 - `engines.node` floor raised to `>=22.0.0` (A2): Node 18/20 are EOL, CI
   pins Node 22 (LTS maintenance to 2027-04). Applied workspace-wide — root,
   `@me2em/core`, `@me2em/crypto`, `@me2em/react`.

@@ -6,6 +6,7 @@ import {
   AttestationError,
   Identity,
   Handle,
+  Session,
   type AttestationErrorCode,
   type AttestationLevel,
   type Signer,
@@ -78,6 +79,34 @@ export function expectAttestationErrorSync(
     expect((e as AttestationError).code).toBe(code);
     expect((e as AttestationError).level).toBe(level);
   }
+}
+
+/**
+ * Rebuilds a {@link Session} from already-verified parts via the
+ * `@internal` `Session.fromVerified` factory (PR-11, D6): the public
+ * constructor is private, and tests reach the internal factory through
+ * this helper rather than touching construction directly.
+ */
+export function sessionFromVerified(
+  handleId: string,
+  handleName: string,
+  audience: string,
+  scopes: string[],
+  expiresAt: number,
+  token: string,
+  path?: string[],
+  sessionId?: string
+): Session {
+  return Session.fromVerified(
+    handleId,
+    handleName,
+    audience,
+    scopes,
+    expiresAt,
+    token,
+    path,
+    sessionId
+  );
 }
 
 /**

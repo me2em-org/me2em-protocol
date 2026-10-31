@@ -341,12 +341,16 @@ export class Handle implements Signer {
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
   ): Promise<Attestation> {
     this.#assertNotDisposed();
-    const normalized = normalizeName(subName);
-    const sub = await this.deriveSubHandle(normalized);
+    // Single normalization (PR-11, 3.6): deriveSubHandle canonicalizes
+    // the subName (NFKC → lowercase → trim) and the returned SubHandle
+    // carries the canonical name — pre-normalizing here ran the same
+    // name through normalizeName twice. Attestation.issue applies its
+    // own defensive canonicalization on top (its public contract).
+    const sub = await this.deriveSubHandle(subName);
     return Attestation.issue(
       this,
       sub.getPublicKey(),
-      normalized,
+      sub.getName(),
       grant,
       opts ?? {}
     );

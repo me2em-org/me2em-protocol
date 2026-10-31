@@ -1,7 +1,7 @@
 // Session unit tests
 import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session, type RevocationChecker } from '../src/index.js';
-import { expectAttestationError } from './test-utils.js';
+import { expectAttestationError, sessionFromVerified } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 
@@ -314,7 +314,9 @@ describe('Session.isExpired', () => {
 
   it('should return true for expired session', () => {
     const past = Math.floor(Date.now() / 1000) - 10;
-    const session = new Session(
+    // PR-11 (D6): the constructor is private — reconstruction goes
+    // through the @internal Session.fromVerified factory via test-utils.
+    const session = sessionFromVerified(
       'mock-hId',
       'expired-now',
       'app',
