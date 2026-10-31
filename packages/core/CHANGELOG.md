@@ -105,6 +105,33 @@
   standard seed.
 
 ### Added
+- **Shared derivation module + static module graph (PR-10, D4/D5).**
+  The derivation formulas now live in the `crypto` namespace —
+  `crypto.deriveRootKey(seed)`, `crypto.deriveHandleKey(rootKey, name)`,
+  `crypto.deriveSubHandleKey(handleKey, handleName, subName)` — and
+  both SubHandle entry points (`Handle.deriveSubHandle`,
+  `Identity.deriveSubHandle`) call the same `deriveSubHandleKey`, so
+  their byte-parity is guaranteed by construction (pinned by test 5.3.3
+  and `test/arch-cycle.spec.ts`). Architecture: the `Handle`/`SubHandle`
+  class pair is co-located in one module and `subhandle.ts` is a pure
+  re-export facade — the dynamic `import('./subhandle.js')` cycle dodge
+  is gone, the module graph is acyclic and 100% static, and it loads
+  from any root (pinned by the `import-order-*.spec.ts` tests). The
+  raw X25519 (Montgomery) ECDH step of the P2P derivation is exposed as
+  `crypto.rawX25519SharedSecret(myPrivateKey, otherPublicKey)`. All
+  internal `hkdf`/`sha256`/curve imports now go through `crypto/`
+  wrappers; no `@noble` import remains outside `src/crypto/` — the
+  source-scan pin covers every import form (static, side-effect,
+  dynamic `import()`, `require()`, `export … from`) and additionally
+  pins the auto-init invariant: `@noble/ed25519` is imported by
+  `crypto/init.ts` alone, which configures the backend on module load;
+  combined with the single-entry-point `exports` map, any code path that
+  can reach a crypto operation sees a configured backend in any import
+  order. The module-structure contract (co-location rationale, crypto
+  boundary, auto-init) is normatively documented in specs/v1.0.md §11.
+  Crypto auto-init (D5): importing `@me2em/core` synchronously configures
+  `@noble/ed25519` (sha512) — no manual init call. Public API is
+  unchanged (additive only).
 - **Derivation revision model (PR-8, D3) — the sanctioned rotation path.**
   `derivePassword` and `deriveChannelKey` accept `revision` (positive
   integer, default `1`; an integer is canonical by construction — NFKC

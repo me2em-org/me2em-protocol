@@ -469,6 +469,25 @@ Redis `RevocationChecker`.
 - **Signatures:** Ed25519 (RFC 8032); tokens are `base64url(payload).base64url(signature)`
 - **Attestation payload limit:** 2048 bytes; **session payload limit:** 4096 bytes
 - **Clock skew tolerance:** ±30 seconds on all time checks
+- **Derivation module:** the formulas above live in the `crypto`
+  namespace — `crypto.deriveRootKey`, `crypto.deriveHandleKey`,
+  `crypto.deriveSubHandleKey`, plus `crypto.rawX25519SharedSecret` for
+  the raw X25519 (Montgomery) ECDH step of the P2P derivation. Both
+  SubHandle entry points (`handle.deriveSubHandle` and
+  `identity.deriveSubHandle`) share `crypto.deriveSubHandleKey`, so
+  their outputs are byte-identical by construction.
+- **Auto-init:** importing `@me2em/core` synchronously configures the
+  Ed25519 backend (sha512 wiring for `@noble/ed25519`). There is no
+  init call to remember and no async setup — the first sign/verify/derive
+  can run immediately after import. The guarantee is structural, not
+  conventional: the package exposes a single entry point (the `exports`
+  map allows only `.` — deep subpath imports such as
+  `@me2em/core/crypto/*` are not part of the public API), and every
+  module that touches Ed25519 imports the backend from
+  `crypto/init.ts`, which configures it on module load. Any code path
+  that can reach a crypto operation therefore loads the configured
+  backend first, in any import order (pinned by `test/arch-cycle.spec.ts`;
+  see specs/v1.0.md §11 for the module-structure contract).
 
 ## 🛡️ Security Best Practices
 
