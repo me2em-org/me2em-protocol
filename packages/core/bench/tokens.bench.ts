@@ -6,10 +6,9 @@ import { Attestation, Session } from '../src/index.js';
 import { createTestHandle } from '../test/test-utils.js';
 
 const { identity, handle } = await createTestHandle('bench-handle');
-const signerKey = crypto.getRandomValues(new Uint8Array(32));
 const grant = { scopes: ['read'], maxSessionTtl: 3600 };
 const attestation = await Attestation.issue(
-  signerKey,
+  identity,
   handle.getPublicKey(),
   'bench-handle',
   grant
@@ -23,7 +22,7 @@ const session = await Session.create(handle, {
 describe('tokens', () => {
   bench('Attestation.issue', async () => {
     await Attestation.issue(
-      signerKey,
+      identity,
       handle.getPublicKey(),
       'bench-handle',
       grant
