@@ -10,6 +10,7 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   expectAttestationError,
   expectAttestationErrorSync,
+  signerFromKey,
 } from './test-utils.js';
 
 describe('Attestation: roundtrip issue → decode', () => {
@@ -18,7 +19,7 @@ describe('Attestation: roundtrip issue → decode', () => {
     const signerPub = ed25519.getPublicKey(signerKey);
 
     const att = await Attestation.issue(
-      signerKey,
+      signerFromKey(signerKey),
       signerPub,
       'Station-001',
       { scopes: ['read'], maxSessionTtl: 3600 }
@@ -45,10 +46,10 @@ describe('Attestation: determinism', () => {
     const grant = { scopes: ['read', 'write'], maxSessionTtl: 7200 };
 
     const att1 = await Attestation.issue(
-      signerKey, signerPub, 'test-handle', grant, opts
+      signerFromKey(signerKey), signerPub, 'test-handle', grant, opts
     );
     const att2 = await Attestation.issue(
-      signerKey, signerPub, 'test-handle', grant, opts
+      signerFromKey(signerKey), signerPub, 'test-handle', grant, opts
     );
 
     expect(att1.token).toBe(att2.token);
@@ -61,7 +62,7 @@ describe('Attestation: pattern validation in issue', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     const signerPub = ed25519.getPublicKey(signerKey);
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600, subNamePatterns: ['connector-*'] }
     );
     expect(att).toBeTruthy();
@@ -71,7 +72,7 @@ describe('Attestation: pattern validation in issue', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     const signerPub = ed25519.getPublicKey(signerKey);
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600, subNamePatterns: ['*'] }
     );
     expect(att).toBeTruthy();
@@ -82,7 +83,7 @@ describe('Attestation: pattern validation in issue', () => {
     const signerPub = ed25519.getPublicKey(signerKey);
     await expectAttestationError(
       Attestation.issue(
-        signerKey, signerPub, 'test',
+        signerFromKey(signerKey), signerPub, 'test',
         { scopes: ['read'], maxSessionTtl: 3600, subNamePatterns: ['a*b'] }
       ),
       'MALFORMED', 'FORMAT'
@@ -94,7 +95,7 @@ describe('Attestation: pattern validation in issue', () => {
     const signerPub = ed25519.getPublicKey(signerKey);
     await expectAttestationError(
       Attestation.issue(
-        signerKey, signerPub, 'test',
+        signerFromKey(signerKey), signerPub, 'test',
         { scopes: ['read'], maxSessionTtl: 3600, subNamePatterns: ['*b'] }
       ),
       'MALFORMED', 'FORMAT'
@@ -263,7 +264,7 @@ describe('Attestation: verifySignature', () => {
     const signerPub = ed25519.getPublicKey(signerKey);
 
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600 }
     );
 
@@ -279,7 +280,7 @@ describe('Attestation: verifySignature', () => {
     const attackerPub = ed25519.getPublicKey(attackerKey);
 
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600 }
     );
 
@@ -291,7 +292,7 @@ describe('Attestation: verifySignature', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     const signerPub = ed25519.getPublicKey(signerKey);
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600 }
     );
     const parts = att.token.split('.');
@@ -315,7 +316,7 @@ describe('Attestation: verifySignature', () => {
     const signerPub = ed25519.getPublicKey(signerKey);
 
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600 }
     );
 
@@ -349,7 +350,7 @@ describe('Attestation: subjectPublicKey length', () => {
 
     await expect(
       Attestation.issue(
-        signerKey, shortPub, 'test',
+        signerFromKey(signerKey), shortPub, 'test',
         { scopes: ['read'], maxSessionTtl: 3600 }
       )
     ).rejects.toThrow(/32 bytes/);
@@ -361,7 +362,7 @@ describe('Attestation.issue: grant validation contract', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     await expectAttestationError(
       Attestation.issue(
-        signerKey, signerKey, 'test',
+        signerFromKey(signerKey), signerKey, 'test',
         { scopes: 'read' as unknown as string[], maxSessionTtl: 3600 }
       ),
       'MALFORMED', 'FORMAT'
@@ -372,7 +373,7 @@ describe('Attestation.issue: grant validation contract', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     await expectAttestationError(
       Attestation.issue(
-        signerKey, signerKey, 'test',
+        signerFromKey(signerKey), signerKey, 'test',
         { scopes: ['read'], maxSessionTtl: 0 }
       ),
       'MALFORMED', 'FORMAT'
@@ -383,7 +384,7 @@ describe('Attestation.issue: grant validation contract', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     await expectAttestationError(
       Attestation.issue(
-        signerKey, signerKey, 'test',
+        signerFromKey(signerKey), signerKey, 'test',
         {
           scopes: ['read'], maxSessionTtl: 3600,
           audiences: 'app' as unknown as string[],
@@ -397,7 +398,7 @@ describe('Attestation.issue: grant validation contract', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     await expectAttestationError(
       Attestation.issue(
-        signerKey, signerKey, 'test',
+        signerFromKey(signerKey), signerKey, 'test',
         {
           scopes: ['read'], maxSessionTtl: 3600,
           subNamePatterns: 'connector-*' as unknown as string[],
@@ -414,7 +415,7 @@ describe('Attestation: no undefined fields in serialization', () => {
     const signerPub = ed25519.getPublicKey(signerKey);
 
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600 }
     );
 
@@ -438,7 +439,7 @@ describe('Attestation: no undefined fields in serialization', () => {
     const signerPub = ed25519.getPublicKey(signerKey);
 
     const att = await Attestation.issue(
-      signerKey, signerPub, 'test',
+      signerFromKey(signerKey), signerPub, 'test',
       { scopes: ['read'], maxSessionTtl: 3600, audiences: [] }
     );
 

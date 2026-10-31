@@ -6,6 +6,7 @@
 
 import { Handle, type HandleMetadata } from './handle.js';
 import { normalizeName } from './canonical-name.js';
+import type { Signer } from './types.js';
 import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 /**
@@ -99,7 +100,7 @@ function copySubMetadata(meta?: SubHandleMetadata): SubHandleMetadata {
  *
  * @category Core Primitives
  */
-export class SubHandle extends Handle {
+export class SubHandle extends Handle implements Signer {
   #path: string[];
   #subMetadata: SubHandleMetadata;
 

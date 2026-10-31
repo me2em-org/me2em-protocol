@@ -3,6 +3,19 @@
 ## [Unreleased] → will ship in 0.8.0
 
 ### BREAKING
+- **`Attestation.issue` takes a `Signer`, not a raw private key (PR-6,
+  §7 / D2).** The signature is now
+  `Attestation.issue(signer, subjectPublicKey, subjectName, grant, opts)`
+  where `signer` is an object with a `sign(data)` method — `Identity`,
+  `Handle` and `SubHandle` all qualify. Passing raw 32-byte private key
+  bytes (the pre-0.8 form) throws `TypeError`. Rationale: raw private
+  keys never cross a trust boundary as function arguments — issuance is
+  signed by the issuer's own encapsulated key. `attestHandle` /
+  `attestSubHandle` pass `this` internally, so their callers are
+  unaffected. No compatibility shims (A9): replace
+  `Attestation.issue(privKey, …)` with `Attestation.issue(identity, …)`
+  / `Attestation.issue(handle, …)`, or wrap the key in a minimal
+  `{ sign(data) }` object when only raw bytes exist.
 - **Encapsulation hardening (PR-5, §7: "API preserved, internals hardened").**
   `Identity`, `Handle` and `SubHandle` store key material in true
   ECMAScript `#private` fields. Consequences, in order of visibility:
@@ -40,6 +53,14 @@
   standard seed.
 
 ### Added
+- **`Signer` interface + `Identity.sign()` (PR-6).** The package root
+  exports the `Signer` contract (`sign(data): Promise<Uint8Array>`,
+  `src/types.ts`) accepted by `Attestation.issue`; custom signers
+  (remote-/HSM-backed) are accepted structurally, no base class needed.
+  `Identity` gains `sign(data)` — root-key signing under the PR-5
+  guarantees (`#private` storage, `DisposedError` after `dispose()`) —
+  making `Identity` a full `Signer`. `Identity`, `Handle` and
+  `SubHandle` now all implement `Signer`.
 - **`dispose()` / `DisposedError` (PR-5).** `Identity.dispose()` and
   `Handle.dispose()` (inherited by `SubHandle`) zeroize the private key
   and permanently revoke all capability methods (`sign`, derivations,

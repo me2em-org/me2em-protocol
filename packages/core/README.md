@@ -273,9 +273,11 @@ class Identity {
   deriveHandle(name: string, metadata?: HandleMetadata): Promise<Handle>;
   deriveSubHandle(handleName: string, subName: string,
                   metadata?: SubHandleMetadata): Promise<SubHandle>; // atomic, for verification
+  sign(data: Uint8Array): Promise<Uint8Array>; // implements Signer (root key)
   attestHandle(name: string, grant: AttestationGrant,
                opts?: { ttlSeconds?, expiresAt?, jti?, now? }): Promise<Attestation>;
   getPublicKey(): Uint8Array;
+  dispose(): void;                    // zeroize key; capability methods throw DisposedError
 }
 ```
 
@@ -369,7 +371,7 @@ interface RevocationChecker {
 
 ```typescript
 class Attestation {
-  static issue(signerPrivateKey: Uint8Array, subjectPublicKey: Uint8Array,
+  static issue(signer: Signer, subjectPublicKey: Uint8Array,
                subjectName: string, grant: AttestationGrant,
                opts?: { ttlSeconds?, expiresAt?, jti?, now? }): Promise<Attestation>;
   static decode(token: string): AttestationPayload;      // structure only — no sig, no time
@@ -379,6 +381,13 @@ class Attestation {
   get token(): string;
   get jti(): string;
 }
+
+interface Signer {                  // the issuance contract (D2)
+  sign(data: Uint8Array): Promise<Uint8Array>;
+}
+// Identity, Handle and SubHandle implement Signer; custom
+// (remote/HSM-backed) signers are accepted structurally. Raw private
+// keys are NOT accepted as of 0.8.0 — the signer's key stays encapsulated.
 
 interface AttestationGrant {
   audiences?: string[];        // undefined = unrestricted; [] = deny all

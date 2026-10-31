@@ -8,6 +8,7 @@ import type { SubHandleMetadata, SubHandle } from './subhandle.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 import { DisposedError } from './disposed-error.js';
+import type { Signer } from './types.js';
 import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 /**
@@ -47,7 +48,7 @@ export interface HandleMetadata {
  *
  * @category Core Primitives
  */
-export class Handle {
+export class Handle implements Signer {
   #privateKey: Uint8Array;
   #publicKey: Uint8Array;
   #name: string;
@@ -84,7 +85,9 @@ export class Handle {
   }
 
   /**
-   * Cryptographically signs arbitrary data using the Handle's private key.
+   * Cryptographically signs arbitrary data using the Handle's private key
+   * (implements {@link Signer} — a `Handle` is acceptable as the `signer`
+   * argument of {@link Attestation.issue}).
    *
    * @param data - The data to be signed, as a Uint8Array.
    * @returns A Promise resolving to the Ed25519 signature as a Uint8Array.
@@ -221,7 +224,7 @@ export class Handle {
     const normalized = normalizeName(subName);
     const sub = await this.deriveSubHandle(normalized);
     return Attestation.issue(
-      this.#privateKey,
+      this,
       sub.getPublicKey(),
       normalized,
       grant,

@@ -1,12 +1,14 @@
 // Shared test utilities for @me2em/core.
 // Not a spec file — vitest picks up only `*.spec.ts`.
 import { expect } from 'vitest';
+import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   AttestationError,
   Identity,
   Handle,
   type AttestationErrorCode,
   type AttestationLevel,
+  type Signer,
 } from '../src/index.js';
 
 /** Fixed 64-byte test seed (D1: seed is the full BIP39 seed). */
@@ -23,6 +25,19 @@ export async function createTestHandle(
   const identity = await Identity.fromSeed(seed);
   const handle = await identity.deriveHandle(name);
   return { identity, handle };
+}
+
+/**
+ * Wraps a raw 32-byte private key in a minimal {@link Signer} — the
+ * mechanical replacement for the pre-PR-6 raw-key first argument of
+ * `Attestation.issue` in tests that exercise signer-agnostic behavior.
+ * Production callers pass `Identity` / `Handle` (or a custom `Signer`).
+ */
+export function signerFromKey(privateKey: Uint8Array): Signer {
+  return {
+    sign: (data: Uint8Array): Promise<Uint8Array> =>
+      ed25519.sign(data, privateKey),
+  };
 }
 
 /**

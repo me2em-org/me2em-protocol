@@ -8,6 +8,7 @@ import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { normalizeName } from './canonical-name.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 import { DisposedError } from './disposed-error.js';
+import type { Signer } from './types.js';
 import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 function parseHexSeed(hex: string): Uint8Array {
@@ -35,7 +36,7 @@ function parseHexSeed(hex: string): Uint8Array {
  *
  * @category Core Primitives
  */
-export class Identity {
+export class Identity implements Signer {
   #privateKey: Uint8Array;
   #publicKey: Uint8Array;
   #disposed = false;
@@ -178,6 +179,23 @@ export class Identity {
   }
 
   /**
+   * Signs arbitrary data with the root private key (implements
+   * {@link Signer}).
+   *
+   * This is what makes an `Identity` acceptable as the `signer` argument
+   * of {@link Attestation.issue} — the raw private key never leaves the
+   * Identity.
+   *
+   * @param data - The data to be signed, as a Uint8Array.
+   * @returns A Promise resolving to the 64-byte Ed25519 signature.
+   * @throws {DisposedError} If the Identity has been disposed.
+   */
+  async sign(data: Uint8Array): Promise<Uint8Array> {
+    this.#assertNotDisposed();
+    return ed.sign(data, this.#privateKey);
+  }
+
+  /**
    * Issues an attestation binding a derived Handle key to its name
    * and grant. The subject public key is always derived internally —
    * it is impossible to attest a foreign key, and the resulting
@@ -186,8 +204,9 @@ export class Identity {
    *
    * @param grant - Constraints verifiers will enforce for this handle
    *   and (via `subNamePatterns`) for the SubHandles it may attest.
-   * @returns An attestation signed by the Identity root key. Store it
-   *   with the Handle — it is a public artifact, not a secret.
+   * @returns An attestation signed by the Identity root key (the
+   *   Identity passes itself to `Attestation.issue` as the {@link Signer}).
+   *   Store it with the Handle — it is a public artifact, not a secret.
    * @throws {Error} If the name is not canonicalizable.
    * @throws {AttestationError} If the grant is invalid.
    *
@@ -210,7 +229,7 @@ export class Identity {
     const normalized = normalizeName(name);
     const handle = await this.deriveHandle(normalized);
     return Attestation.issue(
-      this.#privateKey,
+      this,
       handle.getPublicKey(),
       normalized,
       grant,
@@ -234,8 +253,8 @@ export class Identity {
    * Permanently destroys this Identity's key material.
    *
    * The private key bytes are zeroized; afterwards every capability method
-   * ({@link deriveHandle}, {@link deriveSubHandle}, {@link attestHandle})
-   * throws a {@link DisposedError}. Informational getters
+   * ({@link sign}, {@link deriveHandle}, {@link deriveSubHandle},
+   * {@link attestHandle}) throws a {@link DisposedError}. Informational getters
    * ({@link getPublicKey}) keep working — public keys are not secrets.
    *
    * Calling `dispose()` more than once is a no-op (idempotent).

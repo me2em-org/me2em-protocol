@@ -6,6 +6,7 @@
 import { normalizeName } from './canonical-name.js';
 import { base64urlEncode, base64urlDecode } from './util.js';
 import { ed } from './crypto/init.js';
+import type { Signer } from './types.js';
 
 export const ATTESTATION_TYPE = 'me2em/attestation/v1';
 export const ATTESTATION_MAX_PAYLOAD = 2048;
@@ -121,22 +122,20 @@ function parseToken(token: string): ParseResult {
    * ```ts
    * import { ed25519 } from '@noble/curves/ed25519.js';
    *
-   * // Parent (signer) and child (subject) keys — use a CSPRNG in practice:
-   * const signerPriv = ed25519.utils.randomPrivateKey();
-   * const signerPub = ed25519.getPublicKey(signerPriv);
+   * // Issuer (a Signer — Identity/Handle qualify) and subject public key:
+   * const identity = await Identity.fromSeed(seed);
    * const childPub = ed25519.getPublicKey(ed25519.utils.randomPrivateKey());
    *
-   * const A = await Attestation.issue(signerPriv, childPub, 'station-001', {
+   * const A = await Attestation.issue(identity, childPub, 'station-001', {
    *   audiences: ['ev-app.com'],
    *   scopes: ['charge:start', 'charge:stop'],
    *   maxSessionTtl: 7200,
    *   subNamePatterns: ['connector-*'],
    * });
    *
-   * const ok = await Attestation.verifySignature(A.token, signerPub); // true
+   * const ok = await Attestation.verifySignature(A.token, identity.getPublicKey()); // true
    * const payload = Attestation.decode(A.token); // structure only — no sig, no time
-   * 
- * ```
+   * ```
  *
  * @category Core Primitives
  */
@@ -276,7 +275,16 @@ export class Attestation {
    * `undefined` grant fields are omitted from the JSON entirely
    * (distinguishable from `[]`).
    *
-   * @param signerPrivateKey - 32-byte Ed25519 private key of the parent.
+   * The `signer` is a {@link Signer} — typically the issuing
+   * {@link Identity} (root attestations) or {@link Handle} (SubHandle
+   * attestations). Raw private keys never cross a trust boundary as
+   * function arguments (D2): the key material stays encapsulated in the
+   * signer object.
+   *
+   * @param signer - Object producing the Ed25519 signature via
+   *   `sign(data)`. `Identity` and `Handle` implement `Signer`; custom
+   *   implementations (remote/HSM-backed signing) are accepted
+   *   structurally.
    * @param subjectPublicKey - 32-byte Ed25519 public key being attested.
    * @param subjectName - Child name; canonicalized before signing.
    * @param grant - Constraints enforced by verifiers (Mode 2).
@@ -287,21 +295,31 @@ export class Attestation {
    * @throws {AttestationError} `MALFORMED`/`FORMAT` if the grant is
    *   structurally invalid (bad scopes/TTL/audiences or a wildcard
    *   not at the end of a `subNamePatterns` entry).
+   * @throws {TypeError} If `signer` has no callable `sign` method — e.g.
+   *   when a raw private key is passed (the pre-v1.0 form is no longer
+   *   accepted).
    * @throws {Error} If `subjectPublicKey` is not 32 bytes.
    *
    * @example
    * ```ts
-   * const att = await Attestation.issue(rootPriv, childPub, 'Station-1',
+   * const att = await Attestation.issue(rootIdentity, childPub, 'Station-1',
    *   { scopes: ['read'], maxSessionTtl: 3600 }, { ttlSeconds: 600 });
    * ```
    */
   static async issue(
-    signerPrivateKey: Uint8Array,
+    signer: Signer,
     subjectPublicKey: Uint8Array,
     subjectName: string,
     grant: AttestationGrant,
     opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
   ): Promise<Attestation> {
+    if (typeof (signer as Signer | undefined)?.sign !== 'function') {
+      throw new TypeError(
+        'Attestation.issue requires a Signer — an object with a sign(data) ' +
+        'method (Identity or Handle). Raw private keys are no longer accepted.'
+      );
+    }
+
     const name = normalizeName(subjectName);
 
     if (subjectPublicKey.length !== 32) {
@@ -354,7 +372,7 @@ export class Attestation {
     };
 
     const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
-    const signature = await ed.sign(payloadBytes, signerPrivateKey);
+    const signature = await signer.sign(payloadBytes);
     const payloadB64 = base64urlEncode(payloadBytes);
     const signatureB64 = base64urlEncode(signature);
     const token = `${payloadB64}.${signatureB64}`;

@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { Identity, Attestation, AttestationError, Session, type RevocationChecker } from '../src/index.js';
 import { base64urlEncode, base64urlDecode } from '../src/util.js';
+import { signerFromKey } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 const identity = await Identity.fromSeed(testSeed);
@@ -168,7 +169,7 @@ describe('verifyAttested: negative cases', () => {
     const handlePub = handle.getPublicKey();
     const otherSeed = new Uint8Array(32).fill(99);
     const A = await Attestation.issue(
-      otherSeed,
+      signerFromKey(otherSeed),
       handlePub,
       'station-001',
       grantA
@@ -189,7 +190,7 @@ describe('verifyAttested: negative cases', () => {
     const subPub = sub.getPublicKey();
     const otherSeed = new Uint8Array(32).fill(77);
     const B = await Attestation.issue(
-      otherSeed,
+      signerFromKey(otherSeed),
       subPub,
       'connector-ccs',
       grantB
