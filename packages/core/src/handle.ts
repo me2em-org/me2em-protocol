@@ -47,6 +47,10 @@ export interface DerivePasswordOptions {
    * cryptographically independent of revision 1 for the same context:
    * the sanctioned rotation path when a credential leaks, without
    * changing the context string.
+   *
+   * Canonical by construction: NFKC normalization applies to the string
+   * `context` only. Integers have no Unicode representation, so no
+   * normalization is needed or performed on `revision`.
    */
   revision?: number;
   /**
@@ -73,6 +77,10 @@ export interface DeriveChannelKeyOptions {
    * Revision `N ≥ 2` derives a key that is independent of revision 1 for
    * the same context — rotate a compromised channel by bumping the
    * revision on **both** peers in lockstep.
+   *
+   * Canonical by construction: NFKC normalization applies to the string
+   * `context` only. Integers have no Unicode representation, so no
+   * normalization is needed or performed on `revision`.
    */
   revision?: number;
 }
@@ -343,6 +351,8 @@ export class Handle implements Signer {
    *
    * The `context` is canonicalized NFKC → lowercase → trim before use
    * (`'  GitHub '`, `'github'` and `'ＧitHub'` yield the same secret).
+   * NFKC applies to the string `context` only — `options.revision` is
+   * an integer and is canonical by construction (no normalization).
    *
    * **Revision model (since 0.8.0, D3):** `options.revision` (positive
    * integer, default `1`) selects an independent secret for the same
@@ -388,6 +398,8 @@ export class Handle implements Signer {
    * This enables zero-knowledge encrypted channels without key exchange protocols.
    *
    * The `context` is canonicalized NFKC → lowercase → trim before use.
+   * NFKC applies to the string `context` only — `options.revision` is
+   * an integer and is canonical by construction (no normalization).
    *
    * **Revision model (since 0.8.0, D3):** `options.revision` (positive
    * integer, default `1`) selects an independent 32-byte key for the same

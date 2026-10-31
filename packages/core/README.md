@@ -410,7 +410,9 @@ class AttestationError extends Error {
 
 ### Name normalization
 
-All derivation inputs are canonicalized: `NFKC → lowercase → trim`.
+All string derivation inputs are canonicalized: `NFKC → lowercase →
+trim`. NFKC applies to string inputs only — `revision` (a positive
+integer) is canonical by construction and is never normalized.
 Names are then validated against `/^[a-z0-9][a-z0-9._@-]{0,62}$/`; names
 with `/`, non-ASCII letters, or > 64 chars **throw**. Password/channel
 contexts use the same canonical form without the character-set pattern
@@ -421,7 +423,9 @@ identical keys across platforms and entry points.
 ### Secret revision model (rotation)
 
 `derivePassword` and `deriveChannelKey` take a `revision` (positive
-integer, default `1`). Revision 1 is the initial secret — byte-identical
+integer, default `1`). A `revision` is a monotonic integer — canonical
+by construction; the NFKC canonicalization above applies to the string
+`context` only. Revision 1 is the initial secret — byte-identical
 to the frozen v1.0 derivation. Revision `N ≥ 2` derives a secret that is
 cryptographically independent of revision 1 for the same context: the
 sanctioned rotation path when a credential leaks, without changing the

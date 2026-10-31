@@ -286,6 +286,48 @@ describe('Me2eM Core Functionality', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Revision canonicity & NFKC scope (PR-8 review decision, pinned here so
+  // nobody re-reads "NFKC on context+revision" as a bug later)
+  // ---------------------------------------------------------------------------
+  describe('revision canonicity & NFKC scope', () => {
+    it('revision is canonical as an integer: no string normalization applies', async () => {
+      const identity = await Identity.fromSeed(TEST_SEED);
+      const handle = await identity.deriveHandle('work');
+
+      // Same integer value → same secret (canonical by construction).
+      expect(handle.derivePassword('github', { revision: 2 }))
+        .toBe(handle.derivePassword('github', { revision: 2 }));
+      // revision 1 is the default: omitted options ≡ explicit revision 1
+      // (revision 0 is not a default — it is rejected, see revisions.spec.ts).
+      expect(handle.derivePassword('github'))
+        .toBe(handle.derivePassword('github', { revision: 1 }));
+      // Different revisions → different secrets.
+      expect(handle.derivePassword('github', { revision: 1 }))
+        .not.toBe(handle.derivePassword('github', { revision: 2 }));
+      // `1.0` is the same JS value as `1` — no separate float representation.
+      expect(handle.derivePassword('github', { revision: 1.0 }))
+        .toBe(handle.derivePassword('github', { revision: 1 }));
+      // Channel keys follow the same integer semantics.
+      expect(Array.from(handle.deriveChannelKey('telemetry', { revision: 2.0 })))
+        .toEqual(Array.from(handle.deriveChannelKey('telemetry', { revision: 2 })));
+    });
+
+    it('NFKC applies to the string context only — revision is not a string', async () => {
+      const identity = await Identity.fromSeed(TEST_SEED);
+      const handle = await identity.deriveHandle('work');
+
+      // Fullwidth 'ｇｉｔｈｕｂ' NFKC-normalizes to 'github': the context
+      // (a string) is normalized, the revision (an integer) is not.
+      expect(handle.derivePassword('ｇｉｔｈｕｂ'))
+        .toBe(handle.derivePassword('github'));
+      // Normalization of the context and the revision slot are orthogonal:
+      // the canonical-context identity holds on rotated revisions too.
+      expect(handle.derivePassword('ｇｉｔｈｕｂ', { revision: 2 }))
+        .toBe(handle.derivePassword('github', { revision: 2 }));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // BIP39 Seed Utilities (existing tests, unchanged)
   // ---------------------------------------------------------------------------
   describe('BIP39 Seed Utilities', () => {

@@ -107,7 +107,8 @@
 ### Added
 - **Derivation revision model (PR-8, D3) — the sanctioned rotation path.**
   `derivePassword` and `deriveChannelKey` accept `revision` (positive
-  integer, default `1`). Revision `1` is byte-identical to the frozen
+  integer, default `1`; an integer is canonical by construction — NFKC
+  applies to string contexts only). Revision `1` is byte-identical to the frozen
   v1.0 derivation; revision `N ≥ 2` derives a secret that is
   cryptographically independent of revision 1 for the same context —
   rotate a leaked credential or a compromised channel without changing
