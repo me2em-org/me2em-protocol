@@ -7,6 +7,7 @@
 import { Handle, type HandleMetadata } from './handle.js';
 import { normalizeName } from './canonical-name.js';
 import type { Signer } from './types.js';
+import { AttestationError } from './errors.js';
 import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
 /**
@@ -70,6 +71,27 @@ function extractDisplayFields(
 }
 
 /**
+ * Deep copy of SubHandle metadata for the {@link SubHandle.getSubMetadata}
+ * getter (PR-7): JSON-safe values (plain objects and arrays, including
+ * nested ones) are duplicated so no caller mutation can reach the
+ * enforced constraints. Non-plain values (Date, Map, class instances)
+ * are shared by reference at depth > 8 and documented as such.
+ */
+function deepCloneJsonValue(value: unknown, depth = 0): unknown {
+  if (depth > 8 || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return value.map((v) => deepCloneJsonValue(v, depth + 1));
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return value; // non-plain: share
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    out[k] = deepCloneJsonValue(v, depth + 1);
+  }
+  return out;
+}
+
+/**
  * Deep-ish copy of SubHandle metadata: constraint arrays (the
  * security-relevant part) are duplicated so the caller cannot mutate
  * the enforced constraints after construction. Custom fields are
@@ -128,14 +150,20 @@ export class SubHandle extends Handle implements Signer {
     super(privateKey, name, extractDisplayFields(subMetadata));
 
     if (path.length !== 2) {
-      throw new Error(
+      throw new AttestationError(
+        'MALFORMED',
+        'FORMAT',
         `SubHandle path must have exactly 2 elements: [handleName, subName]. Got ${path.length}.`
       );
     }
 
     const normalizedName = normalizeName(name);
     if (path[1] !== normalizedName) {
-      throw new Error(`path[1] must equal normalized name: path[1]=${JSON.stringify(path[1])}, name=${JSON.stringify(normalizedName)}`);
+      throw new AttestationError(
+        'MALFORMED',
+        'FORMAT',
+        `path[1] must equal normalized name: path[1]=${JSON.stringify(path[1])}, name=${JSON.stringify(normalizedName)}`
+      );
     }
 
     // Defensive copies: the caller keeps no live reference into this leaf.
@@ -185,27 +213,36 @@ export class SubHandle extends Handle implements Signer {
 
   /**
    * SubHandle is a leaf node (depth = 2) and cannot derive children.
-   * Overrides the inherited `Handle.deriveSubHandle` to throw an error.
+   * Overrides the inherited `Handle.deriveSubHandle` to throw
+   * `AttestationError` `MAX_DEPTH_EXCEEDED`/`FORMAT`.
    */
   override async deriveSubHandle(): Promise<never> {
-    throw new Error('Cannot derive child: maximum depth (2) reached or this SubHandle is marked as leaf');
+    throw new AttestationError(
+      'MAX_DEPTH_EXCEEDED',
+      'FORMAT',
+      'Cannot derive child: maximum depth (2) reached or this SubHandle is marked as leaf'
+    );
   }
 
   /**
    * Returns the SubHandle-specific metadata (constraints).
    *
-   * @returns The SubHandleMetadata object.
+   * The returned object is a **deep copy** (PR-7): JSON-safe nested
+   * structures (plain objects, arrays) are fully duplicated, so mutating
+   * the result — at any depth — cannot alter the constraints this
+   * SubHandle enforces. Non-plain values (Date, Map, class instances)
+   * are shared by reference; functions abort the deep copy and fall
+   * back to the shallow constraint-array-duplicating copy.
+   *
+   * @returns A deep copy of the SubHandleMetadata object.
    */
   getSubMetadata(): SubHandleMetadata {
-    return {
-      ...this.#subMetadata,
-      allowedAudiences: this.#subMetadata.allowedAudiences !== undefined
-        ? [...this.#subMetadata.allowedAudiences]
-        : undefined,
-      allowedScopes: this.#subMetadata.allowedScopes !== undefined
-        ? [...this.#subMetadata.allowedScopes]
-        : undefined,
-    };
+    for (const value of Object.values(this.#subMetadata)) {
+      // A function anywhere in the metadata cannot be deep-cloned by the
+      // generic copier — fall back to the shallow, array-duplicating copy.
+      if (typeof value === 'function') return copySubMetadata(this.#subMetadata);
+    }
+    return deepCloneJsonValue(this.#subMetadata) as SubHandleMetadata;
   }
 
   /**
@@ -229,7 +266,9 @@ export class SubHandle extends Handle implements Signer {
     // Audience check: undefined = unrestricted, [] = deny all
     if (this.#subMetadata.allowedAudiences !== undefined) {
       if (!this.#subMetadata.allowedAudiences.includes(options.audience)) {
-        throw new Error(
+        throw new AttestationError(
+          'AUDIENCE_NOT_PERMITTED',
+          'SESSION',
           `Audience "${options.audience}" not allowed for this SubHandle. ` +
           `Allowed: ${this.#subMetadata.allowedAudiences.length === 0
             ? '(none — empty list denies all)'
@@ -245,7 +284,9 @@ export class SubHandle extends Handle implements Signer {
       );
       // An empty allow-list denies every requested scope.
       if (forbidden.length > 0) {
-        throw new Error(
+        throw new AttestationError(
+          'SCOPE_EXCEEDED',
+          'SESSION',
           `Scopes not allowed for this SubHandle: ${forbidden.join(', ')}`
         );
       }
@@ -256,7 +297,9 @@ export class SubHandle extends Handle implements Signer {
       this.#subMetadata.maxSessionTtl !== undefined &&
       options.ttl > this.#subMetadata.maxSessionTtl
     ) {
-      throw new Error(
+      throw new AttestationError(
+        'TTL_EXCEEDED',
+        'SESSION',
         `TTL ${options.ttl}s exceeds max allowed ` +
         `${this.#subMetadata.maxSessionTtl}s for this SubHandle`
       );
@@ -266,7 +309,7 @@ export class SubHandle extends Handle implements Signer {
     if (this.#subMetadata.expiresAt !== undefined) {
       const now = Math.floor(Date.now() / 1000);
       if (now >= this.#subMetadata.expiresAt) {
-        throw new Error('SubHandle has expired');
+        throw new AttestationError('EXPIRED', 'SESSION', 'SubHandle has expired');
       }
     }
   }

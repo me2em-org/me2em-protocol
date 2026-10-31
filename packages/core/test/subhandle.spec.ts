@@ -12,6 +12,7 @@ import {
   Session,
   type SubHandleMetadata,
 } from '../src/index.js';
+import { expectAttestationError } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 
@@ -327,9 +328,10 @@ describe('SubHandle', () => {
       const sub = await handle.deriveSubHandle('c', {
         allowedAudiences: [],
       });
-      await expect(
-        Session.create(sub, { audience: 'any.com', scopes: ['read'], ttl: 3600 })
-      ).rejects.toThrow(/not allowed/);
+      await expectAttestationError(
+        Session.create(sub, { audience: 'any.com', scopes: ['read'], ttl: 3600 }),
+        'AUDIENCE_NOT_PERMITTED', 'SESSION'
+      );
     });
 
     it('allowedAudiences: undefined still unrestricted', async () => {
@@ -350,9 +352,10 @@ describe('SubHandle', () => {
       const sub = await handle.deriveSubHandle('c', {
         allowedScopes: [],
       });
-      await expect(
-        Session.create(sub, { audience: 'app.com', scopes: ['read'], ttl: 3600 })
-      ).rejects.toThrow(/Scopes not allowed/);
+      await expectAttestationError(
+        Session.create(sub, { audience: 'app.com', scopes: ['read'], ttl: 3600 }),
+        'SCOPE_EXCEEDED', 'SESSION'
+      );
     });
 
     it('allowedScopes: [] with empty request passes', async () => {

@@ -3,6 +3,34 @@
 ## [Unreleased] → will ship in 0.8.0
 
 ### BREAKING
+- **Unified error model (PR-7, §7: "All errors are `AttestationError` with
+  `code`/`level`").** Every failure in the package — token parsing, session
+  creation, `Session.verifyStateless`, derivation and lifecycle checks — now
+  throws `AttestationError` with a stable `code` and the `level` that produced
+  it. Previously parsing/structural failures (wrong token shape, invalid
+  Base64URL, oversized payload, non-JSON payload, missing fields) and all of
+  `Session.verifyStateless` threw plain `Error`s, and SubHandle constraint
+  violations threw untyped messages; integrators had to match on message text.
+  Now a single `catch (e) { if (e instanceof AttestationError) e.code; e.level; }`
+  covers the whole surface — match on `code`/`level`, never on messages
+  (specs/v1.0.md §7.2). Consequences, in order of visibility:
+  (1) `Session.verifyStateless` failures map to `AUDIENCE_NOT_PERMITTED`,
+  `EXPIRED`, `NOT_YET_VALID`, `BAD_SIGNATURE`, `SUBJECT_MISMATCH`, `REVOKED`
+  (level `SESSION`) and `MALFORMED`/`FORMAT` for structural failures;
+  (2) `Session.create` / `SubHandle.validateSessionOptions` violations map to
+  `AUDIENCE_NOT_PERMITTED` / `SCOPE_EXCEEDED` / `TTL_EXCEEDED` / `EXPIRED`
+  (level `SESSION`), bad `ttl` to `MALFORMED`/`FORMAT`;
+  (3) key/seed length validation (`Identity.fromSeed`, `deriveSharedSecret`,
+  `Attestation.issue`) is `MALFORMED`/`FORMAT` instead of plain `Error`;
+  (4) `AttestationError.name` is now `'AttestationError'`;
+  (5) a structurally invalid `hPath` (not an array of two strings) is
+  rejected at the FORMAT layer with `MALFORMED` — previously it slipped to
+  step 4 and surfaced as `PATH_MISMATCH`/`SESSION`.
+- **`DisposedError` is an `AttestationError` subclass (PR-7).** It carries
+  `code === 'DISPOSED'`, `level === 'FORMAT'` and keeps `name ===
+  'DisposedError'`, `className` and `instanceof DisposedError` — existing
+  targeted handling keeps working; generic `AttestationError` handlers now
+  catch it too.
 - **`Attestation.issue` takes a `Signer`, not a raw private key (PR-6,
   §7 / D2).** The signature is now
   `Attestation.issue(signer, subjectPublicKey, subjectName, grant, opts)`
@@ -53,6 +81,31 @@
   standard seed.
 
 ### Added
+- **Hardening slice (PR-7).** In detail: base64url is implemented on the
+  audited `@scure/base` codec (A3) with a source-scan test that keeps
+  `btoa`/`atob` out of `src/`; `crypto.randomUUID` gains a
+  `getRandomValues`-based v4 fallback so issuance works on runtimes without
+  it (with test); signature-length pre-checks (non-64-byte signatures are
+  rejected with `false` before curve math in `Attestation.verifySignature`
+  and `Handle.verify`); `jti` validation (non-empty, ≤ 256 chars — at
+  `decode`, in `issue` opts and in session payloads); `__proto__` pollution
+  protection in both token parsers (`safeJsonParse` reviver — hostile
+  payloads are `MALFORMED`, `Object.prototype` stays clean); strict session
+  payload field types (`hId`/`hNm`/`aud`/`hPath`/`scp` are type-checked
+  before name derivation, so tampered tokens can no longer provoke
+  `TypeError`s); `SubHandle.getSubMetadata()` returns a true deep copy
+  (JSON-safe structures cloned at any depth; non-plain values shared and
+  documented).
+- **New error codes (PR-7).** `MAX_DEPTH_EXCEEDED` (a leaf `SubHandle`
+  cannot derive children — previously a plain-`Error` throw) and `DISPOSED`
+  (capability on a disposed object, via the `DisposedError` subclass).
+- **Error table test (5.8).** `test/error-table.spec.ts` pins a
+  representative scenario with code+level for every `AttestationErrorCode`
+  — exhaustiveness is enforced by the type system (`Record<AttestationErrorCode, …>`).
+- **Parser fuzz (5.15).** Deterministic seeded fuzz (~1 050 rounds over
+  garbage and mutated tokens) asserting that only `AttestationError` ever
+  escapes `Attestation.decode` / `Attestation.verifySignature` /
+  `Session.verifyStateless` / `Session.verifyAttested`.
 - **`Signer` interface + `Identity.sign()` (PR-6).** The package root
   exports the `Signer` contract (`sign(data): Promise<Uint8Array>`,
   `src/types.ts`) accepted by `Attestation.issue`; custom signers
@@ -89,6 +142,12 @@
 - `engines.node` floor raised to `>=22.0.0` (A2): Node 18/20 are EOL, CI
   pins Node 22 (LTS maintenance to 2027-04). Applied workspace-wide — root,
   `@me2em/core`, `@me2em/crypto`, `@me2em/react`.
+
+### Dependencies
+- Added `@scure/base: ^2.4.0` (PR-7, A3): audited base64url codec replacing
+  the hand-rolled `btoa`/`atob` math — same family as the already-depended-on
+  `@scure/bip39`. Encoding is byte-identical (unpadded URL-safe), pinned by
+  the golden vectors.
 
 ### Fixed
 - `index.ts` module JSDoc example passed a mnemonic string directly to

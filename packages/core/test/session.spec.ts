@@ -1,6 +1,7 @@
 // Session unit tests
 import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session, type RevocationChecker } from '../src/index.js';
+import { expectAttestationError } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 
@@ -65,11 +66,12 @@ describe('Session.create', () => {
   ])('rejects ttl = %s', async (_name, badTtl) => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('ttl-validate');
-    await expect(
+    await expectAttestationError(
       Session.create(handle, {
         audience: 'app', scopes: ['read'], ttl: badTtl as number,
-      })
-    ).rejects.toThrow(/positive integer/);
+      }),
+      'MALFORMED', 'FORMAT'
+    );
   });
 
   it('should set correct expiration based on TTL', async () => {
@@ -118,9 +120,10 @@ describe('Session.verifyStateless', () => {
       ttl: 3600,
     });
 
-    await expect(
-      Session.verifyStateless(session.token, identity, 'app-b')
-    ).rejects.toThrow(/Audience mismatch/);
+    await expectAttestationError(
+      Session.verifyStateless(session.token, identity, 'app-b'),
+      'AUDIENCE_NOT_PERMITTED', 'SESSION'
+    );
   });
 
   it('should reject expired tokens', async () => {
@@ -146,9 +149,10 @@ describe('Session.verifyStateless', () => {
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const token = `${payloadB64}.${signatureB64}`;
 
-    await expect(
-      Session.verifyStateless(token, identity, 'app')
-    ).rejects.toThrow(/expired/i);
+    await expectAttestationError(
+      Session.verifyStateless(token, identity, 'app'),
+      'EXPIRED', 'SESSION'
+    );
   });
 
   it('should reject future-dated tokens beyond clock skew', async () => {
@@ -174,9 +178,10 @@ describe('Session.verifyStateless', () => {
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const token = `${payloadB64}.${signatureB64}`;
 
-    await expect(
-      Session.verifyStateless(token, identity, 'app')
-    ).rejects.toThrow(/future/i);
+    await expectAttestationError(
+      Session.verifyStateless(token, identity, 'app'),
+      'NOT_YET_VALID', 'SESSION'
+    );
   });
 
   it('should reject tampered payload', async () => {
@@ -202,9 +207,10 @@ describe('Session.verifyStateless', () => {
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const tamperedToken = `${modifiedPayloadB64}.${signatureB64}`;
 
-    await expect(
-      Session.verifyStateless(tamperedToken, identity, 'app')
-    ).rejects.toThrow(/signature/i);
+    await expectAttestationError(
+      Session.verifyStateless(tamperedToken, identity, 'app'),
+      'BAD_SIGNATURE', 'SESSION'
+    );
   });
 
   it('should reject malformed JSON payload', async () => {
@@ -214,22 +220,25 @@ describe('Session.verifyStateless', () => {
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const malformedToken = `${badPayload}.${badSignature}`;
 
-    await expect(
-      Session.verifyStateless(malformedToken, await Identity.fromSeed(testSeed), 'app')
-    ).rejects.toThrow(/JSON|format/i);
+    await expectAttestationError(
+      Session.verifyStateless(malformedToken, await Identity.fromSeed(testSeed), 'app'),
+      'MALFORMED', 'FORMAT'
+    );
   });
 
   it('should reject tokens with invalid format (no dot)', async () => {
-    await expect(
-      Session.verifyStateless('no-dot-here', await Identity.fromSeed(testSeed), 'app')
-    ).rejects.toThrow(/format/i);
+    await expectAttestationError(
+      Session.verifyStateless('no-dot-here', await Identity.fromSeed(testSeed), 'app'),
+      'MALFORMED', 'FORMAT'
+    );
   });
 
   it('should reject tokens with invalid Base64URL characters', async () => {
     const badToken = 'payload with spaces.sig!@#';
-    await expect(
-      Session.verifyStateless(badToken, await Identity.fromSeed(testSeed), 'app')
-    ).rejects.toThrow(/Base64URL|format/i);
+    await expectAttestationError(
+      Session.verifyStateless(badToken, await Identity.fromSeed(testSeed), 'app'),
+      'MALFORMED', 'FORMAT'
+    );
   });
 
   it('should reject tokens with oversized payloads', async () => {
@@ -254,9 +263,10 @@ describe('Session.verifyStateless', () => {
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const token = `${payloadB64}.${signatureB64}`;
 
-    await expect(
-      Session.verifyStateless(token, identity, 'app')
-    ).rejects.toThrow(/size|exceed/i);
+    await expectAttestationError(
+      Session.verifyStateless(token, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
   });
 
   it('should reject tokens for unknown handle names', async () => {
@@ -283,9 +293,10 @@ describe('Session.verifyStateless', () => {
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const token = `${newPayloadB64}.${newSignatureB64}`;
 
-    await expect(
-      Session.verifyStateless(token, identity, 'app')
-    ).rejects.toThrow(/signature/i);
+    await expectAttestationError(
+      Session.verifyStateless(token, identity, 'app'),
+      'BAD_SIGNATURE', 'SESSION'
+    );
   });
 });
 
@@ -398,9 +409,10 @@ describe('Session with RevocationChecker', () => {
     const mockChecker = new MockRevocationChecker();
     mockChecker.revoke(session.sessionId); // Отзываем сессию
 
-    await expect(
-      Session.verifyStateless(session.token, identity, 'app', mockChecker)
-    ).rejects.toThrow(/revoked/i);
+    await expectAttestationError(
+      Session.verifyStateless(session.token, identity, 'app', mockChecker),
+      'REVOKED', 'SESSION'
+    );
   });
 
   it('should pass verification when no RevocationChecker is provided', async () => {
@@ -432,13 +444,14 @@ describe('SubHandle constraints in Session', () => {
       allowedAudiences: ['ev-app.com'],
     });
 
-    await expect(
+    await expectAttestationError(
       Session.create(subHandle, {
         audience: 'malicious-app.com',
         scopes: ['read'],
         ttl: 3600,
-      })
-    ).rejects.toThrow(/Audience.*not allowed/);
+      }),
+      'AUDIENCE_NOT_PERMITTED', 'SESSION'
+    );
   });
 
   it('should reject session creation if scope is not allowed', async () => {
@@ -448,13 +461,14 @@ describe('SubHandle constraints in Session', () => {
       allowedScopes: ['charge:start'],
     });
 
-    await expect(
+    await expectAttestationError(
       Session.create(subHandle, {
         audience: 'ev-app.com',
         scopes: ['charge:start', 'admin:override'],
         ttl: 3600,
-      })
-    ).rejects.toThrow(/Scopes not allowed/);
+      }),
+      'SCOPE_EXCEEDED', 'SESSION'
+    );
   });
 
   it('should reject session creation if TTL exceeds maxSessionTtl', async () => {
@@ -464,13 +478,14 @@ describe('SubHandle constraints in Session', () => {
       maxSessionTtl: 3600,
     });
 
-    await expect(
+    await expectAttestationError(
       Session.create(subHandle, {
         audience: 'ev-app.com',
         scopes: ['read'],
         ttl: 7200, // Превышаем лимит
-      })
-    ).rejects.toThrow(/TTL.*exceeds max allowed/);
+      }),
+      'TTL_EXCEEDED', 'SESSION'
+    );
   });
 
   it('should reject session creation if SubHandle has expired', async () => {
@@ -480,13 +495,14 @@ describe('SubHandle constraints in Session', () => {
       expiresAt: Math.floor(Date.now() / 1000) - 3600, // Истек час назад
     });
 
-    await expect(
+    await expectAttestationError(
       Session.create(subHandle, {
         audience: 'app.com',
         scopes: ['read'],
         ttl: 3600,
-      })
-    ).rejects.toThrow(/SubHandle has expired/);
+      }),
+      'EXPIRED', 'SESSION'
+    );
   });
 });
 
@@ -526,8 +542,12 @@ describe('Handle.deriveSharedSecret', () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('invalid-pubkey');
 
-    await expect(handle.deriveSharedSecret(new Uint8Array(16))).rejects.toThrow(/32 bytes/);
-    await expect(handle.deriveSharedSecret(new Uint8Array(64))).rejects.toThrow(/32 bytes/);
+    await expectAttestationError(
+      handle.deriveSharedSecret(new Uint8Array(16)), 'MALFORMED', 'FORMAT'
+    );
+    await expectAttestationError(
+      handle.deriveSharedSecret(new Uint8Array(64)), 'MALFORMED', 'FORMAT'
+    );
   });
 
   it('self-secret: deriving with own public key works (sorted binding, return 0 path)', async () => {

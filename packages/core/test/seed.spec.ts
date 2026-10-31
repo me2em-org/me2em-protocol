@@ -7,6 +7,7 @@ import {
   validateSeedPhrase,
   wordlist,
 } from '../src/index.js';
+import { expectAttestationError } from './test-utils.js';
 
 // Official BIP39 test vector: "abandon … about" (12 words), empty passphrase.
 // Cross-verified against two independent PBKDF2-HMAC-SHA512 implementations.
@@ -160,34 +161,27 @@ describe('Identity.fromSeed 64-byte contract', () => {
 
   it('rejects the legacy 32-byte seed', async () => {
     const legacy = new Uint8Array(32).fill(42);
-    await expect(Identity.fromSeed(legacy)).rejects.toThrow(
-      'Invalid seed: must be 64 bytes'
-    );
+    await expectAttestationError(Identity.fromSeed(legacy), 'MALFORMED', 'FORMAT');
   });
 
   it('rejects the legacy 64-char hex seed string', async () => {
     const legacyHex = '2a'.repeat(32); // 64 hex chars = legacy 32-byte seed
-    await expect(Identity.fromSeed(legacyHex)).rejects.toThrow(
-      'Seed string must be 128 hex characters'
-    );
+    await expectAttestationError(Identity.fromSeed(legacyHex), 'MALFORMED', 'FORMAT');
   });
 
   it('rejects a 63-byte seed', async () => {
-    await expect(Identity.fromSeed(new Uint8Array(63))).rejects.toThrow(
-      'Invalid seed: must be 64 bytes'
-    );
+    await expectAttestationError(Identity.fromSeed(new Uint8Array(63)), 'MALFORMED', 'FORMAT');
   });
 
   it('rejects a 65-byte seed', async () => {
-    await expect(Identity.fromSeed(new Uint8Array(65))).rejects.toThrow(
-      'Invalid seed: must be 64 bytes'
-    );
+    await expectAttestationError(Identity.fromSeed(new Uint8Array(65)), 'MALFORMED', 'FORMAT');
   });
 
   it('rejects an invalid mnemonic', async () => {
-    await expect(
-      get64ByteSeedFromMnemonic(['not', 'a', 'valid', 'mnemonic'])
-    ).rejects.toThrow(/Invalid seed phrase/);
+    await expectAttestationError(
+      get64ByteSeedFromMnemonic(['not', 'a', 'valid', 'mnemonic']),
+      'MALFORMED', 'FORMAT'
+    );
   });
 
   it('validateSeedPhrase still accepts 12 and 24 words (unchanged)', () => {

@@ -2,7 +2,7 @@
 import { Handle } from './handle.js';
 import { SubHandle } from './subhandle.js';
 import { Identity } from './identity.js';
-import { base64urlEncode, base64urlDecode } from './util.js';
+import { base64urlEncode, base64urlDecode, randomUUID, safeJsonParse } from './util.js';
 import {
   Attestation,
   AttestationError,
@@ -195,7 +195,9 @@ export class Session {
       !Number.isInteger(options.ttl) ||
       options.ttl <= 0
     ) {
-      throw new Error(
+      throw new AttestationError(
+        'MALFORMED',
+        'FORMAT',
         `ttl must be a positive integer (seconds), got: ${String(options.ttl)}`
       );
     }
@@ -203,7 +205,7 @@ export class Session {
 
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = now + options.ttl;
-    const sessionId = options.sessionId ?? crypto.randomUUID();
+    const sessionId = options.sessionId ?? randomUUID();
 
     const payload: SessionPayload = {
       hId: handle.getId(),
@@ -245,49 +247,83 @@ export class Session {
     signatureBytes: Uint8Array;
   } {
     if (typeof token !== 'string') {
-      throw new Error('Token must be a string');
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Token must be a string');
     }
 
     const parts = token.split('.');
     if (parts.length !== 2) {
-      throw new Error('Invalid token format: expected two Base64URL parts separated by "."');
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid token format: expected two Base64URL parts separated by "."');
     }
     const [payloadB64, signatureB64] = parts;
 
     const b64urlRegex = /^[A-Za-z0-9_-]+$/;
     if (!b64urlRegex.test(payloadB64) || !b64urlRegex.test(signatureB64)) {
-      throw new Error('Invalid token format: payload and signature must be valid Base64URL');
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid token format: payload and signature must be valid Base64URL');
     }
 
-    const payloadBytes = base64urlDecode(payloadB64);
+    let payloadBytes: Uint8Array;
+    try {
+      payloadBytes = base64urlDecode(payloadB64);
+    } catch {
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid token format: payload and signature must be valid Base64URL');
+    }
     if (payloadBytes.length > MAX_PAYLOAD_SIZE) {
-      throw new Error(`Payload exceeds maximum size of ${MAX_PAYLOAD_SIZE} bytes`);
+      throw new AttestationError('MALFORMED', 'FORMAT', `Payload exceeds maximum size of ${MAX_PAYLOAD_SIZE} bytes`);
     }
 
     let payload: SessionPayload;
     try {
       const jsonString = new TextDecoder().decode(payloadBytes);
-      payload = JSON.parse(jsonString) as SessionPayload;
-    } catch {
-      throw new Error('Invalid token format: payload is not valid JSON');
+      payload = safeJsonParse(jsonString) as SessionPayload;
+    } catch (e) {
+      throw new AttestationError(
+        'MALFORMED',
+        'FORMAT',
+        e instanceof SyntaxError && e.message.includes('__proto__')
+          ? `Invalid token format: payload is not valid JSON — ${e.message}`
+          : 'Invalid token format: payload is not valid JSON'
+      );
     }
 
-    // Required fields validation
+    // Required fields validation (types first — a tampered token must
+    // never reach name derivation with a non-string hNm/hPath, PR-7)
     if (
-      !payload.hId ||
-      !payload.hNm ||
-      !payload.aud ||
+      typeof payload.hId !== 'string' || payload.hId.length === 0 ||
+      typeof payload.hNm !== 'string' || payload.hNm.length === 0 ||
+      typeof payload.aud !== 'string' || payload.aud.length === 0 ||
       !Array.isArray(payload.scp) ||
+      !payload.scp.every((s: unknown) => typeof s === 'string') ||
       typeof payload.exp !== 'number' ||
       typeof payload.iat !== 'number' ||
-      typeof payload.jti !== 'string'
+      typeof payload.jti !== 'string' ||
+      payload.jti.length === 0
     ) {
-      throw new Error(
+      throw new AttestationError(
+        'MALFORMED',
+        'FORMAT',
         'Invalid token format: missing required fields (hId, hNm, aud, scp, exp, iat, jti)'
       );
     }
 
-    const signatureBytes = base64urlDecode(signatureB64);
+    if (
+      payload.hPath !== undefined &&
+      (!Array.isArray(payload.hPath) ||
+        payload.hPath.length !== 2 ||
+        !payload.hPath.every((x: unknown) => typeof x === 'string'))
+    ) {
+      throw new AttestationError(
+        'MALFORMED',
+        'FORMAT',
+        'Invalid token format: hPath must be an array of two strings'
+      );
+    }
+
+    let signatureBytes: Uint8Array;
+    try {
+      signatureBytes = base64urlDecode(signatureB64);
+    } catch {
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid token format: payload and signature must be valid Base64URL');
+    }
 
     return { payload, payloadBytes, signatureBytes };
   }
@@ -312,7 +348,10 @@ export class Session {
    * @param expectedAudience - The audience that this token must be intended for.
    * @param revocationChecker - Optional checker for revocation list.
    * @returns A Promise resolving to a verified Session instance.
-   * @throws {Error} If the token is invalid, expired, tampered, audience mismatch, or revoked.
+   * @throws {AttestationError} With `code`/`level` — `MALFORMED`/`FORMAT`
+   *   for structural failures, then `AUDIENCE_NOT_PERMITTED`,
+   *   `EXPIRED`, `NOT_YET_VALID` (session), `BAD_SIGNATURE`,
+   *   `SUBJECT_MISMATCH`, `REVOKED` at level `SESSION`.
    *
    * @example
    * ```ts
@@ -334,16 +373,17 @@ export class Session {
 
     // Audience check
     if (payload.aud !== expectedAudience) {
-      throw new Error(`Audience mismatch: expected "${expectedAudience}", got "${payload.aud}"`);
+      throw new AttestationError('AUDIENCE_NOT_PERMITTED', 'SESSION',
+        `Audience mismatch: expected "${expectedAudience}", got "${payload.aud}"`);
     }
 
     // Time checks
     const now = Math.floor(Date.now() / 1000);
     if (now > payload.exp + CLOCK_SKEW_SECONDS) {
-      throw new Error('Token expired');
+      throw new AttestationError('EXPIRED', 'SESSION', 'Token expired');
     }
     if (now < payload.iat - CLOCK_SKEW_SECONDS) {
-      throw new Error('Token is future-dated');
+      throw new AttestationError('NOT_YET_VALID', 'SESSION', 'Token is future-dated');
     }
 
     // Reconstruct Handle or SubHandle
@@ -366,20 +406,19 @@ export class Session {
       isValid = false;
     }
     if (!isValid) {
-      throw new Error(
-        'Invalid signature: token payload has been tampered with or was not signed by the claimed Handle'
-      );
+      throw new AttestationError('BAD_SIGNATURE', 'SESSION',
+        'Invalid signature: token payload has been tampered with or was not signed by the claimed Handle');
     }
 
     if (handle.getId() !== payload.hId) {
-      throw new Error('hId mismatch');
+      throw new AttestationError('SUBJECT_MISMATCH', 'SESSION', 'hId mismatch');
     }
 
     // Revocation check — last, after signature is verified
     if (revocationChecker) {
       const isRevoked = await revocationChecker.isRevoked(payload.jti);
       if (isRevoked) {
-        throw new Error('Session has been revoked');
+        throw new AttestationError('REVOKED', 'SESSION', 'Session has been revoked');
       }
     }
 

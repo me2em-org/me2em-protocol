@@ -199,19 +199,25 @@ try {
 ### Error model
 
 All failures throw `AttestationError` with `code` and `level`
-(`ROOT | HANDLE_ATTESTATION | SUB_ATTESTATION | SESSION | FORMAT`):
+(`ROOT | HANDLE_ATTESTATION | SUB_ATTESTATION | SESSION | FORMAT`) —
+including token parsing, `Session.verifyStateless` and session-creation
+constraint checks (PR-7). Match on `code`/`level`, never on messages:
 
 | code | levels |
 |---|---|
-| `MALFORMED`, `CHAIN_INCOMPLETE` | FORMAT |
+| `MALFORMED`, `CHAIN_INCOMPLETE`, `MAX_DEPTH_EXCEEDED`, `DISPOSED` | FORMAT |
 | `BAD_SIGNATURE` | ROOT, HANDLE_ATTESTATION, SESSION |
 | `EXPIRED`, `NOT_YET_VALID`, `REVOKED` | ROOT, HANDLE_ATTESTATION, SESSION |
 | `PATH_MISMATCH` | ROOT, HANDLE_ATTESTATION, SESSION |
-| `NAME_NOT_PERMITTED`, `SCOPE_EXCEEDED`, `TTL_EXCEEDED` | ROOT |
+| `NAME_NOT_PERMITTED`, `SCOPE_EXCEEDED`, `TTL_EXCEEDED` | ROOT, SESSION |
 | `SCOPE_EXCEEDED`, `TTL_EXCEEDED`, `AUDIENCE_NOT_PERMITTED`, `SESSION_OUTLIVES_ATTESTATION` | SESSION |
-| `SUBJECT_MISMATCH` | ROOT, SUB_ATTESTATION |
+| `SUBJECT_MISMATCH` | ROOT, SUB_ATTESTATION, SESSION |
 
-"Note on error types. Failures detected during token parsing — wrong shape, invalid Base64URL, payload over 4096 bytes, non-JSON payload, missing required fields — throw a plain `Error`, before any attestation layer is consulted. Every failure **after** parsing throws an `AttestationError`. Integration code should handle both."
+`MAX_DEPTH_EXCEEDED` signals the derivation-tree limit (a leaf `SubHandle`
+cannot derive children); `DISPOSED` signals a capability call on a disposed
+`Identity`/`Handle` — `DisposedError` is an `AttestationError` subclass
+carrying that code, so `e.name === 'DisposedError'` still works for targeted
+handling.
 
 ### Verification modes
 

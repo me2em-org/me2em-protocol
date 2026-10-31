@@ -4,12 +4,18 @@
 // authorization attestations for the Me2eM protocol.
 
 import { normalizeName } from './canonical-name.js';
-import { base64urlEncode, base64urlDecode } from './util.js';
+import { base64urlEncode, base64urlDecode, randomUUID, safeJsonParse } from './util.js';
 import { ed } from './crypto/init.js';
 import type { Signer } from './types.js';
+import { AttestationError, type AttestationErrorCode, type AttestationLevel } from './errors.js';
+
+export { AttestationError, type AttestationErrorCode, type AttestationLevel } from './errors.js';
 
 export const ATTESTATION_TYPE = 'me2em/attestation/v1';
 export const ATTESTATION_MAX_PAYLOAD = 2048;
+
+/** Maximum accepted length of an attestation `jti` (hardening, PR-7). */
+const MAX_JTI_LENGTH = 256;
 
 export interface AttestationGrant {
   /**
@@ -46,23 +52,6 @@ export interface AttestationPayload {
   jti: string;
 }
 
-export type AttestationErrorCode =
-  | 'MALFORMED' | 'BAD_SIGNATURE' | 'EXPIRED' | 'NOT_YET_VALID'
-  | 'REVOKED' | 'PATH_MISMATCH' | 'NAME_NOT_PERMITTED'
-  | 'SCOPE_EXCEEDED' | 'AUDIENCE_NOT_PERMITTED' | 'TTL_EXCEEDED'
-  | 'CHAIN_INCOMPLETE' | 'SUBJECT_MISMATCH' | 'SESSION_OUTLIVES_ATTESTATION';
-
-export type AttestationLevel =
-  | 'ROOT' | 'HANDLE_ATTESTATION' | 'SUB_ATTESTATION' | 'SESSION' | 'FORMAT';
-
-export class AttestationError extends Error {
-  constructor(
-    public readonly code: AttestationErrorCode,
-    public readonly level: AttestationLevel,
-    msg: string
-  ) { super(`[${level}/${code}] ${msg}`); }
-}
-
 function throwFormat(code: AttestationErrorCode, msg: string): never {
   throw new AttestationError(code, 'FORMAT', msg);
 }
@@ -90,7 +79,12 @@ function parseToken(token: string): ParseResult {
     throwFormat('MALFORMED', 'Payload and signature must be valid Base64URL');
   }
 
-  const payloadBytes = base64urlDecode(payloadB64);
+  let payloadBytes: Uint8Array;
+  try {
+    payloadBytes = base64urlDecode(payloadB64);
+  } catch {
+    throwFormat('MALFORMED', 'Payload and signature must be valid Base64URL');
+  }
   if (payloadBytes.length > ATTESTATION_MAX_PAYLOAD) {
     throwFormat('MALFORMED', `Payload exceeds maximum size of ${ATTESTATION_MAX_PAYLOAD} bytes`);
   }
@@ -98,12 +92,22 @@ function parseToken(token: string): ParseResult {
   let payload: AttestationPayload;
   try {
     const jsonString = new TextDecoder().decode(payloadBytes);
-    payload = JSON.parse(jsonString) as AttestationPayload;
-  } catch {
-    throwFormat('MALFORMED', 'Payload is not valid JSON');
+    payload = safeJsonParse(jsonString) as AttestationPayload;
+  } catch (e) {
+    throwFormat(
+      'MALFORMED',
+      e instanceof SyntaxError && e.message.includes('__proto__')
+        ? `Payload is not valid JSON — ${e.message}`
+        : 'Payload is not valid JSON'
+    );
   }
 
-  const signatureBytes = base64urlDecode(signatureB64);
+  let signatureBytes: Uint8Array;
+  try {
+    signatureBytes = base64urlDecode(signatureB64);
+  } catch {
+    throwFormat('MALFORMED', 'Payload and signature must be valid Base64URL');
+  }
 
   return { payloadBytes, signatureBytes, payload };
 }
@@ -218,8 +222,11 @@ export class Attestation {
     if (typeof payload.exp !== 'number') {
       throwFormat('MALFORMED', 'Missing required field: exp');
     }
-    if (typeof payload.jti !== 'string') {
+    if (typeof payload.jti !== 'string' || payload.jti.length === 0) {
       throwFormat('MALFORMED', 'Missing required field: jti');
+    }
+    if (payload.jti.length > MAX_JTI_LENGTH) {
+      throwFormat('MALFORMED', `jti exceeds the maximum length of ${MAX_JTI_LENGTH} characters`);
     }
 
     return payload;
@@ -228,6 +235,10 @@ export class Attestation {
   /**
     * Verifies the token signature against a public key.
     *
+    * A signature whose length differs from the 64-byte Ed25519 size is
+    * rejected with `false` before any crypto runs (PR-7 pre-check) —
+    * the method therefore never throws for short/long signatures.
+    *
     * @returns `false` for a bad signature or a wrong key. Returns
     *   `false` for any invalid signature, including malformed lengths.
     *   It still throws `AttestationError` `MALFORMED`/`FORMAT` for
@@ -235,6 +246,11 @@ export class Attestation {
     */
    static async verifySignature(token: string, signerPublicKey: Uint8Array): Promise<boolean> {
      const { signatureBytes, payloadBytes } = parseToken(token);
+     // Ed25519 signatures are exactly 64 bytes — reject other lengths
+     // before the curve math (the underlying library throws RangeError).
+     if (signatureBytes.length !== 64) {
+       return false;
+     }
      try {
        return ed.verify(signatureBytes, payloadBytes, signerPublicKey);
      } catch {
@@ -323,7 +339,15 @@ export class Attestation {
     const name = normalizeName(subjectName);
 
     if (subjectPublicKey.length !== 32) {
-      throw new Error('subject public key must be 32 bytes');
+      throwFormat('MALFORMED', 'subject public key must be 32 bytes');
+    }
+
+    if (opts?.jti !== undefined &&
+        (typeof opts.jti !== 'string' || opts.jti.length === 0 || opts.jti.length > MAX_JTI_LENGTH)) {
+      throwFormat(
+        'MALFORMED',
+        `opts.jti must be a non-empty string of at most ${MAX_JTI_LENGTH} characters`
+      );
     }
 
     // Validate grant
@@ -352,7 +376,7 @@ export class Attestation {
 
     const now = opts?.now ?? Math.floor(Date.now() / 1000);
     const exp = opts?.expiresAt ?? (now + (opts?.ttlSeconds ?? 31536000));
-    const jti = opts?.jti ?? crypto.randomUUID();
+    const jti = opts?.jti ?? randomUUID();
 
     const grantJson: Record<string, unknown> = {};
     if (grant.audiences !== undefined) grantJson.audiences = [...grant.audiences];

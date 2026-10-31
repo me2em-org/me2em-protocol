@@ -348,12 +348,13 @@ describe('Attestation: subjectPublicKey length', () => {
     const signerKey = crypto.getRandomValues(new Uint8Array(32));
     const shortPub = new Uint8Array(16).fill(1);
 
-    await expect(
+    await expectAttestationError(
       Attestation.issue(
         signerFromKey(signerKey), shortPub, 'test',
         { scopes: ['read'], maxSessionTtl: 3600 }
-      )
-    ).rejects.toThrow(/32 bytes/);
+      ),
+      'MALFORMED', 'FORMAT'
+    );
   });
 });
 
