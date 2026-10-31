@@ -93,7 +93,10 @@ describe('specs/test-vectors.json golden test', () => {
       it(`row ${i}: ${v.description}`, async () => {
         const identity = await Identity.fromSeed(fromHex(v.seed_hex as string));
         const handle = await identity.deriveHandle(v.handle_name as string);
-        expect(handle.derivePassword(v.context as string, v.length as number))
+        const opts: { revision?: number; byteLength?: number } = {};
+        if (v.revision !== undefined) opts.revision = v.revision as number;
+        if (v.length !== undefined) opts.byteLength = v.length as number;
+        expect(handle.derivePassword(v.context as string, opts))
           .toBe(v.expected_b64url);
       });
     }
@@ -112,7 +115,10 @@ describe('specs/test-vectors.json golden test', () => {
       it(`row ${i}: ${v.description}`, async () => {
         const identity = await Identity.fromSeed(fromHex(v.seed_hex as string));
         const handle = await identity.deriveHandle(v.handle_name as string);
-        const key = handle.deriveChannelKey(v.context as string);
+        const key = handle.deriveChannelKey(
+          v.context as string,
+          v.revision !== undefined ? { revision: v.revision as number } : undefined
+        );
         expect(key.length).toBe(32);
         expect(hex(key)).toBe(v.expected_key_hex);
       });

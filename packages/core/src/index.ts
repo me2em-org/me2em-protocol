@@ -1,5 +1,5 @@
 export { Identity } from './identity.js';
-export { Handle, type HandleMetadata } from './handle.js';
+export { Handle, type HandleMetadata, type DerivePasswordOptions, type DeriveChannelKeyOptions } from './handle.js';
 export { SubHandle, type SubHandleMetadata } from './subhandle.js';
 export { DisposedError } from './disposed-error.js';
 export type { Signer } from './types.js';

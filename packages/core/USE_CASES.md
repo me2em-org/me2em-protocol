@@ -599,16 +599,26 @@ const identity = await Identity.fromSeed(seedBytes);
 
 // One Handle per service — isolation lives in the key tree:
 const github = await identity.deriveHandle('github.com');
-const githubLogin = github.derivePassword('login', 32);
+const githubLogin = github.derivePassword('login', { byteLength: 32 });
 
 const jira = await identity.deriveHandle('jira.internal');
-const jiraLogin = jira.derivePassword('login', 32);
+const jiraLogin = jira.derivePassword('login', { byteLength: 32 });
+
+// A credential leaks (or a service is breached): rotate without touching
+// the context — revision 2 is a fresh secret, independent of revision 1:
+const githubRotated = github.derivePassword('login', { revision: 2 });
 ```
 
 Properties that fall out for free:
 
 - **Same seed + same handle + same context → same secret.** A new phone plus the seed phrase restores every password.
 - **Per-context isolation.** A Handle per service: secrets derived under one Handle are unreachable from any other — the key tree is the isolation boundary.
+- **Revision rotation, no new context.** When a secret leaks, bump the
+  `revision` (default `1`): revision `N ≥ 2` derives a secret that is
+  cryptographically independent of revision 1 for the same context —
+  the old value stays valid on the service until you overwrite it, and
+  every later restore from the seed reproduces the same revisioned
+  secret (specs/v1.0.md §3).
 - **Nothing to reset.** No "forgot password" exists because no password
   is stored — losing the seed loses the identity, by design.
 

@@ -26,7 +26,7 @@ describe('derivation', () => {
   });
 
   bench('Handle.derivePassword (16)', () => {
-    handle.derivePassword('bench-context', 16);
+    handle.derivePassword('bench-context', { byteLength: 16 });
   });
 
   bench('Handle.deriveChannelKey', () => {

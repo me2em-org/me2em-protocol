@@ -111,7 +111,7 @@ Excluded from LTS: variant-A factory (3.1 long-term), `FinalizationRegistry` gua
 | v0.8.0 | Seed = 64 bytes (D1): `get64ByteSeedFromMnemonic`, `fromSeed` accepts 64 B / 128 hex | Re-derive seed via the new function; **all identities, passwords, channel keys change** |
 | v0.8.0 | `#private` fields, defensive copying, `dispose()` | Public API surface unchanged; serialization paths use explicit redaction |
 | v0.8.0 | `Attestation.issue(signer, subjectPublicKey, ...)` | Pass `Identity`/`Handle` (or any `Signer`) instead of raw private key |
-| v0.8.0 | `derivePassword(context, { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })` | Positional args → options object; no legacy shim (A1) — re-derive |
+| v0.8.0 | `derivePassword(context, { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })` | Positional args → options object; no legacy shim (A1) — re-derive. Contexts now NFKC-canonicalized (was lowercase → trim) — re-derive for non-NFKC contexts; vectors extended (r2 + NFKC rows) |
 | v0.8.0 | All errors are `AttestationError` with `code`/`level` | Match on `e.code`/`e.level`, not messages |
 | v0.8.0 | `Session` constructor private; `fromVerified` internal | `Session.create` / `Session.verify*` on the public surface |
 | v1.0.0 | API freeze | — |
