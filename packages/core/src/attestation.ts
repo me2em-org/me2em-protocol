@@ -222,6 +222,14 @@ export class Attestation {
     if (typeof payload.exp !== 'number') {
       throwFormat('MALFORMED', 'Missing required field: exp');
     }
+    // Non-finite numbers survive JSON.parse only as `Infinity` (e.g. 1e999);
+    // unchecked, `now > exp + skew` would be false forever — fail-open expiry.
+    if (!Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)) {
+      throwFormat('MALFORMED', 'iat/exp must be finite numbers');
+    }
+    if (payload.exp <= payload.iat) {
+      throwFormat('MALFORMED', 'exp must be greater than iat');
+    }
     if (typeof payload.jti !== 'string' || payload.jti.length === 0) {
       throwFormat('MALFORMED', 'Missing required field: jti');
     }

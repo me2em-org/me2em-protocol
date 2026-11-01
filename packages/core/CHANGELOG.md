@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Stricter validation at decode/parse time (iat/exp hardening):
+  non-finite `iat`/`exp` (e.g. `1e999`, which `JSON.parse` maps to
+  `Infinity` — such an `exp` previously defeated the expiry time check,
+  making a validly signed token never expire) and `exp <= iat` are now
+  rejected by `Attestation.decode` and `Session.parseSessionToken` with
+  `AttestationError` `MALFORMED`/`FORMAT`. Non-breaking: previously
+  valid tokens are unaffected; golden vectors untouched.
+
 ## [1.0.0-rc.1] — 2026-11-01
 
 First release candidate of the LTS line: everything in this block

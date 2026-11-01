@@ -88,7 +88,8 @@ const TABLE: Record<AttestationErrorCode, Row> = {
       const h = await identity.deriveHandle('et-expired');
       const s = await Session.create(h, { audience: 'app.com', scopes: ['charge:start'], ttl: 60 });
       return Session.verifyStateless(
-        tamperPayload(s.token, (p) => { p.exp = nowSec() - 100; }),
+        // keep exp > iat — expired, not malformed (decode-level check)
+        tamperPayload(s.token, (p) => { p.iat = nowSec() - 1000; p.exp = nowSec() - 100; }),
         identity, 'app.com',
       );
     },
@@ -100,7 +101,8 @@ const TABLE: Record<AttestationErrorCode, Row> = {
       const h = await identity.deriveHandle('et-future');
       const s = await Session.create(h, { audience: 'app.com', scopes: ['charge:start'], ttl: 60 });
       return Session.verifyStateless(
-        tamperPayload(s.token, (p) => { p.iat = nowSec() + 3600; }),
+        // keep exp > iat — not-yet-valid, not malformed (decode-level check)
+        tamperPayload(s.token, (p) => { p.iat = nowSec() + 3600; p.exp = nowSec() + 7200; }),
         identity, 'app.com',
       );
     },

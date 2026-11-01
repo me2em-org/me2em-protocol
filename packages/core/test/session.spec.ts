@@ -1,7 +1,8 @@
 // Session unit tests
 import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session, type RevocationChecker } from '../src/index.js';
-import { expectAttestationError, sessionFromVerified } from './test-utils.js';
+import { base64urlDecode } from '../src/util.js';
+import { expectAttestationError, sessionFromVerified, tamperPayload, tamperPayloadJson } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 
@@ -136,7 +137,7 @@ describe('Session.verifyStateless', () => {
       hNm: handle.getName(),
       aud: 'app',
       scp: ['read'],
-      exp: farPast,
+      exp: farPast + 3600, // exp > iat — expired, not malformed
       iat: farPast,
       jti: 'mock-jti-expired',
     });
@@ -159,13 +160,13 @@ describe('Session.verifyStateless', () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('future-test');
     const farFuture = Math.floor(Date.now() / 1000) + 100000;
-    
+
     const payload = JSON.stringify({
       hId: handle.getId(),
       hNm: handle.getName(),
       aud: 'app',
       scp: ['read'],
-      exp: farFuture,
+      exp: farFuture + 3600, // exp > iat — not-yet-valid, not malformed
       iat: farFuture,
       jti: 'mock-jti-future',
     });
@@ -193,19 +194,9 @@ describe('Session.verifyStateless', () => {
       ttl: 3600,
     });
 
-    const parts = session.token.split('.');
-    const payloadB64 = parts[0];
-    const signatureB64 = parts[1];
-    const payloadBytes = base64urlDecode(payloadB64);
-    const payloadObj = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    
-    payloadObj.scp = ['read']; // Tamper
-    
-    const modifiedPayload = JSON.stringify(payloadObj);
-    const modifiedPayloadBytes = new TextEncoder().encode(modifiedPayload);
-    const modifiedPayloadB64 = btoa(String.fromCharCode(...modifiedPayloadBytes))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const tamperedToken = `${modifiedPayloadB64}.${signatureB64}`;
+    const tamperedToken = tamperPayload(session.token, (payload) => {
+      payload.scp = ['read']; // Tamper
+    });
 
     await expectAttestationError(
       Session.verifyStateless(tamperedToken, identity, 'app'),
@@ -281,7 +272,7 @@ describe('Session.verifyStateless', () => {
     const parts = session.token.split('.');
     const payloadBytes = base64urlDecode(parts[0]);
     const payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    
+
     payload.hNm = 'unknown-handle-xyz'; // Tamper name
     
     const modifiedPayload = JSON.stringify(payload);
@@ -296,6 +287,65 @@ describe('Session.verifyStateless', () => {
     await expectAttestationError(
       Session.verifyStateless(token, identity, 'app'),
       'BAD_SIGNATURE', 'SESSION'
+    );
+  });
+});
+
+describe('Session.parseSessionToken: non-finite iat/exp and exp <= iat', () => {
+  async function createVerifiedSession() {
+    const identity = await Identity.fromSeed(testSeed);
+    const handle = await identity.deriveHandle('parse-guard');
+    const session = await Session.create(handle, {
+      audience: 'app',
+      scopes: ['read'],
+      ttl: 3600,
+    });
+    return { identity, session };
+  }
+
+  it('exp < iat → MALFORMED/FORMAT at parse time', async () => {
+    const { identity, session } = await createVerifiedSession();
+    const tampered = tamperPayload(session.token, (p) => {
+      p.exp = (p.iat as number) - 1;
+    });
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp === iat → MALFORMED/FORMAT at parse time', async () => {
+    const { identity, session } = await createVerifiedSession();
+    const tampered = tamperPayload(session.token, (p) => {
+      p.exp = p.iat;
+    });
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const { identity, session } = await createVerifiedSession();
+    // JSON.stringify cannot emit Infinity — inject the 1e999 literal;
+    // unchecked, `now > exp + skew` would be false forever (fail-open expiry)
+    const tampered = tamperPayloadJson(session.token, (json) =>
+      json.replace(/"exp":\d+/, '"exp":1e999')
+    );
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('iat: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const { identity, session } = await createVerifiedSession();
+    const tampered = tamperPayloadJson(session.token, (json) =>
+      json.replace(/"iat":\d+/, '"iat":1e999')
+    );
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
     );
   });
 });
@@ -348,7 +398,7 @@ describe('Session with SubHandle', () => {
 
     expect(session.path).toEqual(['station-001', 'connector-1']);
     
-    // Проверка, что токен декодируется и содержит hPath
+    // Проверка, что токен декодируется и содержит hPath (read-side — SUT-кодек)
     const payloadBytes = base64urlDecode(session.token.split('.')[0]);
     const payload = JSON.parse(new TextDecoder().decode(payloadBytes));
     expect(payload.hPath).toEqual(['station-001', 'connector-1']);
@@ -582,18 +632,3 @@ describe('Handle.deriveSharedSecret', () => {
   });
 });
 
-// Вспомогательная функция (локальная для тестов)
-function base64urlDecode(input: string): Uint8Array {
-  let base64 = input
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  while (base64.length % 4 !== 0) {
-    base64 += '=';
-  }
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}

@@ -352,6 +352,16 @@ export class Session {
       );
     }
 
+    // Mirror of Attestation.decode: non-finite iat/exp and exp <= iat
+    // are FORMAT-layer failures, caught at parse time — not late as
+    // EXPIRED/NOT_YET_VALID (or never, for `exp: 1e999` → Infinity).
+    if (!Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)) {
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid token format: iat/exp must be finite numbers');
+    }
+    if (payload.exp <= payload.iat) {
+      throw new AttestationError('MALFORMED', 'FORMAT', 'Invalid token format: exp must be greater than iat');
+    }
+
     if (
       payload.hPath !== undefined &&
       (!Array.isArray(payload.hPath) ||

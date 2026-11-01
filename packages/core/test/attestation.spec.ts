@@ -5,12 +5,14 @@ import {
   ATTESTATION_TYPE,
   ATTESTATION_MAX_PAYLOAD,
 } from '../src/index.js';
-import { base64urlEncode } from '../src/util.js';
+import { base64urlDecode, base64urlEncode } from '../src/util.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   expectAttestationError,
   expectAttestationErrorSync,
   signerFromKey,
+  tamperPayload,
+  tamperPayloadJson,
 } from './test-utils.js';
 
 describe('Attestation: roundtrip issue → decode', () => {
@@ -320,23 +322,9 @@ describe('Attestation: verifySignature', () => {
       { scopes: ['read'], maxSessionTtl: 3600 }
     );
 
-    const parts = att.token.split('.');
-    const payloadB64 = parts[0];
-    const signatureB64 = parts[1];
-
-    let base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
-    const obj = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    (obj.grant as Record<string, unknown>).scopes = ['write'];
-    const modified = new TextEncoder().encode(JSON.stringify(obj));
-    const modifiedB64 = btoa(String.fromCharCode(...modified))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const tamperedToken = `${modifiedB64}.${signatureB64}`;
+    const tamperedToken = tamperPayload(att.token, (obj) => {
+      (obj.grant as Record<string, unknown>).scopes = ['write'];
+    });
 
     const valid = await Attestation.verifySignature(tamperedToken, signerPub);
     expect(valid).toBe(false);
@@ -421,13 +409,7 @@ describe('Attestation: no undefined fields in serialization', () => {
     );
 
     const parts = att.token.split('.');
-    let base64 = parts[0].replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
+    const payloadBytes = base64urlDecode(parts[0]);
     const parsed = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
     const grant = parsed.grant as Record<string, unknown>;
 
@@ -445,13 +427,7 @@ describe('Attestation: no undefined fields in serialization', () => {
     );
 
     const parts = att.token.split('.');
-    let base64 = parts[0].replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
+    const payloadBytes = base64urlDecode(parts[0]);
     const parsed = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
     const grant = parsed.grant as Record<string, unknown>;
 
@@ -476,5 +452,73 @@ describe('Attestation: decode does not check time', () => {
     const decoded = Attestation.decode(token);
     expect(decoded.iat).toBe(1000000000);
     expect(decoded.exp).toBe(1000003600);
+  });
+});
+
+describe('Attestation: decode rejects non-finite iat/exp and exp <= iat', () => {
+  const basePayload = {
+    typ: ATTESTATION_TYPE,
+    subjectName: 'test',
+    subjectId: 'dGVzdA',
+    grant: { scopes: ['read'], maxSessionTtl: 3600 },
+    iat: 1000000000,
+    exp: 1000003600,
+    jti: 'test-jti',
+  };
+
+  // Synthetic fixtures — free encoder (btoa) is the independent
+  // test-oracle (write-side fixture building; read-side uses the SUT codec).
+  function decodeRawPayload(raw: string): void {
+    const payloadB64 = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    Attestation.decode(`${payloadB64}.fakesig`);
+  }
+
+  it('finite iat < exp → still decodes (no regression)', () => {
+    const payloadB64 = btoa(JSON.stringify(basePayload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const decoded = Attestation.decode(`${payloadB64}.fakesig`);
+    expect(decoded.iat).toBe(1000000000);
+    expect(decoded.exp).toBe(1000003600);
+  });
+
+  it('exp < iat → MALFORMED/FORMAT', () => {
+    expectAttestationErrorSync(
+      () => decodeRawPayload(JSON.stringify({ ...basePayload, exp: 999999000 })),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp === iat → MALFORMED/FORMAT', () => {
+    expectAttestationErrorSync(
+      () => decodeRawPayload(JSON.stringify({ ...basePayload, exp: 1000000000 })),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    const att = await Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test',
+      { scopes: ['read'], maxSessionTtl: 3600 },
+      { jti: 'inf-exp', now: 1700000000, ttlSeconds: 3600 }
+    );
+    // JSON.stringify cannot emit Infinity — patch the raw payload JSON
+    // with the 1e999 literal via the shared helper (same style as
+    // session.spec); unchecked, `now > exp + skew` would be false
+    // forever (fail-open expiry)
+    const tampered = tamperPayloadJson(att.token, (json) => json.replace(/"exp":\d+/, '"exp":1e999'));
+    expectAttestationErrorSync(() => Attestation.decode(tampered), 'MALFORMED', 'FORMAT');
+  });
+
+  it('iat: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    const att = await Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test',
+      { scopes: ['read'], maxSessionTtl: 3600 },
+      { jti: 'inf-iat', now: 1700000000, ttlSeconds: 3600 }
+    );
+    const tampered = tamperPayloadJson(att.token, (json) => json.replace(/"iat":\d+/, '"iat":1e999'));
+    expectAttestationErrorSync(() => Attestation.decode(tampered), 'MALFORMED', 'FORMAT');
   });
 });
