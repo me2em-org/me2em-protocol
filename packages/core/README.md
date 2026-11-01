@@ -393,7 +393,7 @@ interface Signer {                  // the issuance contract (D2)
 }
 // Identity, Handle and SubHandle implement Signer; custom
 // (remote/HSM-backed) signers are accepted structurally. Raw private
-// keys are NOT accepted as of 0.8.0 — the signer's key stays encapsulated.
+// keys are NOT accepted as of 1.0.0-rc.1 — the signer's key stays encapsulated.
 
 interface AttestationGrant {
   audiences?: string[];        // undefined = unrestricted; [] = deny all
@@ -489,6 +489,38 @@ Redis `RevocationChecker`.
   backend first, in any import order (pinned by `test/arch-cycle.spec.ts`;
   see specs/v1.0.md §11 for the module-structure contract).
 
+## ⚙️ Runtime & Limits
+
+**Runtimes**
+
+- **Node.js ≥ 22** (`engines.node`, A2 — Node 18/20 are EOL; CI pins
+  Node 22).
+- Modern browsers and edge runtimes. Portability is pinned by tests:
+  base64url comes from `@scure/base` — `btoa`/`atob` are banned from
+  `src/` by a source-scan test; `jti` generation uses
+  `crypto.randomUUID` with a `getRandomValues`-based v4 fallback.
+- The Ed25519 backend auto-initializes at import (structural guarantee —
+  see Cryptographic Details above); modules are side-effect-free at the
+  top level otherwise.
+
+**Limits**
+
+| Limit | Value | Enforced |
+|-------|-------|----------|
+| Attestation payload | ≤ 2048 bytes (`ATTESTATION_MAX_PAYLOAD`, exported) | rejected before decode |
+| Session payload | ≤ 4096 bytes | rejected before decode |
+| Clock-skew tolerance | ±30 seconds on all time checks | `EXPIRED` / `NOT_YET_VALID` |
+| Derivation tree depth | `MAX_DEPTH = 2` — a `SubHandle` is always a leaf | `MAX_DEPTH_EXCEEDED` |
+| Password `byteLength` | integer 1–8160 (RFC 5869: 255 × SHA-256), default 16 | `MALFORMED`/`FORMAT` |
+| Session `ttl` | positive integer (seconds), capped by the grant's `maxSessionTtl`; the session cannot outlive the earliest attestation expiry | `MALFORMED` / `TTL_EXCEEDED` |
+| `jti` length | non-empty, ≤ 256 characters | `MALFORMED` |
+
+**Key lifecycle:** `dispose()` zeroizes the private key (`fill(0)`) and
+permanently revokes all capability methods (`DisposedError`); it is
+idempotent. Hard zeroization cannot be guaranteed in a JS runtime —
+GC/JIT may retain copies ([BACKLOG](../../BACKLOG.md) BL-07,
+[THREAT_MODEL.md](../../THREAT_MODEL.md) §5.2).
+
 ## 🛡️ Security Best Practices
 
 ✅ **Do**:
@@ -515,22 +547,28 @@ Redis `RevocationChecker`.
 cd packages/core && pnpm test
 ```
 
-186 tests cover: deterministic derivation and cross-entry-point key
-consistency, name canonicalization, session lifecycle (create, verify,
+350 tests cover: deterministic derivation and cross-entry-point key
+consistency, name canonicalization, derivation revisions (r1 byte-parity,
+r2 independence, NFKC contexts), session lifecycle (create, verify,
 tamper, expiry, iat), revocation, SubHandle constraint enforcement,
 MAX_DEPTH leaf enforcement, attestation issue/decode/signature
-determinism and validation, and the full `verifyAttested` chain
-(20+ cases including nesting, wildcard permitting, revocation at every
+determinism and validation, the full `verifyAttested` chain
+(28 cases including nesting, wildcard permitting, revocation at every
 level, signature robustness, BIP39 passphrase derivation, and wordlist
-validation).
+validation), module-structure and crypto-boundary pins, and parser fuzz
+(~1 050 rounds).
 
 ## 🗺️ Roadmap
 
-Passphrase support has shipped (0.7.0). Remaining recommendations —
-session lineage (`sid`), key zeroing, attestation reference compression,
+Passphrase support and `dispose()` zeroization have shipped. Remaining
+recommendations — session lineage (`sid`), zeroization hardening
+(BL-07), attestation reference compression,
 and the full package strategy (`@me2em/crypto`, `@me2em/messenger`,
 `@me2em/iot`) — live in [BACKLOG.md](../../BACKLOG.md). The backlog is
 advisory and not part of the shipped API contract.
+
+The public API is **frozen** as of `1.0.0-rc.1` — see
+[specs/v1.0.md §12](../../specs/v1.0.md) for the evolution rules.
 
 ## 📜 License
 

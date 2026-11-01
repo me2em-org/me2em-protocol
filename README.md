@@ -105,7 +105,7 @@ me2em-protocol/
 │   │   │   ├── session.ts       # Stateless sessions (verifyStateless + verifyAttested)
 │   │   │   ├── seed.ts          # BIP39 mnemonic utilities (+ passphrase)
 │   │   │   └── index.ts         # Public API
-│   │   ├── test/                # 186 tests
+│   │   ├── test/                # 350 tests
 │   │   ├── README.md            # Package documentation
 │   │   ├── USE_CASES.md         # Production examples
 │   │   └── CHANGELOG.md         # Release notes
@@ -264,9 +264,9 @@ function CreateIdentityScreen() {
 
 | Package | Status | Description |
 |---------|--------|-------------|
-| [`@me2em/core`](./packages/core) | 🧪 **alpha (v0.7.0-alpha.2)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
-| [`@me2em/crypto`](./packages/crypto) | 🧪 **alpha (v0.1.0-alpha.1)** | Protocol crypto: canonical X3DH, pre-keys, E2EE channels with epoch rotation, envelopes, Argon2id |
-| [`@me2em/react`](./packages/react) | 🧪 **alpha (v0.1.0-alpha.2)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
+| [`@me2em/core`](./packages/core) | 🔐 **rc (v1.0.0-rc.1, API frozen)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
+| [`@me2em/crypto`](./packages/crypto) | 🔐 **rc (v1.0.0-rc.1)** | Protocol crypto: canonical X3DH, pre-keys, E2EE channels with epoch rotation, envelopes, Argon2id |
+| [`@me2em/react`](./packages/react) | 🔐 **rc (v1.0.0-rc.1)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
 | `@me2em/messenger` | 🚧 Planned (0.9) | Vertical: E2EE chats, groups with epoch key rotation |
 | `@me2em/iot` | 💤 Deferred | Vertical: managed attested devices (EV, drones) |
 | `@me2em/server` | 🚧 Planned | Reference NestJS backend: verification middleware, revocation store |
@@ -381,9 +381,9 @@ pnpm --filter @me2em/react test
 
 ### Testing
 
-**438 tests** across 38 suites (vitest, three packages):
+**602 tests** across 50 suites (vitest, three packages):
 
-- **core — 186**: derivation & canonical names, session lifecycle (create, verify, tamper, expiry, revocation), SubHandle constraints and leaf enforcement, attestation issuance/decode/determinism, the full attested-verification chain (nesting, wildcards, revocation at every level, signature robustness), BIP39 passphrase & wordlist
+- **core — 350**: derivation & canonical names, derivation revisions (r1 byte-parity, r2 independence, NFKC contexts), session lifecycle (create, verify, tamper, expiry, revocation), SubHandle constraints and leaf enforcement, attestation issuance/decode/determinism, the full attested-verification chain (nesting, wildcards, revocation at every level, signature robustness), BIP39 passphrase & wordlist, module-structure and crypto-boundary pins, parser fuzz
 - **crypto — 151**: HKDF (RFC 5869 vectors), X25519 ECDH (symmetry, full-32B pin), AEAD tamper cases, Argon2id profiles, seed & password validation (HIBP), canonical X3DH (roundtrip, MITM defense, canonical-order pin, no-OTK rejection), pre-key batches, channels (replay, epoch forward secrecy), envelopes (self-contained unwrap, deterministic-IV isolation)
 - **react — 101**: identity flow state machines, seed verification grid, Provider lifecycle, context cache isolation (two identities, one device), session auto-renewal, component suites
 
@@ -402,6 +402,8 @@ pnpm --filter @me2em/react test
 | **Crypto package README** (X3DH, channels, envelopes) | [`packages/crypto/README.md`](./packages/crypto/README.md) |
 | **React package README** (hooks, components, context cache) | [`packages/react/README.md`](./packages/react/README.md) |
 | **Use Cases Guide** | [`packages/core/USE_CASES.md`](./packages/core/USE_CASES.md) |
+| **Threat Model** (assets, adversary, mitigations, non-goals) | [`THREAT_MODEL.md`](./THREAT_MODEL.md) |
+| **Security Policy** (reporting, 7-day critical SLA) | [`SECURITY.md`](./SECURITY.md) |
 | **Development Backlog** | [`BACKLOG.md`](./BACKLOG.md) |
 | **Changelog (core)** | [`packages/core/CHANGELOG.md`](./packages/core/CHANGELOG.md) |
 | **Changelog (react)** | [`packages/react/CHANGELOG.md`](./packages/react/CHANGELOG.md) |
@@ -420,7 +422,9 @@ pnpm --filter @me2em/react test
 - ✅ **Canonical X3DH** — OTK mandatory, SPK signature verified (MITM defense)
 - ✅ **Stateless verification** — no server-side session state to compromise
 
-For security concerns or to report vulnerabilities, see [`SECURITY.md`](./SECURITY.md).
+Threats, mitigations and accepted residual risks are documented in
+[`THREAT_MODEL.md`](./THREAT_MODEL.md). For security concerns or to
+report vulnerabilities, see [`SECURITY.md`](./SECURITY.md).
 
 ---
 
@@ -443,10 +447,11 @@ We welcome contributions! Please read:
 | **Shipped** | `@me2em/react` 0.1 alpha — identity hooks, seed UX, session management, context cache |
 | **Shipped** | `@me2em/crypto` 0.1 alpha — X3DH, E2EE channels, envelopes, Argon2id guard rails |
 | **Shipped** | [me2em.com](https://me2em.com) — protocol blog: guides, tutorials, deep dives (RU) |
+| **Shipped** | `1.0.0-rc.1` — public API freeze (specs/v1.0.md §12), threat model, LTS security policy |
 | **Next** | DevSecOps hardening — branch protection, coverage thresholds (CI pipeline live) |
 | **Next** | `@me2em/messenger` (0.9) — first vertical; `@me2em/server` reference backend |
-| **Q3 2027** | `@me2em/core` v1.0 — stable API freeze |
-| **Q4 2027** | ZK-proof integration (anonymous attribute verification) |
+| **Next** | `@me2em/core` v1.0.0 GA — opens the 24-month LTS support window (7-day critical SLA) |
+| **Later** | ZK-proof integration (anonymous attribute verification) |
 
 Forward-looking items: [BACKLOG.md](./BACKLOG.md).
 

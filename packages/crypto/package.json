@@ -1,6 +1,6 @@
 {
   "name": "@me2em/crypto",
-  "version": "0.1.0-alpha.1",
+  "version": "1.0.0-rc.1",
   "description": "Cryptographic mechanisms for the Me2eM protocol: E2EE channels, X3DH, purpose-based key derivation, envelopes",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.0-rc.1] — 2026-11-01
+
+Release-candidate alignment with `@me2em/core` 1.0.0-rc.1 (the
+API-freeze release of the LTS program). The public API of this package
+is frozen as of this version; additive changes land in 1.x minors.
 
 ### Changed
 - `engines.node` floor raised to `>=22.0.0` (A2, applied workspace-wide:
