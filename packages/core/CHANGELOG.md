@@ -10,6 +10,21 @@
   direction): closes the last live-reference input in the Handle family
   — the caller keeps no live reference. Non-breaking: code relying on
   the previous shallow behavior sees only more isolation.
+- `specs/v1.0.md` §12 now enumerates the `crypto` namespace as actually
+  exported — the derivation functions, the documented raw Ed25519
+  wrappers (`getPublicKey`, `sign`, `verify` and their `*Async`
+  variants) and `hkdf` / `sha256` — and notes that `derivePassword` /
+  `deriveChannelKey` are `Handle` methods, not namespace members;
+  the seed-utilities list is completed (`generateSeedPhrase`,
+  `normalizeSeedPhrase`, `validateSeedPhrase`). §7/§8: API-misuse
+  `TypeError` cases (non-string name/context, non-`Signer` issuer,
+  raw private-key bytes) documented as outside the `AttestationError`
+  model. Docs+tests only, non-breaking; golden vectors untouched.
+- TSDoc completed for the raw wrappers (Async variants, `sha256`) and
+  the `crypto` namespace description added; README core documents the
+  raw-primitives group and the reasons the wrappers exist; the
+  five previously unpinned wrappers are pinned by arch-cycle parity
+  tests (noble-oracle agreement + sync/async byte-identity).
 
 ### Fixed
 - Stricter validation at decode/parse time (iat/exp hardening):
@@ -19,6 +34,13 @@
   rejected by `Attestation.decode` and `Session.parseSessionToken` with
   `AttestationError` `MALFORMED`/`FORMAT`. Non-breaking: previously
   valid tokens are unaffected; golden vectors untouched.
+- Passphrase normalization is performed by the BIP39 layer (`NFKD`,
+  per the standard); the previous explicit NFKC call in
+  `get64ByteSeedFromMnemonic` was redundant — output bytes are
+  identical for all inputs (UAX #15 identity `NFKD(NFKC(x)) = NFKD(x)`,
+  pinned by a new byte-identity test). Spec §2 prose corrected from
+  "NFKC-normalized" to "NFKD-normalized (by the BIP39 layer)" with an
+  explicit MUST NOT for additional normalization; JSDoc updated.
 
 ## [1.0.0-rc.1] — 2026-11-01
 

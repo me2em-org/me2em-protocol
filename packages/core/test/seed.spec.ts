@@ -58,19 +58,43 @@ describe('BIP39 passphrase support', () => {
     expect(a).toEqual(b);
   });
 
-  it('passphrase is case-sensitive (NFKC folds forms but not case)', async () => {
+  it('passphrase is case-sensitive (NFKD folds forms but not case)', async () => {
     const phrase = generateSeedPhrase(128);
     const lower = await get64ByteSeedFromMnemonic(phrase, 'secret');
     const upper = await get64ByteSeedFromMnemonic(phrase, 'SECRET');
     expect(lower).not.toEqual(upper);
   });
 
-  it('NFKC folds compatibility forms in passphrase', async () => {
+  it('NFKD folds compatibility forms in passphrase (BIP39 canonicalization)', async () => {
     const phrase = generateSeedPhrase(128);
     // ﬁ (U+FB01) folds to "fi"
     const folded = await get64ByteSeedFromMnemonic(phrase, '\uFB01le');
     const plain  = await get64ByteSeedFromMnemonic(phrase, 'file');
     expect(folded).toEqual(plain);
+  });
+
+  it('passphrase bytes identical with or without pre-NFKC (UAX #15 pin)', async () => {
+    // NFKD(NFKC(x)) === NFKD(x) for all strings (UAX #15): the removed
+    // explicit NFKC pre-normalization was byte-redundant — the BIP39
+    // layer normalizes (NFKD) the whole salt. If @scure/bip39 ever
+    // changes its normalization behavior, this pin fails loudly and
+    // forces an explicit decision instead of a silent derivation change
+    // (empirical base: packages/core/scripts/nfkd-redundancy-check.mjs
+    // — 1,112,064-codepoint sweep, 784 starter+combining pairs, 200k-row
+    // fuzz, zero mismatches).
+    const matrix = [
+      'caf\u00E9',                          // precomposed é
+      'cafe\u0301',                         // e + combining acute
+      '\uFB01le',                           // ﬁ ligature
+      '\uFF34\uFF32\uFF25\uFF3A\uFF2F\uFF32', // ＴＲＥＺＯＲ (fullwidth)
+      '\u1100\u1161\u11AB',                // hangul jamo
+      '\u212B',                             // Å (Angstrom sign)
+    ];
+    for (const p of matrix) {
+      const direct = await get64ByteSeedFromMnemonic(VECTOR_12, p);
+      const preNfkc = await get64ByteSeedFromMnemonic(VECTOR_12, p.normalize('NFKC'));
+      expect(Buffer.from(direct).toString('hex')).toBe(Buffer.from(preNfkc).toString('hex'));
+    }
   });
 });
 

@@ -476,6 +476,16 @@ Redis `RevocationChecker`.
   SubHandle entry points (`handle.deriveSubHandle` and
   `identity.deriveSubHandle`) share `crypto.deriveSubHandleKey`, so
   their outputs are byte-identical by construction.
+- **Raw primitives in `crypto`:** besides the derivation module, the
+  namespace exposes documented Ed25519 wrappers (`crypto.getPublicKey`,
+  `crypto.sign`, `crypto.verify` and their `*Async` variants) and the
+  `crypto.hkdf` / `crypto.sha256` helpers — building blocks for tooling
+  outside the token flow (the protocol itself signs through
+  `Identity`/`Handle`/`SubHandle`, which implement `Signer`). The
+  wrappers are real functions rather than alias re-exports so TSDoc
+  ownership and TypeDoc typing stay in-package (`treatWarningsAsErrors`);
+  they are frozen public API (spec §12) — removal is a breaking 2.0.0
+  decision, do not propose.
 - **Auto-init:** importing `@me2em/core` synchronously configures the
   Ed25519 backend (sha512 wiring for `@noble/ed25519`). There is no
   init call to remember and no async setup — the first sign/verify/derive
