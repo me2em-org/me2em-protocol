@@ -622,6 +622,52 @@ Properties that fall out for free:
 - **Nothing to reset.** No "forgot password" exists because no password
   is stored — losing the seed loses the identity, by design.
 
+#### Encrypting provider tokens with the handle key (token vault)
+
+Passwords are derivable at any moment, but **provider-issued tokens**
+(a GitHub PAT, an OAuth refresh token) are not: they exist only where
+the provider issued them, so the app has to store them — and storing
+them plaintext in a browser is not acceptable. The frozen API already
+provides everything needed for an encrypted vault:
+`handle.deriveChannelKey('token-store/<service>')` returns a 32-byte
+key from the handle's key tree; AES-256-GCM is application-side (the
+protocol provides only the key):
+
+```ts
+// Once at setup: derive the vault key, encrypt each token into its slot.
+const vaultKey = handle.deriveChannelKey('token-store/github.com'); // 32 bytes
+
+async function encryptToken(slot: string, token: string): Promise<{ iv: Uint8Array; ciphertext: Uint8Array }> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));       // fresh 96-bit nonce per write
+  const aad = new TextEncoder().encode(`${slot}|${handle.getId()}`); // AAD binds slot name + handle id
+  const key = await crypto.subtle.importKey('raw', vaultKey, 'AES-GCM', false, ['encrypt']);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: aad }, key, new TextEncoder().encode(token)
+  );
+  return { iv, ciphertext: new Uint8Array(ciphertext) };       // persist anywhere
+}
+
+// In any later session (new tab, new device after seed restore):
+// re-derive the same vaultKey, decrypt the slot — same AAD required.
+```
+
+The pattern: **encrypt once at setup — decrypt in any later session**;
+passwords keep deriving on demand as usual. Two honest caveats:
+
+- **Per-service keys derived from the same Handle give no cross-service
+  isolation.** The Handle is the root of trust: whoever can derive one
+  `token-store/*` key can derive all of them. Isolation between services
+  comes from separate Handles (one per service), not from the context
+  strings.
+- **The path is semantically "channel".** `deriveChannelKey('token-store/…')`
+  borrows a frozen derivation slot for storage-key material — the salt/info
+  domain separation makes the result independent of every channel key; the
+  borrowing is deliberate and documented here. A dedicated derivation path
+  (`me2em/token-store/v1` via a new `deriveTokenStorageKey` method, leaving
+  `deriveChannelKey` untouched) would be a new normative section of the
+  spec — deliberately out of LTS scope; recorded in BACKLOG (BL-40) as a
+  potential v2.0 item.
+
 `@me2em/crypto` adds the guard rails: Argon2id profiles for secrets the
 user must type rather than derive, and HIBP breach checks for the rare
 hand-chosen password.

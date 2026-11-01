@@ -105,6 +105,16 @@ development, not part of the shipped API contract.
 
 ## P3 — Protocol Extensions (0.8+)
 
+- **BL-40 · open · Dedicated token-vault derivation path (potential
+  v2.0).** USE_CASES.md Scenario 8 builds the token vault by borrowing
+  the frozen channel slot (`deriveChannelKey('token-store/<service>')`,
+  recipe caveat 2 — deliberate, documented). A future release could add
+  a dedicated path `me2em/token-store/v1` with a new public method
+  `deriveTokenStorageKey(context)` — additive in shape:
+  `deriveChannelKey` stays byte-identical, no existing derivation
+  changes; requires a new normative section of the spec and new golden
+  vectors. Tracked at the architect's direction as a potential v2.0
+  item (2026-11-02, PR-5 review) — no v1.1 rework is planned.
 - **BL-29 · open · `@me2em/messenger` package.** Target 0.9.
   First vertical: chats, groups (epoch/GK patterns), delivery
   receipts, @me2em/server integration. Pilot consumer: BeSafeChat.
