@@ -1,7 +1,7 @@
 {
   "files": [
     {
-      "filepath": "/home/z/my-project/me2em-protocol/packages/core/bench/derivation.bench.ts",
+      "filepath": "bench/derivation.bench.ts",
       "groups": [
         {
           "fullName": "bench/derivation.bench.ts > derivation",
@@ -161,7 +161,7 @@
       ]
     },
     {
-      "filepath": "/home/z/my-project/me2em-protocol/packages/core/bench/tokens.bench.ts",
+      "filepath": "bench/tokens.bench.ts",
       "groups": [
         {
           "fullName": "bench/tokens.bench.ts > tokens",

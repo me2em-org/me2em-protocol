@@ -137,6 +137,7 @@ If capacity shrinks, these four PRs are the LTS floor; PR-10/PR-11 may defer to 
 | CI coverage wiring + any `ci-security.yml` edit | with PR-4 | I supply the diff; push needs Workflows scope (A7) |
 | Audit vendor / bug bounty search (D7) | at the developer's discretion | typical lead time 4–10 weeks; audit runs on the PR-11 code freeze — no fixed start deadline (amended 2026-11-01) |
 | Publish pair-checks per DR-4 checklist | RC + release | package + consumer on clean install |
+| Verify `vectors` on exactly Node 22.6.0 | before `v1.0.0`, not `rc.2` | П.7 moved the script to `--experimental-strip-types` (a 22.6.0+ flag); the agent sandbox only has Node 24, where the run is verified byte-identical. The first `pnpm --filter @me2em/core vectors` run on exactly 22.6.0 gates `v1.0.0` — CI never invokes `vectors`, so zero runtime risk in the meantime |
 | `v1.0.0-rc.1` → `v1.0.0`, npm dist-tag `lts`, migration guide post | Stage 6–7 | release ops |
 
 ---
