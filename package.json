@@ -10,7 +10,7 @@
     "build-docs": "pnpm -r --filter './packages/*' run build-docs"
   },
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=22.6.0",
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@10.11.1",

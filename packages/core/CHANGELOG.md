@@ -25,6 +25,18 @@
   raw-primitives group and the reasons the wrappers exist; the
   five previously unpinned wrappers are pinned by arch-cycle parity
   tests (noble-oracle agreement + sync/async byte-identity).
+- `vectors` script now runs `node --experimental-strip-types
+  scripts/generate-vectors.ts` and `engines.node` is bumped from
+  `>=22.0.0` to `>=22.6.0` (root and all packages): Node could not
+  execute a `.ts` entry point without the flag before 23.6, so the
+  documented regeneration flow failed on Node 22 (the CI major). The
+  flag is a no-op on ≥23.6; no new dependencies.
+- `bench:baseline` now normalizes `bench/baseline.json` after every
+  regeneration (`scripts/normalize-baseline.mjs`): vitest emits the
+  runner machine's absolute `filepath`; the committed baseline is
+  package-relative and machine-independent. The two previously
+  committed absolute paths are normalized; `bench --compare` matching
+  is by task name and unaffected.
 
 ### Fixed
 - Stricter validation at decode/parse time (iat/exp hardening):
