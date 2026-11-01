@@ -446,6 +446,18 @@ Info strings: `me2em/secret/v1` → `me2em/secret/v1/rN`,
 output is prefix-stable — the first `n` bytes of a longer derivation
 equal the `n`-byte derivation.
 
+**Choosing revision values (application-level convention).** A
+`revision` is an opaque positive integer — the protocol deliberately
+does not assign meaning to it (mechanism, not policy). Common
+app-level conventions: date-stamped rotations (`20261009` = `YYYYMMDD`,
+keeps the rotation history readable), small enum-like codes for named
+credential generations, or a hash of a human-readable label mapped
+into the integer range — the last one reproduces the same secret from
+the label across implementations without storing the mapping. The
+label↔revision mapping (where one exists) is public metadata: keep it
+next to the credentials it describes (e.g. in the password manager's
+notes) — the secret itself is protected by the seed alone.
+
 ## 🎯 Core Use Cases
 
 Mapped to the official registry — see [USE_CASES.md](./USE_CASES.md):
