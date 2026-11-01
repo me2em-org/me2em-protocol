@@ -111,6 +111,25 @@ describe('5.2 Handle encapsulation', () => {
     expect(bare.getMetadata()).toBeUndefined();
   });
 
+  it('getMetadata(): input is deep-copied in the constructor — caller mutation before or after is invisible', () => {
+    const input = { custom: { a: 1 } };
+    const handle = new Handle(scratchKey('meta-deep-in'), 'meta-deep-in', input);
+    // the copy happens in the constructor, not lazily in the getter
+    expect(handle.getMetadata()).toEqual({ custom: { a: 1 } });
+    input.custom.a = 42; // mutate the CALLER's input after construction
+    expect(handle.getMetadata()).toEqual({ custom: { a: 1 } });
+  });
+
+  it('getMetadata(): nested values are deep-copied on the way out — mutating them does not leak', () => {
+    const handle = new Handle(scratchKey('meta-deep-out'), 'meta-deep-out', {
+      custom: { a: 1 },
+    });
+    const meta = handle.getMetadata() as { custom: { a: number } };
+    meta.custom.a = 42;
+    (meta as Record<string, unknown>)['added'] = true;
+    expect(handle.getMetadata()).toEqual({ custom: { a: 1 } });
+  });
+
   it('getPublicKey() returns a defensive copy', async () => {
     const handle = new Handle(scratchKey('pk-copy'), 'pk-copy');
     const pk = handle.getPublicKey();
@@ -181,6 +200,24 @@ describe('5.3 SubHandle encapsulation', () => {
         ttl: 600,
       })
     ).toThrow(/not allowed/);
+  });
+
+  it('getMetadata() and getSubMetadata() nested custom values are independent deep copies', async () => {
+    const identity = await Identity.fromSeed(TEST_SEED);
+    const sub = await identity.deriveSubHandle('parent', 'child', {
+      nested: { a: 1 },
+    } as never);
+    const fromMeta = sub.getMetadata() as { nested: { a: number } };
+    const fromSub = sub.getSubMetadata() as unknown as { nested: { a: number } };
+    expect(fromMeta.nested).toEqual({ a: 1 });
+    expect(fromSub.nested).toEqual({ a: 1 });
+    // mutating one getter's output must not be visible through the other
+    fromMeta.nested.a = 42;
+    expect(fromSub.nested).toEqual({ a: 1 });
+    expect(sub.getMetadata()).toEqual({ nested: { a: 1 } });
+    fromSub.nested.a = 7;
+    expect(sub.getMetadata()).toEqual({ nested: { a: 1 } });
+    expect((sub.getSubMetadata() as unknown as { nested: { a: number } }).nested).toEqual({ a: 1 });
   });
 
   it('inherits dispose() from Handle — capability methods throw DisposedError', async () => {

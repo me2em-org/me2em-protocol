@@ -186,13 +186,15 @@ export class Handle implements Signer {
    *   Copied on input — later mutation of the caller's buffer has no effect.
    * @param name - The context name this handle represents.
    * @param metadata - Optional metadata associated with this handle.
-   *   Shallow-copied on input (nested values are not cloned).
+   *   Custom metadata is deep-copied (JSON-safe structures up to depth 8);
+   *   non-plain values (Date, Map, functions) remain shared by reference —
+   *   same caveats as `getSubMetadata()`.
    */
   constructor(privateKey: Uint8Array, name: string, metadata?: HandleMetadata) {
     this.#privateKey = new Uint8Array(privateKey);
     this.#publicKey = ed.getPublicKey(this.#privateKey);
     this.#name = name;
-    this.#metadata = metadata ? { ...metadata } : undefined;
+    this.#metadata = metadata ? deepCloneJsonValue(metadata) as HandleMetadata : undefined;
   }
 
   /**
@@ -248,11 +250,14 @@ export class Handle implements Signer {
   }
 
   /**
-   * @returns A shallow copy of the metadata object associated with this
+   * @returns A deep copy of the metadata object associated with this
    *   Handle — mutating the returned object does not affect the Handle.
+   *   Custom metadata is deep-copied (JSON-safe structures up to depth 8);
+   *   non-plain values (Date, Map, functions) remain shared by reference —
+   *   same caveats as `getSubMetadata()`.
    */
   getMetadata(): HandleMetadata | undefined {
-    return this.#metadata ? { ...this.#metadata } : undefined;
+    return this.#metadata ? deepCloneJsonValue(this.#metadata) as HandleMetadata : undefined;
   }
 
   /**
@@ -603,11 +608,13 @@ function extractDisplayFields(
 }
 
 /**
- * Deep copy of SubHandle metadata for the {@link SubHandle.getSubMetadata}
- * getter (PR-7): JSON-safe values (plain objects and arrays, including
- * nested ones) are duplicated so no caller mutation can reach the
- * enforced constraints. Non-plain values (Date, Map, class instances)
- * are shared by reference at depth > 8 and documented as such.
+ * Deep copy of Handle metadata for the {@link Handle.getMetadata} and
+ * {@link SubHandle.getSubMetadata} getters (PR-7; extended to the Handle
+ * constructor/getter for symmetry): JSON-safe values (plain objects and
+ * arrays, including nested ones) are duplicated so no caller mutation can
+ * reach the stored metadata or the enforced constraints. Non-plain values
+ * (Date, Map, class instances) are shared by reference at depth > 8 and
+ * documented as such.
  */
 function deepCloneJsonValue(value: unknown, depth = 0): unknown {
   if (depth > 8 || value === null || typeof value !== 'object') return value;

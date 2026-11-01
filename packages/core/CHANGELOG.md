@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+- `Handle.getMetadata()` and the `Handle` constructor metadata input now
+  deep-copy custom metadata (JSON-safe structures up to depth 8);
+  non-plain values (Date, Map, functions) remain shared by reference —
+  same caveats as `getSubMetadata()`. Symmetry hardening (PR-7
+  direction): closes the last live-reference input in the Handle family
+  — the caller keeps no live reference. Non-breaking: code relying on
+  the previous shallow behavior sees only more isolation.
+
 ### Fixed
 - Stricter validation at decode/parse time (iat/exp hardening):
   non-finite `iat`/`exp` (e.g. `1e999`, which `JSON.parse` maps to
