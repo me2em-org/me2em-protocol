@@ -663,8 +663,10 @@ passwords keep deriving on demand as usual. Two honest caveats:
   borrows a frozen derivation slot for storage-key material — the salt/info
   domain separation makes the result independent of every channel key; the
   borrowing is deliberate and documented here. A dedicated derivation path
-  would be a new normative section of the spec and is deliberately out of
-  LTS scope.
+  (`me2em/token-store/v1` via a new `deriveTokenStorageKey` method, leaving
+  `deriveChannelKey` untouched) would be a new normative section of the
+  spec — deliberately out of LTS scope; recorded in BACKLOG (BL-40) as a
+  potential v2.0 item.
 
 `@me2em/crypto` adds the guard rails: Argon2id profiles for secrets the
 user must type rather than derive, and HIBP breach checks for the rare
