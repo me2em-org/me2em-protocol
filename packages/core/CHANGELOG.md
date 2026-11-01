@@ -37,6 +37,16 @@
   package-relative and machine-independent. The two previously
   committed absolute paths are normalized; `bench --compare` matching
   is by task name and unaffected.
+- Security-posture docs: SECURITY.md now states the PGP key
+  publication commitment (before v1.0.0) and points reporters to
+  email / GitHub private vulnerability reporting in the interim;
+  the CI security posture (gitleaks, CodeQL, typecheck,
+  test:coverage thresholds, advisory lint/audit) is documented next
+  to the audit-status table. USE_CASES.md Scenario 8 adds the
+  token-vault recipe on frozen primitives
+  (`deriveChannelKey('token-store/<service>')` + application-side
+  AES-256-GCM, with its two documented caveats). Docs-only,
+  non-breaking.
 
 ### Fixed
 - Stricter validation at decode/parse time (iat/exp hardening):

@@ -31,7 +31,11 @@ authentication. We take security seriously.
    - Steps to reproduce (if applicable)
    - Potential impact assessment
    - Suggested fix (optional but appreciated)
-3. Use PGP if possible: [PGP Key](https://me2em.com/security/pgp-key.asc) (coming soon)
+3. **PGP encryption for reports** — the project PGP key will be
+   published at [me2em.com/security/pgp-key.asc](https://me2em.com/security/pgp-key.asc)
+   **before v1.0.0**. Until then, use the email address above or
+   [GitHub private vulnerability reporting](https://github.com/me2em-org/me2em-protocol/security/advisories/new)
+   (encrypted, free, zero ops).
 
 ## 📬 What to Expect
 
@@ -101,6 +105,12 @@ When implementing Me2eM in your application:
 
 > Independent security audits are planned before the v1.0 release.
 > Follow [Discussions](https://github.com/me2em-org/me2em-protocol/discussions) for updates.
+
+**CI security posture** (automated on every push/PR and a weekly
+schedule): CI runs gitleaks, CodeQL, typecheck, test:coverage
+(thresholds enforced: core/crypto 90/90, react ratcheted 82/71 —
+BL-34), lint (advisory), audit (advisory); blocking lint/audit are
+pre-v1.0.0 items.
 
 ## 📜 Responsible Disclosure Policy
 
