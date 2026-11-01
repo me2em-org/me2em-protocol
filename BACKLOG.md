@@ -1,7 +1,9 @@
 # Me2eM Protocol — Development Backlog
 
-Baseline: core v0.7.0-alpha.2 (186) · react v0.1.0-alpha.2 (101) ·
-crypto v0.1.0-alpha.1 (151) = 438 tests. tsc/build-docs clean per package.
+Baseline: core · react · crypto all at **1.0.0-rc.1** (602 tests =
+core 350 · crypto 151 · react 101). tsc/build-docs clean per package.
+The API-freeze release candidate of the LTS program (PR-12); the
+original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 This document is **advisory** — a recommendation list for future
 development, not part of the shipped API contract.
 
@@ -120,6 +122,12 @@ development, not part of the shipped API contract.
   afterwards. TSDoc must honestly state GC/JIT limits. Partially
   superseded by the session-bound profile (transient secrets are
   architectural), but stays relevant for the classic fromSeed flow.
+  *Status note (PR-12):* the mechanism itself has shipped — `dispose()`
+  (PR-5) does `fill(0)` + flag + `DisposedError` on all three classes,
+  and the GC/JIT limitation is stated honestly in the core README, in
+  `THREAT_MODEL.md` §5.2 and in `SECURITY.md`. What remains is the
+  decision whether the residual platform gap justifies anything beyond
+  `dispose()`; candidate to close at the next BACKLOG sweep.
 - **BL-10 · open · `attRef` — chain compression for narrow channels.**
   Full chain on first contact, verifier caches by `jti`, later tokens
   carry `attRef` only. Cache holds public data; loss degrades

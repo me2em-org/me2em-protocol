@@ -1,6 +1,25 @@
 # Changelog
 
-## [Unreleased] → will ship in 0.8.0
+## [1.0.0-rc.1] — 2026-11-01
+
+First release candidate of the LTS line: everything in this block
+accumulated on `main` since 0.7.0-alpha.2 and ships together (no 0.8.0
+was ever published). **The public API is frozen as of this version**
+(specs/v1.0.md §12): additive changes may land in 1.x minors; breaking
+changes require 2.0.0 and a new spec revision. All BREAKING entries
+below are a record, not a migration guide (A9 — no-compatibility
+mandate).
+
+### API freeze
+- **Public API frozen (PR-12).** The frozen surface — classes, `Signer`,
+  `crypto` namespace, seed utilities, error model and the wire formats
+  of specs/v1.0.md §4–§7 — is enumerated normatively in
+  [specs/v1.0.md §12](../../specs/v1.0.md); the machine-checkable part
+  of the freeze is `specs/test-vectors.json` (untouched in this PR).
+  Docs consolidated in this release: root `THREAT_MODEL.md` (replay,
+  clock-skew bounds, BL-07 limits, grant escalation, parser hardening,
+  explicit non-goals), `SECURITY.md` (24-month LTS window, 7-day
+  critical-fix SLA), core README "Runtime & Limits" section.
 
 ### BREAKING
 - **The `Session` constructor is private (PR-11, D6).** Direct

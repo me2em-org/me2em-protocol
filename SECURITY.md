@@ -3,17 +3,19 @@
 ## 🔐 Supported Versions
 
 Me2eM packages version independently. Security fixes ship in the
-latest alpha of every package:
+latest release candidate of every package:
 
 | Package | Version | Supported |
 |---------|---------|-----------|
-| `@me2em/core` | 0.7.0-alpha.x | ✅ Yes |
-| `@me2em/crypto` | 0.1.0-alpha.x | ✅ Yes |
-| `@me2em/react` | 0.1.0-alpha.x | ✅ Yes |
+| `@me2em/core` | 1.0.0-rc.1 | ✅ Yes |
+| `@me2em/crypto` | 1.0.0-rc.1 | ✅ Yes |
+| `@me2em/react` | 1.0.0-rc.1 | ✅ Yes |
 | any older release | — | ❌ No |
 
-> Me2eM is in active development. Always use the latest alpha of each
-> package for security fixes.
+> `1.0.0-rc.1` is the API-freeze release candidate of the LTS program.
+> The 24-month security-support window opens at `v1.0.0` GA; until
+> then, always use the latest RC of each package for security fixes.
+> The threat model lives in [`THREAT_MODEL.md`](./THREAT_MODEL.md).
 
 ## 🚨 Reporting a Vulnerability
 
@@ -35,8 +37,12 @@ authentication. We take security seriously.
 
 - **Acknowledgment**: Within 72 hours
 - **Assessment**: Within 7 business days
-- **Fix timeline**: Severity-dependent (critical: ≤14 days)
+- **Fix timeline**: Severity-dependent — **critical: ≤ 7 days (LTS
+  SLA)**; high and below: next release
 - **Disclosure**: Coordinated with the reporter, after the fix is released
+
+> The **7-day critical-fix SLA** is the LTS commitment for the
+> 24-month support window that opens at `v1.0.0` GA.
 
 ## 🔍 Security Model Notes for Reporters
 
@@ -46,9 +52,13 @@ Understanding the architecture helps you report accurately:
   carrier of identity. A report of "recovering the key tree from a
   leaked seed" describes expected behavior, not a vulnerability — the
   seed is assumed secret by the threat model.
-- **Transient key material**: private keys exist in RAM during login
-  and are wiped after use. GC/JIT copies are a documented limitation
-  (see BACKLOG BL-07), not a vulnerability.
+- **Transient key material**: private keys live in RAM in `#private`
+  fields, are redacted from `JSON.stringify`/console inspection, and
+  are zeroized by `dispose()` (`fill(0)`, capability methods then
+  throw `DisposedError`). Hard zeroization cannot be guaranteed in a
+  JS runtime — GC/JIT may retain copies; this is a documented
+  limitation (see THREAT_MODEL.md §5.2 and BACKLOG BL-07), not a
+  vulnerability.
 - **Verification modes**: SubHandle constraint enforcement at
   *verification* time is Mode 2 (`verifyAttested`) only. Mode 1
   enforces at creation — see the README "Verification modes" section.
@@ -101,7 +111,8 @@ We follow responsible disclosure principles:
 
 ## 🔄 Updates
 
-This policy is reviewed quarterly. Last updated: September 2026.
+This policy is reviewed quarterly. Last updated: November 2026
+(`1.0.0-rc.1`, PR-12).
 
 ---
 
