@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session, type RevocationChecker } from '../src/index.js';
 import { base64urlDecode } from '../src/util.js';
-import { expectAttestationError, sessionFromVerified, tamperPayload } from './test-utils.js';
+import { expectAttestationError, sessionFromVerified, tamperPayload, tamperPayloadJson } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 
@@ -137,7 +137,7 @@ describe('Session.verifyStateless', () => {
       hNm: handle.getName(),
       aud: 'app',
       scp: ['read'],
-      exp: farPast,
+      exp: farPast + 3600, // exp > iat — expired, not malformed
       iat: farPast,
       jti: 'mock-jti-expired',
     });
@@ -160,13 +160,13 @@ describe('Session.verifyStateless', () => {
     const identity = await Identity.fromSeed(testSeed);
     const handle = await identity.deriveHandle('future-test');
     const farFuture = Math.floor(Date.now() / 1000) + 100000;
-    
+
     const payload = JSON.stringify({
       hId: handle.getId(),
       hNm: handle.getName(),
       aud: 'app',
       scp: ['read'],
-      exp: farFuture,
+      exp: farFuture + 3600, // exp > iat — not-yet-valid, not malformed
       iat: farFuture,
       jti: 'mock-jti-future',
     });
@@ -287,6 +287,65 @@ describe('Session.verifyStateless', () => {
     await expectAttestationError(
       Session.verifyStateless(token, identity, 'app'),
       'BAD_SIGNATURE', 'SESSION'
+    );
+  });
+});
+
+describe('Session.parseSessionToken: non-finite iat/exp and exp <= iat', () => {
+  async function createVerifiedSession() {
+    const identity = await Identity.fromSeed(testSeed);
+    const handle = await identity.deriveHandle('parse-guard');
+    const session = await Session.create(handle, {
+      audience: 'app',
+      scopes: ['read'],
+      ttl: 3600,
+    });
+    return { identity, session };
+  }
+
+  it('exp < iat → MALFORMED/FORMAT at parse time', async () => {
+    const { identity, session } = await createVerifiedSession();
+    const tampered = tamperPayload(session.token, (p) => {
+      p.exp = (p.iat as number) - 1;
+    });
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp === iat → MALFORMED/FORMAT at parse time', async () => {
+    const { identity, session } = await createVerifiedSession();
+    const tampered = tamperPayload(session.token, (p) => {
+      p.exp = p.iat;
+    });
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const { identity, session } = await createVerifiedSession();
+    // JSON.stringify cannot emit Infinity — inject the 1e999 literal;
+    // unchecked, `now > exp + skew` would be false forever (fail-open expiry)
+    const tampered = tamperPayloadJson(session.token, (json) =>
+      json.replace(/"exp":\d+/, '"exp":1e999')
+    );
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('iat: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const { identity, session } = await createVerifiedSession();
+    const tampered = tamperPayloadJson(session.token, (json) =>
+      json.replace(/"iat":\d+/, '"iat":1e999')
+    );
+    await expectAttestationError(
+      Session.verifyStateless(tampered, identity, 'app'),
+      'MALFORMED', 'FORMAT'
     );
   });
 });

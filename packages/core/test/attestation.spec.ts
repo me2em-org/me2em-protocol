@@ -453,3 +453,59 @@ describe('Attestation: decode does not check time', () => {
     expect(decoded.exp).toBe(1000003600);
   });
 });
+
+describe('Attestation: decode rejects non-finite iat/exp and exp <= iat', () => {
+  const basePayload = {
+    typ: ATTESTATION_TYPE,
+    subjectName: 'test',
+    subjectId: 'dGVzdA',
+    grant: { scopes: ['read'], maxSessionTtl: 3600 },
+    iat: 1000000000,
+    exp: 1000003600,
+    jti: 'test-jti',
+  };
+
+  // Synthetic fixtures — free encoder (btoa) is the independent
+  // test-oracle (write-side fixture building; read-side uses the SUT codec).
+  function decodeRawPayload(raw: string): void {
+    const payloadB64 = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    Attestation.decode(`${payloadB64}.fakesig`);
+  }
+
+  it('finite iat < exp → still decodes (no regression)', () => {
+    const payloadB64 = btoa(JSON.stringify(basePayload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const decoded = Attestation.decode(`${payloadB64}.fakesig`);
+    expect(decoded.iat).toBe(1000000000);
+    expect(decoded.exp).toBe(1000003600);
+  });
+
+  it('exp < iat → MALFORMED/FORMAT', () => {
+    expectAttestationErrorSync(
+      () => decodeRawPayload(JSON.stringify({ ...basePayload, exp: 999999000 })),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp === iat → MALFORMED/FORMAT', () => {
+    expectAttestationErrorSync(
+      () => decodeRawPayload(JSON.stringify({ ...basePayload, exp: 1000000000 })),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('exp: 1e999 (parses as Infinity) → MALFORMED/FORMAT', () => {
+    // JSON.stringify cannot emit Infinity — inject the 1e999 literal;
+    // unchecked, `now > exp + skew` would be false forever (fail-open expiry)
+    expectAttestationErrorSync(
+      () => decodeRawPayload(JSON.stringify({ ...basePayload, exp: 0 }).replace('"exp":0', '"exp":1e999')),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('iat: 1e999 (parses as Infinity) → MALFORMED/FORMAT', () => {
+    expectAttestationErrorSync(
+      () => decodeRawPayload(JSON.stringify({ ...basePayload, iat: 0 }).replace('"iat":0', '"iat":1e999')),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+});

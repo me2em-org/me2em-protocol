@@ -115,9 +115,9 @@ export function sessionFromVerified(
  * signature — the standard way to produce a tampered token in tests.
  *
  * Read-side decodes the library token via the SUT codec
- * (`base64urlDecode` from `src/util.ts`, П.8 rule B); the write-side
- * encoding below intentionally keeps `btoa` as an independent
- * test-oracle for fixture building (not the SUT codec).
+ * (`base64urlDecode` from `src/util.ts`); the write-side encoding
+ * below intentionally keeps `btoa` as an independent test-oracle for
+ * fixture building (not the SUT codec).
  */
 export function tamperPayload(
   token: string,
@@ -130,6 +130,27 @@ export function tamperPayload(
   mutate(payload);
 
   const modifiedBytes = new TextEncoder().encode(JSON.stringify(payload));
+  const modifiedB64 = btoa(String.fromCharCode(...modifiedBytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  return `${modifiedB64}.${signatureB64}`;
+}
+
+/**
+ * Rebuilds a two-part token with the payload JSON string rewritten by
+ * `patch` — the escape hatch for numeric literals that `JSON.stringify`
+ * cannot emit (e.g. `1e999`, which `JSON.parse` maps to `Infinity`).
+ * Same codec split as {@link tamperPayload}: read-side through the SUT
+ * codec, write-side `btoa` kept as the independent test-oracle.
+ */
+export function tamperPayloadJson(
+  token: string,
+  patch: (payloadJson: string) => string
+): string {
+  const [payloadB64, signatureB64] = token.split('.');
+  const payloadJson = new TextDecoder().decode(base64urlDecode(payloadB64));
+  const modifiedBytes = new TextEncoder().encode(patch(payloadJson));
   const modifiedB64 = btoa(String.fromCharCode(...modifiedBytes))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
