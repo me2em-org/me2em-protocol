@@ -12,6 +12,7 @@ import {
   expectAttestationErrorSync,
   signerFromKey,
   tamperPayload,
+  tamperPayloadJson,
 } from './test-utils.js';
 
 describe('Attestation: roundtrip issue → decode', () => {
@@ -493,19 +494,31 @@ describe('Attestation: decode rejects non-finite iat/exp and exp <= iat', () => 
     );
   });
 
-  it('exp: 1e999 (parses as Infinity) → MALFORMED/FORMAT', () => {
-    // JSON.stringify cannot emit Infinity — inject the 1e999 literal;
-    // unchecked, `now > exp + skew` would be false forever (fail-open expiry)
-    expectAttestationErrorSync(
-      () => decodeRawPayload(JSON.stringify({ ...basePayload, exp: 0 }).replace('"exp":0', '"exp":1e999')),
-      'MALFORMED', 'FORMAT'
+  it('exp: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    const att = await Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test',
+      { scopes: ['read'], maxSessionTtl: 3600 },
+      { jti: 'inf-exp', now: 1700000000, ttlSeconds: 3600 }
     );
+    // JSON.stringify cannot emit Infinity — patch the raw payload JSON
+    // with the 1e999 literal via the shared helper (same style as
+    // session.spec); unchecked, `now > exp + skew` would be false
+    // forever (fail-open expiry)
+    const tampered = tamperPayloadJson(att.token, (json) => json.replace(/"exp":\d+/, '"exp":1e999'));
+    expectAttestationErrorSync(() => Attestation.decode(tampered), 'MALFORMED', 'FORMAT');
   });
 
-  it('iat: 1e999 (parses as Infinity) → MALFORMED/FORMAT', () => {
-    expectAttestationErrorSync(
-      () => decodeRawPayload(JSON.stringify({ ...basePayload, iat: 0 }).replace('"iat":0', '"iat":1e999')),
-      'MALFORMED', 'FORMAT'
+  it('iat: 1e999 (parses as Infinity) → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    const att = await Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test',
+      { scopes: ['read'], maxSessionTtl: 3600 },
+      { jti: 'inf-iat', now: 1700000000, ttlSeconds: 3600 }
     );
+    const tampered = tamperPayloadJson(att.token, (json) => json.replace(/"iat":\d+/, '"iat":1e999'));
+    expectAttestationErrorSync(() => Attestation.decode(tampered), 'MALFORMED', 'FORMAT');
   });
 });
