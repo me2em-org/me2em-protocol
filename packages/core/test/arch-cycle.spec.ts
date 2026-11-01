@@ -199,6 +199,44 @@ describe('PR-10 architecture pins (D4 / 3.2 / 3.3.1)', () => {
         Array.from(subViaIdentity.getPublicKey())
       );
     });
+
+    it('raw Ed25519 wrappers — noble-oracle agreement and sync/async parity', async () => {
+      // Pins the five wrappers not covered by the derive*-parity tests
+      // above (getPublicKey, verify, getPublicKeyAsync, signAsync,
+      // verifyAsync): each agrees with the @noble oracle imported
+      // directly (the oracle scope rule is src/-only — tests are free
+      // to use @noble), and every *Async wrapper is byte-identical to
+      // its sync counterpart.
+      const privateKey = crypto.deriveRootKey(TEST_SEED);
+      const publicKey = crypto.getPublicKey(privateKey);
+      const msg = new TextEncoder().encode('me2em arch-cycle wrapper parity probe');
+
+      // getPublicKey agrees with the oracle.
+      expect(Array.from(publicKey)).toEqual(
+        Array.from(ed25519.getPublicKey(privateKey))
+      );
+
+      // sign/verify roundtrip through the wrappers; verify agrees with
+      // the oracle on both accept and reject paths.
+      const sig = crypto.sign(msg, privateKey);
+      expect(sig.length).toBe(64);
+      expect(crypto.verify(sig, msg, publicKey)).toBe(true);
+      expect(ed25519.verify(sig, msg, publicKey)).toBe(true);
+      const bad = Uint8Array.from(sig);
+      bad[0] ^= 0x01;
+      expect(crypto.verify(bad, msg, publicKey)).toBe(false);
+      expect(ed25519.verify(bad, msg, publicKey)).toBe(false);
+
+      // Async variants are byte-identical to their sync counterparts.
+      expect(Array.from(await crypto.getPublicKeyAsync(privateKey))).toEqual(
+        Array.from(publicKey)
+      );
+      expect(Array.from(await crypto.signAsync(msg, privateKey))).toEqual(
+        Array.from(sig)
+      );
+      expect(await crypto.verifyAsync(sig, msg, publicKey)).toBe(true);
+      expect(await crypto.verifyAsync(bad, msg, publicKey)).toBe(false);
+    });
   });
 
   describe('5.3.4 — rawX25519SharedSecret (crypto/ecdh.ts) is raw ECDH', () => {

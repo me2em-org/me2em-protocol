@@ -28,6 +28,11 @@ development, not part of the shipped API contract.
   (core/crypto/react.me2em.com); TypeDoc runs with
   `treatWarningsAsErrors: true` — every exported symbol needs complete
   TSDoc (description, params/returns, `@example` for non-trivial API).
+- `crypto` namespace includes documented raw Ed25519 wrappers
+  (`crypto/ed25519.ts`): they are frozen public API surface
+  (specs/v1.0.md §12), kept for TSDoc documentation ownership and
+  `@noble` typing isolation under `treatWarningsAsErrors`; removal is a
+  breaking 2.0.0 decision — do not propose (PLAN amendment A5).
 - Versioning: independent per-package semver. Cross-package
   dependencies inside the monorepo use `workspace:^` — `pnpm publish`
   substitutes `workspace:*` with an EXACT version, which breaks

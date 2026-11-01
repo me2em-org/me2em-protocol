@@ -21,7 +21,16 @@ export function hkdf(
   return nobleHkdf(nobleSha256, ikm, salt, info, length);
 }
 
-/** SHA-256 hash function. */
+/**
+ * SHA-256 hash function (wrapper over `@noble/hashes/sha2`).
+ *
+ * Exposed as a building block for application-side tooling that needs
+ * the same hash the protocol's derivation uses; the derivation module
+ * consumes it internally.
+ *
+ * @param input - The bytes to hash.
+ * @returns The 32-byte SHA-256 digest.
+ */
 export function sha256(input: Uint8Array): Uint8Array {
   return nobleSha256(input);
 }

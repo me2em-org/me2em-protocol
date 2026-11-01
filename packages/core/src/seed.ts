@@ -146,7 +146,9 @@ export function validateSeedPhrase(words: string[]): SeedValidationResult {
  *
  * @param seedPhrase - The BIP39 mnemonic phrase (string or array of words).
  * @param passphrase - Optional BIP39 passphrase ("25th word").
- *   Normalized via NFKC before use. An empty string (default)
+ *   BIP39 NFKD normalization (mnemonic and passphrase) is performed by
+ *   `@scure/bip39`; this function passes the passphrase through
+ *   unchanged. An empty string (default)
  *   matches phrases without a passphrase. WARNING: the passphrase
  *   is NOT recoverable — a different passphrase silently derives a
  *   completely different seed with no error indication. Store it
@@ -171,6 +173,9 @@ export async function get64ByteSeedFromMnemonic(
     throw new AttestationError('MALFORMED', 'FORMAT', `Invalid seed phrase: ${validation.error}`);
   }
   const mnemonic = words.join(' ');
-  // Full 64-byte BIP39 seed (PBKDF2-HMAC-SHA512 output) — no post-hashing
-  return mnemonicToSeed(mnemonic, passphrase.normalize('NFKC'));
+  // Full 64-byte BIP39 seed (PBKDF2-HMAC-SHA512 output) — no post-hashing.
+  // Normalization (NFKD on mnemonic + passphrase salt) is the BIP39 layer's
+  // job — do not pre-normalize here (spec §2: implementations MUST NOT
+  // apply additional normalization on top).
+  return mnemonicToSeed(mnemonic, passphrase);
 }
