@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- `useIdentityContext`: an in-flight context load (identity change or
+  `refresh()`) could resolve **after** a newer `save()`/`clear()` and
+  overwrite the fresh state with pre-save data — an out-of-order async
+  update. All async state transitions (load, save, clear, refresh) are
+  now generation-sequenced: a stale resolution is dropped instead of
+  clobbering newer state. Pinned by a deterministic regression test
+  that holds the pre-save load snapshot in a gated storage proxy and
+  releases it after the save.
+
+### Changed
+- Test hygiene in the `useIdentityContext` spec: a fresh fake-IndexedDB
+  factory per test. The tests derive the same identity from the same
+  mnemonic, so their storage DB name is identical — a shared database
+  leaked the previous test's record into the next one. This fed the
+  race above a stale record and was observed once as a CI flake
+  ('rerender → context stays': expected `persistent-handle`, received
+  the previous test's `test-handle`).
+
 ## [1.0.0-rc.1] — 2026-11-01
 
 Release-candidate alignment with `@me2em/core` 1.0.0-rc.1 (the
