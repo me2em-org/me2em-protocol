@@ -79,8 +79,9 @@ describe('BIP39 passphrase support', () => {
     // layer normalizes (NFKD) the whole salt. If @scure/bip39 ever
     // changes its normalization behavior, this pin fails loudly and
     // forces an explicit decision instead of a silent derivation change
-    // (empirical base: 1 112 064-codepoint sweep, 784 starter+combining
-    // pairs, 200k-row fuzz — zero mismatches).
+    // (empirical base: packages/core/scripts/nfkd-redundancy-check.mjs
+    // — 1,112,064-codepoint sweep, 784 starter+combining pairs, 200k-row
+    // fuzz, zero mismatches).
     const matrix = [
       'caf\u00E9',                          // precomposed é
       'cafe\u0301',                         // e + combining acute
