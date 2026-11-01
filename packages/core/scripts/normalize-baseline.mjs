@@ -12,6 +12,11 @@
 // JSON.parse → stringify roundtrip) so the emitted vitest formatting
 // stays byte-identical outside the replaced spans.
 //
+// Assumes bench files live under the package's `bench/` directory —
+// the only expected input. An absolute path outside the package would
+// come out as a `../...` relative path instead of a package-relative
+// one; not expected, bench files are fixed under `bench/`.
+//
 // Hooked into `bench:baseline` — future regenerations are normalized
 // automatically.
 
