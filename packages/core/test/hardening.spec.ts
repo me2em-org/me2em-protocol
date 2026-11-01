@@ -58,6 +58,10 @@ describe('5.18 — randomUUID fallback (runtime portability)', () => {
   });
 });
 
+// A3 is core-scoped by design (П.8 fixation): the scan below covers only
+// `packages/core/src`. btoa/atob inside packages/crypto and packages/react
+// src are intentional (documented Latin-1 usage, e.g. binary.ts:6) —
+// extending this scan to other packages without analysis breaks tests falsely.
 describe('A3 — base64url exclusively via @scure/base', () => {
   it('no btoa/atob calls remain in src/', () => {
     const srcDir = new URL('../src/', import.meta.url);

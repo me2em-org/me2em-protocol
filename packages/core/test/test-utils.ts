@@ -2,6 +2,7 @@
 // Not a spec file — vitest picks up only `*.spec.ts`.
 import { expect } from 'vitest';
 import { ed25519 } from '@noble/curves/ed25519.js';
+import { base64urlDecode } from '../src/util.js';
 import {
   AttestationError,
   Identity,
@@ -112,22 +113,19 @@ export function sessionFromVerified(
 /**
  * Rebuilds a two-part token with a mutated payload, keeping the original
  * signature — the standard way to produce a tampered token in tests.
+ *
+ * Read-side decodes the library token via the SUT codec
+ * (`base64urlDecode` from `src/util.ts`, П.8 rule B); the write-side
+ * encoding below intentionally keeps `btoa` as an independent
+ * test-oracle for fixture building (not the SUT codec).
  */
 export function tamperPayload(
   token: string,
   mutate: (payload: Record<string, unknown>) => void
 ): string {
   const [payloadB64, signatureB64] = token.split('.');
-  let base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4 !== 0) base64 += '=';
-  const binary = atob(base64);
-  const payloadBytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    payloadBytes[i] = binary.charCodeAt(i);
-  }
-
   const payload = JSON.parse(
-    new TextDecoder().decode(payloadBytes)
+    new TextDecoder().decode(base64urlDecode(payloadB64))
   ) as Record<string, unknown>;
   mutate(payload);
 

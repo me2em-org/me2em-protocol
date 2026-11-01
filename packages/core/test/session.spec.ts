@@ -1,7 +1,8 @@
 // Session unit tests
 import { describe, it, expect } from 'vitest';
 import { Identity, Handle, SubHandle, Session, type RevocationChecker } from '../src/index.js';
-import { expectAttestationError, sessionFromVerified } from './test-utils.js';
+import { base64urlDecode } from '../src/util.js';
+import { expectAttestationError, sessionFromVerified, tamperPayload } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 
@@ -193,19 +194,9 @@ describe('Session.verifyStateless', () => {
       ttl: 3600,
     });
 
-    const parts = session.token.split('.');
-    const payloadB64 = parts[0];
-    const signatureB64 = parts[1];
-    const payloadBytes = base64urlDecode(payloadB64);
-    const payloadObj = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    
-    payloadObj.scp = ['read']; // Tamper
-    
-    const modifiedPayload = JSON.stringify(payloadObj);
-    const modifiedPayloadBytes = new TextEncoder().encode(modifiedPayload);
-    const modifiedPayloadB64 = btoa(String.fromCharCode(...modifiedPayloadBytes))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const tamperedToken = `${modifiedPayloadB64}.${signatureB64}`;
+    const tamperedToken = tamperPayload(session.token, (payload) => {
+      payload.scp = ['read']; // Tamper
+    });
 
     await expectAttestationError(
       Session.verifyStateless(tamperedToken, identity, 'app'),
@@ -281,7 +272,7 @@ describe('Session.verifyStateless', () => {
     const parts = session.token.split('.');
     const payloadBytes = base64urlDecode(parts[0]);
     const payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    
+
     payload.hNm = 'unknown-handle-xyz'; // Tamper name
     
     const modifiedPayload = JSON.stringify(payload);
@@ -348,7 +339,7 @@ describe('Session with SubHandle', () => {
 
     expect(session.path).toEqual(['station-001', 'connector-1']);
     
-    // Проверка, что токен декодируется и содержит hPath
+    // Проверка, что токен декодируется и содержит hPath (read-side — SUT-кодек)
     const payloadBytes = base64urlDecode(session.token.split('.')[0]);
     const payload = JSON.parse(new TextDecoder().decode(payloadBytes));
     expect(payload.hPath).toEqual(['station-001', 'connector-1']);
@@ -582,18 +573,3 @@ describe('Handle.deriveSharedSecret', () => {
   });
 });
 
-// Вспомогательная функция (локальная для тестов)
-function base64urlDecode(input: string): Uint8Array {
-  let base64 = input
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  while (base64.length % 4 !== 0) {
-    base64 += '=';
-  }
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}

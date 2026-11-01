@@ -5,12 +5,13 @@ import {
   ATTESTATION_TYPE,
   ATTESTATION_MAX_PAYLOAD,
 } from '../src/index.js';
-import { base64urlEncode } from '../src/util.js';
+import { base64urlDecode, base64urlEncode } from '../src/util.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   expectAttestationError,
   expectAttestationErrorSync,
   signerFromKey,
+  tamperPayload,
 } from './test-utils.js';
 
 describe('Attestation: roundtrip issue → decode', () => {
@@ -320,23 +321,9 @@ describe('Attestation: verifySignature', () => {
       { scopes: ['read'], maxSessionTtl: 3600 }
     );
 
-    const parts = att.token.split('.');
-    const payloadB64 = parts[0];
-    const signatureB64 = parts[1];
-
-    let base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
-    const obj = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    (obj.grant as Record<string, unknown>).scopes = ['write'];
-    const modified = new TextEncoder().encode(JSON.stringify(obj));
-    const modifiedB64 = btoa(String.fromCharCode(...modified))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const tamperedToken = `${modifiedB64}.${signatureB64}`;
+    const tamperedToken = tamperPayload(att.token, (obj) => {
+      (obj.grant as Record<string, unknown>).scopes = ['write'];
+    });
 
     const valid = await Attestation.verifySignature(tamperedToken, signerPub);
     expect(valid).toBe(false);
@@ -421,13 +408,7 @@ describe('Attestation: no undefined fields in serialization', () => {
     );
 
     const parts = att.token.split('.');
-    let base64 = parts[0].replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
+    const payloadBytes = base64urlDecode(parts[0]);
     const parsed = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
     const grant = parsed.grant as Record<string, unknown>;
 
@@ -445,13 +426,7 @@ describe('Attestation: no undefined fields in serialization', () => {
     );
 
     const parts = att.token.split('.');
-    let base64 = parts[0].replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4 !== 0) base64 += '=';
-    const binary = atob(base64);
-    const payloadBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      payloadBytes[i] = binary.charCodeAt(i);
-    }
+    const payloadBytes = base64urlDecode(parts[0]);
     const parsed = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
     const grant = parsed.grant as Record<string, unknown>;
 
