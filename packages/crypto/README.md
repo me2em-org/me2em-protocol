@@ -95,6 +95,7 @@ Canonical Signal X3DH key exchange.
 - **initiateX3DH** — Initiator side: derives a shared secret using the recipient's published `PreKeyBundle` (SPK + OTK). Enforces OTK consumption (no zero-fallback).
 - **completeX3DH** — Recipient side: completes the same computation using persisted pre-key material.
 - **SPK/OTK management** — `generateSignedPreKey`, `generateOneTimePreKeys`, `verifySignedPreKey`.
+- **Envelope id format** — the `usedOneTimePreKeyId` returned by `initiateX3DH` (and carried in `WrappedKey`) is **base64url unpadded** of the OTK public key — URL-safe, consistent with `@me2em/core` wire formats. `unwrapKeyForMe` does not decode it (it is caller-facing metadata).
 - **Replay guard** — OTK consumption ensures each envelope is unique.
 
 > ⚠️ **OTK consumption is destructive.** `completeX3DH` and

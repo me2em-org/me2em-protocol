@@ -1,5 +1,6 @@
 // packages/crypto/test/envelopes/key-wrapping.spec.ts
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { base64urlnopad } from '@scure/base';
 import { generateX25519KeyPair } from '../../src/index.js';
 import * as wipeNs from '../../src/core/wipe.js';
 import * as aeadNs from '../../src/core/aead.js';
@@ -59,7 +60,11 @@ describe('wrapKeyForRecipient', () => {
     expect(wrapped.iv.length).toBe(12);
     expect(wrapped.ephemeralPublicKey.length).toBe(32);
     expect(wrapped.initiatorIdentityPublicKey.length).toBe(32);
-    expect(wrapped.usedOneTimePreKeyId).toBeDefined();
+    expect(wrapped.usedOneTimePreKeyId).toMatch(/^[A-Za-z0-9_-]+$/);
+
+    // Round-trip: the envelope id decodes back to the consumed OTK public key.
+    const decodedOtk = base64urlnopad.decode(wrapped.usedOneTimePreKeyId);
+    expect(decodedOtk).toEqual(bobOTK.publicKey);
 
     const bobOTKObj: OneTimePreKey = { keyPair: { privateKey: new Uint8Array(bobOTK.privateKey), publicKey: new Uint8Array(bobOTK.publicKey) } };
     const unwrapped = await unwrapKeyForMe({

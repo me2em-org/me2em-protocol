@@ -46,6 +46,12 @@ is frozen as of this version; additive changes land in 1.x minors.
   every channel API rejects impostor objects (plain look-alikes,
   spread-clones) with `INVALID_ARGUMENT` — rotated-away and
   destroyed channels keep the more precise `INVALID_KEY`.
+- `usedOneTimePreKeyId` (in `WrappedKey` and `X3DHInitiationResult`) is
+  now **base64url unpadded** (was standard base64 with `+/=`),
+  consistent with `@me2em/core` wire formats. **Breaking:**
+  envelopes produced before this change carry standard-base64 ids —
+  re-wrap them. `unwrapKeyForMe` is unaffected (the id is metadata
+  for the caller; it is not decoded during unwrap).
 - `engines.node` floor raised to `>=22.0.0` (A2, applied workspace-wide:
   root, core, crypto, react).
 - Docs: `completeX3DH`/`unwrapKeyForMe` TSDoc and the README x3dh

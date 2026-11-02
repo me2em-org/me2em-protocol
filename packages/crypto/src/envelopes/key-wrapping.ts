@@ -26,7 +26,7 @@ export interface WrappedKey {
   /** Initiator's Ed25519 identity public key — needed by the
    * recipient to complete X3DH. */
   initiatorIdentityPublicKey: Uint8Array;
-  /** Base64 of the consumed OTK public key — recipient uses it
+  /** Base64url (unpadded) of the consumed OTK public key — recipient uses it
    * to select their matching OTK private key. */
   usedOneTimePreKeyId: string;
   /** Envelope version. */
