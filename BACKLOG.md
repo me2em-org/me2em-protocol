@@ -7,9 +7,16 @@ original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —
 tag `v1.0.0-rc.1` on the publish source `9bcf0f3`; verified by
 dist-tags and a clean-install consumer smoke (all four core exports).
-The react/crypto publishes follow separately (react on readiness,
-crypto after the pending rework) — their npm lines are still the
-alphas (react 0.1.0-alpha.2, crypto 0.1.0-alpha.1).
+**@me2em/crypto 1.0.0-rc.1 published as `latest`** the same day —
+published with `--tag rc`, then re-pointed via `npm dist-tag add`,
+the `rc` tag removed (core convention: no prerelease tag next to
+`latest`); git tag `crypto-v1.0.0-rc.1` on `095b29b`. Verified by
+dist-tags and a clean-install consumer smoke: 54 exports, runtime
+deps exactly `@me2em/core ^1.0.0-rc.1`, `@scure/base ^2.4.0`,
+`@scure/bip39 ^1.6.0`, `hash-wasm ^4.12.0` — the BL-41/BL-45 fixes
+are visible in the published manifest. The react publish follows
+separately (react on readiness) — its npm line is still the alpha
+(0.1.0-alpha.2).
 This document is **advisory** — a recommendation list for future
 development, not part of the shipped API contract.
 
@@ -120,9 +127,14 @@ development, not part of the shipped API contract.
   `--tag latest`, so a plain `npm install @me2em/core` resolves to
   1.0.0-rc.1 (verified via dist-tags). The `alpha` tag stays at
   0.7.0-alpha.2 — exact pins are unaffected, and `dist-tag rm` is
-  declined for now (it would break `@alpha` consumers). Still open:
-  re-point @me2em/react `latest` (0.1.0-alpha.1) when the react rc.1
-  line publishes.
+  declined for now (it would break `@alpha` consumers). Crypto half
+  **done (2026-11-03)**: @me2em/crypto 1.0.0-rc.1 published with
+  `--tag rc`, then `latest` re-pointed via `npm dist-tag add` and the
+  `rc` tag removed (core convention: no prerelease tag next to
+  `latest`) — a plain `npm install @me2em/crypto` resolves to
+  1.0.0-rc.1 (verified via dist-tags). Still open: re-point
+  @me2em/react `latest` (0.1.0-alpha.1) when the react rc.1 line
+  publishes.
 - **BL-39 · open · Audit vendor / bug bounty search (D7, PLAN-LTS §9).**
   The search starts **at the developer's discretion** — there is no
   fixed PR deadline (amended 2026-11-01 per architect: the old
@@ -133,16 +145,14 @@ development, not part of the shipped API contract.
   (D7) before v1.0.0 (see the DR-6 entry). Architect-owned track
   (PLAN-LTS §9, outside agent scope); tracked here so the track is
   not lost between PRs.
-- **BL-41 · open · Reconcile `@me2em/crypto` dependency spec with
+- **BL-41 · done · Reconcile `@me2em/crypto` dependency spec with
   DR-4 before the crypto rc.1 publish (O2).**
-  `packages/crypto/package.json` declares `"@me2em/core":
-  "workspace:*"`; DR-4 mandates `workspace:^` for cross-package
-  deps — `pnpm publish` substitutes `workspace:*` with the EXACT
-  workspace version (the react 0.1.0-alpha.1 incident). Fix is a
-  one-line spec change + lockfile refresh; must land before the
-  crypto 1.0.0-rc.1 publish (flagged in the PR-B review, 2026-11-03).
-  *(In review: PR #43 — `workspace:^` + lockfile; pack check proves
-  `^1.0.0-rc.1` substitution.)*
+  Shipped (PR #43): `packages/crypto/package.json` declares
+  `"@me2em/core": "workspace:^"` + lockfile refresh; the pack check
+  proved the tarball carries `^1.0.0-rc.1`, and the published
+  manifest itself now confirms the substitution — the exact-pin
+  incident class (react 0.1.0-alpha.1) is closed for crypto. Landed
+  before the crypto 1.0.0-rc.1 publish (2026-11-03), as required.
 - **BL-43 · done · Password char-selection modulo bias.**
   Shipped (PR #44): `generateSecurePassword` now takes every random
   index — per-class selection (8 guaranteed slots), fill, and
@@ -412,9 +422,9 @@ quotes in this entry are intentional).
 
 | Layer | Package | Status |
 |---|---|---|
-| 0 — primitives | `@me2em/core` | ✅ alpha (0.7.0-alpha.2) — LTS program started (DR-6) |
+| 0 — primitives | `@me2em/core` | ✅ rc (1.0.0-rc.1) — published as npm `latest` (DR-6) |
 | 1 — react bindings | `@me2em/react` | ✅ alpha (0.1.0-alpha.2) |
-| 2 — protocol mechanisms | `@me2em/crypto` | ✅ alpha (0.1.0-alpha.1) |
+| 2 — protocol mechanisms | `@me2em/crypto` | ✅ rc (1.0.0-rc.1) — published as npm `latest` |
 | 3 — verticals | `@me2em/messenger` | planned (BL-29, pilot: BeSafeChat) |
 | 3 — verticals | `@me2em/iot` | deferred (BL-30) |
 | — | `@me2em/server` | planned (reference NestJS, with BL-22) |
