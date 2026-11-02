@@ -1,7 +1,7 @@
 # Me2eM Protocol — Development Backlog
 
-Baseline: core · react · crypto all at **1.0.0-rc.1** (647 tests =
-core 364 · crypto 181 · react 102). tsc/build-docs clean per package.
+Baseline: core · react · crypto all at **1.0.0-rc.1** (648 tests =
+core 364 · crypto 182 · react 102). tsc/build-docs clean per package.
 The API-freeze release candidate of the LTS program (PR-12); the
 original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —
@@ -141,6 +141,8 @@ development, not part of the shipped API contract.
   workspace version (the react 0.1.0-alpha.1 incident). Fix is a
   one-line spec change + lockfile refresh; must land before the
   crypto 1.0.0-rc.1 publish (flagged in the PR-B review, 2026-11-03).
+  *(In review: PR #43 — `workspace:^` + lockfile; pack check proves
+  `^1.0.0-rc.1` substitution.)*
 - **BL-43 · done · Password char-selection modulo bias.**
   Shipped (PR #44): `generateSecurePassword` now takes every random
   index — per-class selection (8 guaranteed slots), fill, and
@@ -155,6 +157,31 @@ development, not part of the shipped API contract.
   `255 % 26 = 21` → `'v'`; the pin asserts `'v'` can never appear
   (flagged during the PR-C review (#38, 2026-11-03); non-blocking for
   rc.1 per the architect's review decision).
+- **BL-45 · done · Phantom dep `@scure/bip39` broke the crypto dist
+  at runtime.**
+  Shipped (PR #45): `src/validation/seed.ts` imported `@scure/bip39`
+  without declaring it; tsup inlined the (undeclared) package and the
+  inlined copy's `import { utils } from '@scure/base'` fails against
+  `@scure/base` 2.x (post-F6, no `utils` export) — a module-level
+  SyntaxError made `dist/index.js` unimportable for consumers while
+  the src-based vitest suite stayed green (found 2026-11-03 while
+  re-running the bias script against the built artifact). Fix:
+  declare `"@scure/bip39": "^1.6.0"` (externalized; same 1.x family
+  as core) + `test/dist-artifact.spec.ts` smoke pinning the published
+  graph. Evidence: uniform-null χ² on the PRE-fix dist = 145–146
+  (FAIL, bias detected); post-fix = 80 / 89 (PASS, E = df = 87).
+  Blocks the crypto rc.1 publish until merged.
+- **BL-46 · open · `@noble/curves` and `@noble/hashes` are runtime
+  imports declared as devDependencies (same phantom class, non-breaking).**
+  `src/core/ecdh.ts` imports `@noble/curves/ed25519.js`; HKDF/Argon2
+  paths use `@noble/hashes` — both are devDeps, so tsup INLINES ~11
+  chunks of noble code into `dist/index.js` instead of externalizing
+  (dist works — noble is self-contained — but the published artifact
+  ships a private noble copy, the dep graph lies to consumers, and
+  dedup with `@me2em/core`'s noble is lost). Fix: move both to
+  `dependencies` (version ranges already match core's) + rebuild.
+  Non-blocking for rc.1 (runtime-safe); resolve before or with the
+  crypto publish — same file, same review pass as BL-45.
 
 ## P3 — Protocol Extensions (0.8+)
 

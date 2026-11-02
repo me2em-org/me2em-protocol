@@ -73,6 +73,9 @@ importers:
       '@scure/base':
         specifier: ^2.4.0
         version: 2.4.0
+      '@scure/bip39':
+        specifier: ^1.6.0
+        version: 1.6.0
       hash-wasm:
         specifier: ^4.12.0
         version: 4.12.0
@@ -3105,7 +3108,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.28.2)(yaml@2.9.0))
+      vitest: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.27.7)(yaml@2.9.0))
 
   '@vitest/expect@4.1.11':
     dependencies:
