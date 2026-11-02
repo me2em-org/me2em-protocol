@@ -70,6 +70,25 @@ describe('generateSecurePassword', () => {
     const p2 = generateSecurePassword(16);
     expect(p2).not.toBe(p1);
   });
+
+  it('all characters come from the declared charset', () => {
+    // Uniformity of the shuffle distribution is verified OUTSIDE CI by
+    // scripts/password-shuffle-bias.mjs (selection-corrected chi-square
+    // over 50k samples, df = 87) — see the randomIntBelow JSDoc
+    // (F2: unbiased Fisher-Yates). CI pins only the charset and shape
+    // invariants.
+    const lower = 'abcdefghijklmnopqrstuvwxyz';
+    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const digits = '0123456789';
+    const special = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    const allowed = new Set([...(lower + upper + digits + special)]);
+    for (let i = 0; i < 25; i++) {
+      const pw = generateSecurePassword(16);
+      for (const ch of pw) {
+        expect(allowed.has(ch)).toBe(true);
+      }
+    }
+  });
 });
 
 describe('quickPasswordValidation', () => {

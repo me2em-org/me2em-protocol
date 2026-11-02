@@ -23,6 +23,16 @@ describe('normalizeSeedPhrase', () => {
     const result = normalizeSeedPhrase('   ');
     expect(result).toEqual([]);
   });
+
+  it('NFKC folds fullwidth letters to ASCII (consistent with @me2em/core)', () => {
+    const result = normalizeSeedPhrase('ａｂａｎｄｏｎ ａｒｔ');
+    expect(result).toEqual(['abandon', 'art']);
+  });
+
+  it('NFKC folds compatibility forms inside array input', () => {
+    const result = normalizeSeedPhrase(['ａｂａｎｄｏｎ', 'ABANDON']);
+    expect(result).toEqual(['abandon', 'abandon']);
+  });
 });
 
 describe('validateSeedPhrase', () => {
@@ -72,5 +82,24 @@ describe('validateSeedPhrase', () => {
     expect(result.isValid).toBe(false);
     expect(result.wordCount).toBe(13);
     expect(result.error).toContain('13');
+  });
+
+  it('NFKC: fullwidth spelling of a valid phrase validates like ASCII', () => {
+    const phrase = [
+      'abandon', 'ability', 'able', 'about', 'above', 'absent',
+      'absorb', 'abstract', 'absurd', 'abuse', 'access', 'ability',
+    ];
+    // Control: the ASCII spelling is a valid checksum phrase.
+    expect(validateSeedPhrase(phrase).isValid).toBe(true);
+
+    // Fullwidth mapping a..z (U+FF41..U+FF5A) — a compatibility form
+    // that must fold to ASCII via NFKC and validate identically.
+    const toFullwidth = (w: string): string =>
+      [...w]
+        .map((c) => String.fromCharCode(c.charCodeAt(0) - 0x61 + 0xff41))
+        .join('');
+    const result = validateSeedPhrase(phrase.map(toFullwidth));
+    expect(result.isValid).toBe(true);
+    expect(result.invalidWords).toEqual([]);
   });
 });

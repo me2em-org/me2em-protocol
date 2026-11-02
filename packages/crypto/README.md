@@ -76,15 +76,16 @@ const { ciphertext, iv } = await encryptAead(key, plaintext);
 Key derivation and password utilities.
 
 - **hashIdentityMaterial** — hPK pattern: deterministic SHA-256 derivative of an identity private key, scoped by identity ID. RAM-only, never persist.
-- **Argon2id** — Password-based KDF with configurable profiles (`INTERACTIVE`, `SENSITIVE`). Includes salt generation and verification.
-- **Password validation** — Strength validation and HIBP (Have I Been Pwned) breach checking.
-- **Seed validation** — BIP39 mnemonic validation and normalization.
+- **Argon2id** — Password-based KDF with configurable profiles (`INTERACTIVE`, `SENSITIVE`). Includes salt generation and verification. Passwords are **NFKC-normalized** before hashing (consistent with `@me2em/core` canonicalization) — hashes produced before NFKC was introduced will not verify for non-canonical passwords; re-derive.
+- **Password validation** — Strength validation and HIBP (Have I Been Pwned) breach checking. `generateSecurePassword` uses an **unbiased** (rejection-sampled) Fisher-Yates shuffle; its distribution is verified by `scripts/password-shuffle-bias.mjs` (outside CI).
+- **Seed validation** — BIP39 mnemonic validation and normalization with **NFKC folding** — fullwidth and other compatibility-form mnemonics validate the same as their ASCII spellings.
 
 ```ts
-import { deriveKeyArgon2id, ARGON2_PROFILES } from '@me2em/crypto';
+import { deriveKeyArgon2id, generateArgon2Salt } from '@me2em/crypto';
 
-const result = await deriveKeyArgon2id(password, ARGON2_PROFILES.INTERACTIVE);
-// result.key → 32 bytes, result.salt → for storage
+const salt = generateArgon2Salt('INTERACTIVE');
+const result = await deriveKeyArgon2id(password, salt, 'INTERACTIVE');
+// result.key → 32 bytes, result.salt → store alongside the hash
 ```
 
 ### x3dh/
