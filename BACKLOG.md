@@ -1,7 +1,7 @@
 # Me2eM Protocol — Development Backlog
 
-Baseline: core · react · crypto all at **1.0.0-rc.1** (646 tests =
-core 364 · crypto 180 · react 102). tsc/build-docs clean per package.
+Baseline: core · react · crypto all at **1.0.0-rc.1** (647 tests =
+core 364 · crypto 181 · react 102). tsc/build-docs clean per package.
 The API-freeze release candidate of the LTS program (PR-12); the
 original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —
@@ -141,14 +141,20 @@ development, not part of the shipped API contract.
   workspace version (the react 0.1.0-alpha.1 incident). Fix is a
   one-line spec change + lockfile refresh; must land before the
   crypto 1.0.0-rc.1 publish (flagged in the PR-B review, 2026-11-03).
-- **BL-43 · open · Password char-selection modulo bias.**
-  `generateSecurePassword` picks the character class per position and
-  the fill character with plain modulo (`bytes[k] % classSize`,
-  `bytes[i] % all.length`) — a ±5% within-class skew on the 26-char
-  classes. NOT covered by F2 (which fixed the shuffle only). Fix is
-  small: reuse the F2 rejection-sampling helper `randomIntBelow` for
-  both selections. Flagged during the PR-C review (#38, 2026-11-03);
-  does not block rc.1 — tracked per the architect's review decision.
+- **BL-43 · done · Password char-selection modulo bias.**
+  Shipped (PR #44): `generateSecurePassword` now takes every random
+  index — per-class selection (8 guaranteed slots), fill, and
+  shuffle — from the F2 rejection-sampling helper `randomIntBelow`; the
+  ±5% within-class skew on the 26-char classes is gone. The dead
+  `randomBytes` selection path and its import are removed; the
+  `password-shuffle-bias.mjs` null model collapses from
+  selection-corrected to uniform-within-class (the same χ² now guards
+  selection AND shuffle). CI pins the fix deterministically: a
+  scripted `getRandomValues` queue feeds `0xffffffff` (in the rejected
+  partial-residue class for n = 26) — a modulo-based path would yield
+  `255 % 26 = 21` → `'v'`; the pin asserts `'v'` can never appear
+  (flagged during the PR-C review (#38, 2026-11-03); non-blocking for
+  rc.1 per the architect's review decision).
 
 ## P3 — Protocol Extensions (0.8+)
 

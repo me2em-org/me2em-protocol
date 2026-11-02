@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Statistical verification for the F2 fix (unbiased Fisher-Yates in
+ * Statistical verification for the F2 + BL-43 fixes (unbiased
+ * Fisher-Yates AND unbiased per-class selection / fill in
  * `generateSecurePassword`, `src/validation/password.ts`).
  *
  * NOT part of the CI suite — slow and statistical by nature (see the
@@ -16,46 +17,38 @@
  * 2 special — no random-fill slots), so the multiset the fair
  * Fisher-Yates draws position 0 from is exactly known.
  *
- * The NULL MODEL below is the exact distribution of position 0 for a
- * FAIR shuffle on top of the CURRENT selection step, which uses
- * modulo-biased byte picks (`bytes[k] % classSize` — deliberately NOT
- * touched by F2; F2 scope is the shuffle only):
+ * NULL MODEL — exact distribution of position 0 after BL-43, where
+ * EVERY random index (per-class selection, fill, shuffle) comes from
+ * the rejection-sampled `randomIntBelow` helper:
  *
- *   P(byte pick selects class char c) =
- *       floor(256/m)/256 + (cIndex < 256 % m ? 1/256 : 0),  m = class size
- *   P(pos0 = c) = 2 · P(pick c) / 8            (two class slots, fair FY)
+ *   P(selection picks class char c) = 1/m,  m = class size   (BL-43)
+ *   P(pos0 = c) = 2 · (1/m) / 8                              (fair FY)
  *
- * (The original ТЗ sketch assumed a uniform distribution over the
- * whole charset — statistically wrong twice: the charset is 88 chars,
- * not 94, and length-8 class weights are 0.25 each regardless of
- * within-class selection probabilities. A naive uniform test at 50k
- * samples partly detects the KNOWN selection bias and flakes at the
- * ~p=0.001 boundary — χ² ≈ 130 on df = 87 was observed against the
- * uniform model. The selection-corrected model below has
- * E[χ²] = df exactly, so excess χ² measures SHUFFLE fairness, which
- * is what F2 changed.)
+ * History: pre-F2 the shuffle reused selection bytes with
+ * modulo-biased swap indices; pre-BL-43 the SELECTION step kept
+ * modulo-biased byte picks (`bytes[k] % classSize`, ±5% within the
+ * 26-char classes), and this script then ran with a
+ * selection-corrected null model
+ * (`P(pick c) = floor(256/m)/256 + (cIndex < 256 % m ? 1/256 : 0)`)
+ * that ABSORBED that known bias so excess χ² isolated the shuffle.
+ * With BL-43 the bias is gone, the model collapses to uniform within
+ * each class, and the same χ² now guards BOTH the shuffle and the
+ * selection path.
  *
  * Verdict: pass if Pearson χ² < 140 on df = 87 (z ≈ 4 above the mean
- * under the corrected null; conservative against false fails) AND the
- * class-level χ² < 16.27 (p = 0.001, df = 3 — class weights are
- * exactly 0.25 each and selection-bias-immune). Exit 0 — pass;
- * exit 1 — distribution suspect: re-check after ANY change to the
- * shuffle or selection path before shipping.
+ * under the uniform-selection null; conservative against false fails)
+ * AND the class-level χ² < 16.27 (p = 0.001, df = 3 — class weights
+ * are exactly 0.25 each). Exit 0 — pass; exit 1 — distribution
+ * suspect: re-check after ANY change to the shuffle or selection
+ * path before shipping.
  *
- * Power note: the pre-fix shuffle defects (modulo-biased swap indices
- * + reuse of the selection bytes) are largely BELOW the noise floor
- * of 50k samples — this script is a regression guard for gross
- * distribution errors, not a proof of perfect uniformity. The
- * unbiasedness of `randomIntBelow` itself follows from the rejection
- * construction: accepted 32-bit values form an exactly divisible
- * range, so every residue mod n is equiprobable.
- *
- * KNOWN RESIDUAL ISSUE (out of F2 scope, flagged to the architect):
- * the char-SELECTION step (`bytes[k] % classSize` for the guaranteed
- * slots and `bytes[i] % all.length` for the fill) is still
- * modulo-biased (±5% within lower/upper/special at 26-char classes).
- * The null model below absorbs it; fixing it would be a separate
- * decision (reuse `randomIntBelow` for selection/fill).
+ * Power note: residual defects below the noise floor of 50k samples
+ * (e.g. a single-count skew of a few units) are not detectable — this
+ * script is a regression guard for gross distribution errors, not a
+ * proof of perfect uniformity. The unbiasedness of `randomIntBelow`
+ * itself follows from the rejection construction: accepted 32-bit
+ * values form an exactly divisible range, so every residue mod n is
+ * equiprobable.
  */
 import { generateSecurePassword } from '../dist/index.js';
 
@@ -66,24 +59,14 @@ const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const DIGITS = '0123456789';
 const SPECIAL = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 
-// Exact selection probability for a class char at byte-index residue
-// r: byte % m favors residues 0..(256 % m - 1).
-function selectionProb(char, classStr) {
-  const m = classStr.length;
-  const base = Math.floor(256 / m);
-  const r = classStr.indexOf(char);
-  if (r < 0) return 0;
-  return base / 256 + (r < 256 % m ? 1 / 256 : 0);
-}
-
-// Null model: P(pos0 = c) = 2 · selectionProb(c) / 8 under a fair
-// Fisher-Yates over the length-8 guaranteed-slot multiset.
+// Null model (BL-43): selection is rejection-sampled — uniform within
+// each class — so a class char c (class size m) lands at position 0
+// with probability 2 · (1/m) / 8 under a fair Fisher-Yates.
 function expectedProb(char) {
-  if (LOWER.includes(char) || UPPER.includes(char)) {
-    return (2 * selectionProb(char, LOWER.includes(char) ? LOWER : UPPER)) / 8;
-  }
-  if (DIGITS.includes(char)) return (2 * selectionProb(char, DIGITS)) / 8;
-  if (SPECIAL.includes(char)) return (2 * selectionProb(char, SPECIAL)) / 8;
+  if (LOWER.includes(char)) return (2 / LOWER.length) / 8;
+  if (UPPER.includes(char)) return (2 / UPPER.length) / 8;
+  if (DIGITS.includes(char)) return (2 / DIGITS.length) / 8;
+  if (SPECIAL.includes(char)) return (2 / SPECIAL.length) / 8;
   throw new Error(`Unexpected char in output: ${char}`);
 }
 
@@ -117,8 +100,8 @@ const DF = chars.length - 1; // 88 chars → df = 87
 const CRITICAL = 140; // z ≈ 4 above E[χ²] = df under the corrected null
 
 // Class-level summary: each class owns exactly 0.25 of position 0
-// (two guaranteed slots of eight) — immune to within-class selection
-// bias, so this check needs no correction.
+// (two guaranteed slots of eight) — independent of within-class
+// selection probabilities, so this check needs no correction.
 const classes = {
   lower: { count: 0 },
   upper: { count: 0 },
@@ -139,7 +122,7 @@ const classChi = Object.values(classes).reduce((acc, cls) => {
 
 console.log(`samples               : ${SAMPLES} (length 8)`);
 console.log(`charset cells         : ${chars.length} (df = ${DF})`);
-console.log(`null model            : selection-corrected (see header)`);
+console.log(`null model            : uniform selection (BL-43) + fair FY (F2)`);
 console.log(`chi-square (per char) : ${chi.toFixed(2)}  | critical ${CRITICAL}`);
 console.log(`chi-square (per class): ${classChi.toFixed(2)}  | critical 16.27 (p=0.001, df=3)`);
 for (const [name, cls] of Object.entries(classes)) {
@@ -154,7 +137,7 @@ const max = Math.max(...observed);
 console.log(`per-char counts min/max: ${min} / ${max}`);
 
 if (chi >= CRITICAL || classChi >= 16.27) {
-  console.error('FAIL: shuffle distribution suspect — investigate before shipping.');
+  console.error('FAIL: password distribution suspect — investigate before shipping.');
   process.exit(1);
 }
-console.log('PASS: shuffle distribution consistent with the unbiased-shuffle model.');
+console.log('PASS: distribution consistent with unbiased selection (BL-43) + unbiased shuffle (F2).');

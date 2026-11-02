@@ -1,5 +1,4 @@
 // packages/crypto/src/validation/password.ts
-import { randomBytes } from '../utils/binary.js';
 
 /**
  * Result of password strength validation.
@@ -288,9 +287,9 @@ export async function validatePasswordStrength(
  * values in the final partial residue class, which makes every
  * residue exactly equiprobable.
  *
- * Statistical verification of the resulting shuffle distribution
- * lives in `scripts/password-shuffle-bias.mjs` (not in CI — slow and
- * statistical by nature).
+ * Statistical verification of the resulting distribution (shuffle AND
+ * per-class selection, BL-43) lives in `scripts/password-shuffle-bias.mjs`
+ * (not in CI — slow and statistical by nature).
  *
  * @param n - Upper exclusive bound; MUST be >= 1 (internal invariant).
  * @returns A uniform integer in `[0, n)`.
@@ -309,9 +308,10 @@ function randomIntBelow(n: number): number {
  *
  * Guarantees at least 2 characters of each type (lowercase, uppercase,
  * digit, special) and fills the rest with Fisher-Yates shuffled
- * characters from the full charset. The shuffle is UNBIASED:
- * rejection-sampled fresh random per swap (no modulo bias, no reuse
- * of the selection bytes).
+ * characters from the full charset. Every random index — per-class
+ * selection, fill, and shuffle — comes from the rejection-sampled
+ * `randomIntBelow` helper: no modulo bias anywhere (BL-43), no reuse
+ * of selection bytes.
  *
  * @param length - Password length (default 16). Minimum 8.
  * @returns A random password string.
@@ -331,29 +331,32 @@ export function generateSecurePassword(length: number = 16): string {
   const special = '!@#$%^&*()_+-=[]{}|;:,.<>?';
   const all = lower + upper + digits + special;
 
-  const bytes = randomBytes(length);
   const chars: string[] = [];
 
-  // Guarantee at least 2 of each type
-  chars.push(lower[bytes[0] % lower.length]);
-  chars.push(upper[bytes[1] % upper.length]);
-  chars.push(digits[bytes[2] % digits.length]);
-  chars.push(special[bytes[3] % special.length]);
-  chars.push(lower[bytes[4] % lower.length]);
-  chars.push(upper[bytes[5] % upper.length]);
-  chars.push(digits[bytes[6] % digits.length]);
-  chars.push(special[bytes[7] % special.length]);
+  // Guarantee at least 2 of each type. Selection uses the same
+  // rejection-sampled helper as the shuffle (BL-43): a naive
+  // `byte % classSize` skewed each 26-char class by ±5% (22 of 256
+  // byte values spill past 26*9=234 onto the first residues).
+  chars.push(lower[randomIntBelow(lower.length)]);
+  chars.push(upper[randomIntBelow(upper.length)]);
+  chars.push(digits[randomIntBelow(digits.length)]);
+  chars.push(special[randomIntBelow(special.length)]);
+  chars.push(lower[randomIntBelow(lower.length)]);
+  chars.push(upper[randomIntBelow(upper.length)]);
+  chars.push(digits[randomIntBelow(digits.length)]);
+  chars.push(special[randomIntBelow(special.length)]);
 
   // Fill the rest
   for (let i = 8; i < length; i++) {
-    chars.push(all[bytes[i] % all.length]);
+    chars.push(all[randomIntBelow(all.length)]);
   }
 
   // Unbiased Fisher-Yates: fresh 4-byte random per swap,
-  // rejection-sampled (see randomIntBelow). The previous
-  // implementation reused the same random bytes that selected the
-  // first 8 characters (double-use) and took modulo-biased indices,
-  // which skewed the password distribution.
+  // rejection-sampled (see randomIntBelow). The pre-F2 implementation
+  // reused the selection bytes (double-use) and took modulo-biased
+  // swap indices; the pre-BL-43 implementation still took
+  // modulo-biased CHARACTER indices — both skew the password
+  // distribution.
   for (let i = chars.length - 1; i > 0; i--) {
     const j = randomIntBelow(i + 1);
     [chars[i], chars[j]] = [chars[j], chars[i]];
