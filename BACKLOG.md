@@ -4,6 +4,12 @@ Baseline: core · react · crypto all at **1.0.0-rc.1** (602 tests =
 core 350 · crypto 151 · react 101). tsc/build-docs clean per package.
 The API-freeze release candidate of the LTS program (PR-12); the
 original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
+npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —
+tag `v1.0.0-rc.1` on the publish source `9bcf0f3`; verified by
+dist-tags and a clean-install consumer smoke (all four core exports).
+The react/crypto publishes follow separately (react on readiness,
+crypto after the pending rework) — their npm lines are still the
+alphas (react 0.1.0-alpha.2, crypto 0.1.0-alpha.1).
 This document is **advisory** — a recommendation list for future
 development, not part of the shipped API contract.
 
@@ -100,12 +106,14 @@ development, not part of the shipped API contract.
   Pending: branch protection with required checks (Build & Test,
   CodeQL, CodeQL SAST, gitleaks) — precondition (2+ stable green
   runs) met.
-- **BL-37 · open · npm dist-tag maintenance.** `latest` for
-  @me2em/core points at 0.4.1-alpha.1 and for @me2em/react at
-  0.1.0-alpha.1, while new releases ship under the `alpha` tag. When
-  versions stabilize, re-point `latest` (`npm dist-tag add
-  @me2em/core@<ver> latest`) so a plain `npm install @me2em/core`
-  resolves to the current line.
+- **BL-37 · in-progress · npm dist-tag maintenance.** Core half
+  **done (2026-11-03)**: the @me2em/core rc.1 publish shipped with
+  `--tag latest`, so a plain `npm install @me2em/core` resolves to
+  1.0.0-rc.1 (verified via dist-tags). The `alpha` tag stays at
+  0.7.0-alpha.2 — exact pins are unaffected, and `dist-tag rm` is
+  declined for now (it would break `@alpha` consumers). Still open:
+  re-point @me2em/react `latest` (0.1.0-alpha.1) when the react rc.1
+  line publishes.
 - **BL-39 · open · Audit vendor / bug bounty search (D7, PLAN-LTS §9).**
   The search starts **at the developer's discretion** — there is no
   fixed PR deadline (amended 2026-11-01 per architect: the old
