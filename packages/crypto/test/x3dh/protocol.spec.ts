@@ -1,5 +1,6 @@
 // packages/crypto/test/x3dh/protocol.spec.ts
 import { describe, it, expect } from 'vitest';
+import { base64urlnopad } from '@scure/base';
 import {
   generateX25519KeyPair,
   verifyRaw,
@@ -97,6 +98,32 @@ describe('initiateX3DH', () => {
     );
 
     expect(sharedB).toEqual(result.sharedSecret);
+  });
+
+  it('usedOneTimePreKeyId is base64url (no +, /, =)', async () => {
+    const alice = randomIdentity();
+    const bob = randomIdentity();
+    const bobSPK = generateSignedPreKey(bob);
+    const bobOTK = generateX25519KeyPair();
+
+    const bundle: PreKeyBundle = {
+      identityPublicKey: bob.publicKey,
+      signedPreKeyPublicKey: bobSPK.keyPair.publicKey,
+      signedPreKeySignature: bobSPK.signature,
+      oneTimePreKeyPublicKey: bobOTK.publicKey,
+    };
+    verifySignedPreKey(bundle, bob.publicKey);
+
+    const result = await initiateX3DH(alice, bundle);
+
+    expect(result.usedOneTimePreKeyId).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(result.usedOneTimePreKeyId).not.toContain('+');
+    expect(result.usedOneTimePreKeyId).not.toContain('/');
+    expect(result.usedOneTimePreKeyId).not.toContain('=');
+
+    // Round-trip: the id decodes back to the bundle's OTK public key.
+    const decoded = base64urlnopad.decode(result.usedOneTimePreKeyId!);
+    expect(decoded).toEqual(bobOTK.publicKey);
   });
 
   it('freshness: two initiations produce different ephemeral keys and secrets', async () => {

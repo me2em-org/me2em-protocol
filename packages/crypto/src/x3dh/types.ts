@@ -75,6 +75,6 @@ export interface X3DHInitiationResult {
   /** The initiator's ephemeral public key (32B X25519) — MUST be
    * transmitted to the recipient in the first message. */
   ephemeralPublicKey: Uint8Array;
-  /** Which OTK was consumed (base64 of its public key), if any. */
+  /** Which OTK was consumed (base64url unpadded of its public key), if any. */
   usedOneTimePreKeyId?: string;
 }

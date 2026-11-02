@@ -1,7 +1,7 @@
 # Me2eM Protocol — Development Backlog
 
-Baseline: core · react · crypto all at **1.0.0-rc.1** (602 tests =
-core 350 · crypto 151 · react 101). tsc/build-docs clean per package.
+Baseline: core · react · crypto all at **1.0.0-rc.1** (644 tests =
+core 364 · crypto 178 · react 102). tsc/build-docs clean per package.
 The API-freeze release candidate of the LTS program (PR-12); the
 original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —
@@ -65,7 +65,7 @@ development, not part of the shipped API contract.
 
 ## P2 — Robustness, Infrastructure & Package Strategy
 
-- **BL-31 · in-progress · Replay window for channels.**
+- **BL-31 · done · Replay window for channels.**
   Implemented in `crypto/replay-window` (security-batch item F7,
   2026-11-03): sliding
   window of the last 1000 successfully decrypted sequences per
@@ -73,7 +73,7 @@ development, not part of the shipped API contract.
   bounded out-of-order delivery accepted, FIFO eviction (evicted
   sequences can replay again — documented trade-off), failed decrypts
   do not consume window slots, window resets on epoch rotation.
-  Closes on merge.
+  Merged as #37 (2026-11-03).
 - **BL-32 · open · PreKeyStorage IDB implementation.**
   The `PreKeyStorage` contract (persisted SPK/OTK batches under the
   non-extractable cache key) is defined but only the in-memory test
@@ -135,6 +135,14 @@ development, not part of the shipped API contract.
   workspace version (the react 0.1.0-alpha.1 incident). Fix is a
   one-line spec change + lockfile refresh; must land before the
   crypto 1.0.0-rc.1 publish (flagged in the PR-B review, 2026-11-03).
+- **BL-43 · open · Password char-selection modulo bias.**
+  `generateSecurePassword` picks the character class per position and
+  the fill character with plain modulo (`bytes[k] % classSize`,
+  `bytes[i] % all.length`) — a ±5% within-class skew on the 26-char
+  classes. NOT covered by F2 (which fixed the shuffle only). Fix is
+  small: reuse the F2 rejection-sampling helper `randomIntBelow` for
+  both selections. Flagged during the PR-C review (#38, 2026-11-03);
+  does not block rc.1 — tracked per the architect's review decision.
 
 ## P3 — Protocol Extensions (0.8+)
 

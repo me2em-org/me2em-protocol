@@ -1,5 +1,6 @@
 // packages/crypto/src/x3dh/protocol.ts
 
+import { base64urlnopad } from '@scure/base';
 import { hkdf } from '../core/hkdf.js';
 import {
   generateX25519KeyPair,
@@ -8,7 +9,7 @@ import {
   ed25519PubToX25519,
 } from '../core/ecdh.js';
 import { signRaw, verifyRaw } from '../core/signatures.js';
-import { concat, toBase64 } from '../utils/binary.js';
+import { concat } from '../utils/binary.js';
 import { throwCryptoError } from '../errors.js';
 import { secureWipe } from '../core/wipe.js';
 import type {
@@ -203,7 +204,10 @@ export async function initiateX3DH(
     ikm = concat(dh1, dh2, dh3, dh4);
     const sharedSecret = await hkdf(ikm, new Uint8Array(32), X3DH_INFO, 32);
 
-    const usedOneTimePreKeyId = toBase64(opkB_xPub);
+    // URL-safe envelope id (F6): unpadded base64url of the consumed
+    // OTK public key — consistent with @me2em/core wire formats. Opaque
+    // metadata for the caller (never decoded during unwrap).
+    const usedOneTimePreKeyId = base64urlnopad.encode(opkB_xPub);
 
     return { sharedSecret, ephemeralPublicKey: ek.publicKey, usedOneTimePreKeyId };
   } finally {
