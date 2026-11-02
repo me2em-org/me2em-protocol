@@ -19,7 +19,11 @@ export function renderHookCapturingError(
   callback: () => unknown
 ): { captured: { message: string } | null; rerender: () => void } {
   let captured: { message: string } | null = null;
-  const spy = (globalThis as any).console?.error;
+  type MockedConsoleError = {
+    mockImplementation: (impl: (...args: unknown[]) => void) => void;
+  };
+  const spy = (globalThis as { console?: { error?: MockedConsoleError } })
+    .console?.error;
   if (spy) {
     spy.mockImplementation((...args: unknown[]) => {
       const msg = args[0];

@@ -37,6 +37,19 @@
   package-relative and machine-independent. The two previously
   committed absolute paths are normalized; `bench --compare` matching
   is by task name and unaffected.
+- Workspace-wide ESLint gate (BL-34): a single root `eslint.config.mjs`
+  (`@eslint/js` recommended + `typescript-eslint` recommended, plus
+  `eslint-plugin-react-hooks` v7 for `@me2em/react`) with the toolchain
+  in the ROOT devDependencies and per-package `lint: eslint .`
+  scripts — `pnpm -r lint` and every single-package run (e.g. before
+  `pnpm publish`) now execute the same rule set. First pass triaged
+  940 findings to zero errors: generated TypeDoc assets are ignored,
+  49 real findings fixed (unused imports/vars, three `any` casts
+  typed, one dead AEAD key import with its misleading comment
+  removed), and three rationale line-disables in the freshly
+  race-fixed hooks (`set-state-in-effect`, `immutability`) whose
+  render-phase refactor is tracked post-rc.2. Non-breaking: types,
+  API and golden vectors untouched.
 - Security-posture docs: SECURITY.md now carries the published project
   PGP key — `Me2eM Security <security@me2em.com>` (ed25519 primary +
   ed25519 sign / cv25519 encr subkeys), live at

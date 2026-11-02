@@ -41,6 +41,7 @@ export function useIdentityContext(
     let cancelled = false;
 
     if (!identity) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing the stale async state when identity is gone (generation-ticket effect from the load-race fix); set-during-render refactor is a tracked post-rc.2 follow-up
       setContext(null);
       setIsLoaded(true);
       setError(null);

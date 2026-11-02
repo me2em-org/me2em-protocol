@@ -28,7 +28,7 @@ export function SeedPhraseDisplay({
   const handleCopy = async () => {
     if (status === 'revealed' && copyCount === 0) {
       try {
-        await (navigator as any).clipboard.writeText(words.join(' '));
+        await navigator.clipboard.writeText(words.join(' '));
         dispatch({ type: 'COPY', at: Date.now() });
         setCopyFailed(false);
         onCopyAllowed?.();

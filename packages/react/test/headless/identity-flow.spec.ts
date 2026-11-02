@@ -55,7 +55,6 @@ describe('identityFlowReducer', () => {
   });
 
   it('CONFIRM_WORDS from idle does not change state', () => {
-    const original = { ...initialIdentityFlowState };
     const event: IdentityFlowEvent = { type: 'CONFIRM_WORDS' };
     const result = identityFlowReducer(initialIdentityFlowState, event);
 

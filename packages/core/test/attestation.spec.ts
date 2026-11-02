@@ -3,7 +3,6 @@ import { describe, it, expect } from 'vitest';
 import {
   Attestation,
   ATTESTATION_TYPE,
-  ATTESTATION_MAX_PAYLOAD,
 } from '../src/index.js';
 import { base64urlDecode, base64urlEncode } from '../src/util.js';
 import { ed25519 } from '@noble/curves/ed25519.js';

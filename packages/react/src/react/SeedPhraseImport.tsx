@@ -1,5 +1,5 @@
 // packages/react/src/react/SeedPhraseImport.tsx
-import { useReducer, useCallback, useEffect, useRef } from 'react';
+import { useReducer, useEffect, useRef } from 'react';
 import {
   importFlowReducer,
   initImportState,

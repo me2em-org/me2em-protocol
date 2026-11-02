@@ -10,6 +10,7 @@ export function useHandle(name: string): Handle | null {
   useEffect(() => {
     let cancelled = false;
     if (!identity) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing the stale async result when identity is gone; set-during-render refactor is a tracked post-rc.2 follow-up
       setHandle(null);
       return;
     }

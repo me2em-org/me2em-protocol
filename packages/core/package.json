@@ -24,7 +24,7 @@
     "bench": "vitest bench --run",
     "bench:baseline": "vitest bench --run --outputJson bench/baseline.json && node scripts/normalize-baseline.mjs",
     "vectors": "tsc -p tsconfig.json && node --experimental-strip-types scripts/generate-vectors.ts",
-    "lint": "eslint src",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "build-docs": "typedoc"
   },
@@ -45,7 +45,6 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "^4.1.11",
-    "eslint": "^10.4.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   }

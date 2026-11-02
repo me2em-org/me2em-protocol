@@ -3,7 +3,6 @@ import { describe, it, expect } from 'vitest';
 import {
   deriveKeyArgon2id,
   generateArgon2Salt,
-  ARGON2_PROFILES,
   verifyArgon2,
 } from '../../src/kdf/argon2.js';
 import { CryptoError } from '../../src/errors.js';

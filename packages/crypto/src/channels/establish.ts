@@ -1,7 +1,6 @@
 // packages/crypto/src/channels/establish.ts
 
 import { hkdfWithInfo } from '../core/hkdf.js';
-import { importAeadKey } from '../core/aead.js';
 import { toHex, concat } from '../utils/binary.js';
 import { setInternals } from './state.js';
 import { throwCryptoError } from '../errors.js';
@@ -82,9 +81,9 @@ export async function establishChannel(
   const channelIdHash = await sha256Bytes(concat(sharedSecret, saltBytes));
   const channelId = toHex(channelIdHash).slice(0, 32);
 
-  const rootKey = await importAeadKey(rootMaterial);
-  // rootKey is non-extractable AES-GCM CryptoKey; used for AEAD ops.
-  // rootKeyMaterial is the raw 32B backing store in internals.
+  // The raw root key material is stored in internals; AEAD keys are
+  // imported from it per operation (non-extractable CryptoKeys are
+  // not kept on the channel object).
 
   const channel: Channel = {
     channelId,

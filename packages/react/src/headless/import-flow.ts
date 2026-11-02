@@ -1,5 +1,5 @@
 // packages/react/src/headless/import-flow.ts
-import { validateSeedPhrase, type SeedStrength } from '@me2em/core';
+import { validateSeedPhrase } from '@me2em/core';
 
 export type ImportStatus = 'entering' | 'valid' | 'invalid';
 
