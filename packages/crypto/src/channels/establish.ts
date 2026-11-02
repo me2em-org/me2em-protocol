@@ -3,6 +3,7 @@
 import { hkdfWithInfo } from '../core/hkdf.js';
 import { toHex, concat } from '../utils/binary.js';
 import { setInternals } from './state.js';
+import { secureWipe } from '../core/wipe.js';
 import { throwCryptoError } from '../errors.js';
 import type { Channel } from './types.js';
 
@@ -78,8 +79,18 @@ export async function establishChannel(
     32
   );
 
-  const channelIdHash = await sha256Bytes(concat(sharedSecret, saltBytes));
-  const channelId = toHex(channelIdHash).slice(0, 32);
+  // channelId = SHA-256(sharedSecret ‖ salt). The combined buffer is
+  // secret-derived material — wiped on every exit path (digest failure
+  // must not leave it behind). The caller's sharedSecret buffer is
+  // NOT touched (it may back several channels with different salts).
+  const combined = concat(sharedSecret, saltBytes);
+  let channelId: string;
+  try {
+    const channelIdHash = await sha256Bytes(combined);
+    channelId = toHex(channelIdHash).slice(0, 32);
+  } finally {
+    secureWipe(combined);
+  }
 
   // The raw root key material is stored in internals; AEAD keys are
   // imported from it per operation (non-extractable CryptoKeys are

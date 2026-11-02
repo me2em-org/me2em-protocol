@@ -87,28 +87,37 @@ export async function wrapKeyForRecipient(
 
   const x3dh = await initiateX3DH(params.myIdentity, params.recipientBundle);
 
-  const wrapKey = await hkdfWithInfo(x3dh.sharedSecret, params.contextSalt, params.info, 32);
+  // Memory hygiene: the X3DH shared secret and the wrapping key
+  // derived from it are wiped on EVERY exit path — an import or
+  // encrypt failure must not leave live key bytes behind.
+  try {
+    const wrapKey = await hkdfWithInfo(x3dh.sharedSecret, params.contextSalt, params.info, 32);
 
-  const aeadKey = await importAeadKey(wrapKey);
+    try {
+      const aeadKey = await importAeadKey(wrapKey);
 
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertextBuf = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    aeadKey,
-    params.keyBytes
-  );
-  const ciphertext = new Uint8Array(ciphertextBuf);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertextBuf = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        aeadKey,
+        params.keyBytes
+      );
+      const ciphertext = new Uint8Array(ciphertextBuf);
 
-  secureWipe(wrapKey);
-
-  return {
-    wrappedKey: ciphertext,
-    iv,
-    ephemeralPublicKey: x3dh.ephemeralPublicKey,
-    initiatorIdentityPublicKey: params.myIdentity.publicKey,
-    usedOneTimePreKeyId: x3dh.usedOneTimePreKeyId!,
-    v: 1,
-  };
+      return {
+        wrappedKey: ciphertext,
+        iv,
+        ephemeralPublicKey: x3dh.ephemeralPublicKey,
+        initiatorIdentityPublicKey: params.myIdentity.publicKey,
+        usedOneTimePreKeyId: x3dh.usedOneTimePreKeyId!,
+        v: 1,
+      };
+    } finally {
+      secureWipe(wrapKey);
+    }
+  } finally {
+    secureWipe(x3dh.sharedSecret);
+  }
 }
 
 export interface UnwrapKeyParams {
@@ -118,7 +127,10 @@ export interface UnwrapKeyParams {
   /** Recipient's SPK (the one matching the bundle the initiator used). */
   mySignedPreKey: SignedPreKey;
   /** Recipient's OTK matching usedOneTimePreKeyId — REQUIRED
-   * (initiateX3DH enforces OTK; unwrap mirrors it). */
+   * (initiateX3DH enforces OTK; unwrap mirrors it).
+   * ⚠️ Consumed: the private key is wiped IN PLACE by completeX3DH
+   * (session-bound ephemeral-key model) — pass a copy if retention
+   * is needed. */
   myOneTimePreKey: OneTimePreKey;
   contextSalt: Uint8Array;
   info: string;
@@ -128,6 +140,9 @@ export interface UnwrapKeyParams {
  * Unwraps a key envelope on the recipient side. Completes the
  * same X3DH the initiator started, derives the identical wrapping
  * key, decrypts.
+ *
+ * Memory hygiene: the X3DH shared secret and the wrapping key are
+ * wiped on every exit path — including DECRYPTION_FAILED.
  *
  * @throws {CryptoError} 'DECRYPTION_FAILED' if the envelope was
  *   wrapped for a different key set (wrong OTK / wrong identity),
@@ -149,13 +164,22 @@ export async function unwrapKeyForMe(
     params.wrapped.ephemeralPublicKey
   );
 
-  const wrapKey = await hkdfWithInfo(sharedSecret, params.contextSalt, params.info, 32);
+  // Memory hygiene: same discipline as wrapKeyForRecipient — the
+  // shared secret and the wrapping key are wiped on every exit
+  // path, including DECRYPTION_FAILED.
+  try {
+    const wrapKey = await hkdfWithInfo(sharedSecret, params.contextSalt, params.info, 32);
 
-  const aeadKey = await importAeadKey(wrapKey);
+    try {
+      const aeadKey = await importAeadKey(wrapKey);
 
-  const plaintext = await decryptAead(aeadKey, params.wrapped.wrappedKey, params.wrapped.iv);
+      const plaintext = await decryptAead(aeadKey, params.wrapped.wrappedKey, params.wrapped.iv);
 
-  secureWipe(wrapKey);
-
-  return plaintext;
+      return plaintext;
+    } finally {
+      secureWipe(wrapKey);
+    }
+  } finally {
+    secureWipe(sharedSecret);
+  }
 }

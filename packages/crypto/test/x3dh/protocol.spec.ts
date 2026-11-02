@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   generateX25519KeyPair,
   verifyRaw,
+  signRaw,
 } from '../../src/index.js';
 import {
   generateSignedPreKey,
@@ -247,5 +248,153 @@ describe('completeX3DH', () => {
     );
 
     expect(sharedB).toEqual(result.sharedSecret);
+  });
+});
+
+describe('completeX3DH — OTK consumption (session-bound ephemeral-key model)', () => {
+  it('wipes the OTK private key in place; identity and SPK keys untouched', async () => {
+    const alice = randomIdentity();
+    const bob = randomIdentity();
+
+    const bobSPK = generateSignedPreKey(bob);
+    const bobOTK = generateX25519KeyPair();
+
+    const bundle: PreKeyBundle = {
+      identityPublicKey: bob.publicKey,
+      signedPreKeyPublicKey: bobSPK.keyPair.publicKey,
+      signedPreKeySignature: bobSPK.signature,
+      oneTimePreKeyPublicKey: bobOTK.publicKey,
+    };
+    verifySignedPreKey(bundle, bob.publicKey);
+
+    const result = await initiateX3DH(alice, bundle);
+
+    const idPrivBefore = new Uint8Array(bob.privateKey);
+    const spkPrivBefore = new Uint8Array(bobSPK.keyPair.privateKey);
+    const otkPriv = new Uint8Array(bobOTK.privateKey); // the consumed buffer
+
+    const shared = await completeX3DH(
+      bob,
+      bobSPK,
+      { keyPair: { privateKey: otkPriv, publicKey: bobOTK.publicKey } },
+      alice.publicKey,
+      result.ephemeralPublicKey
+    );
+
+    expect(shared.length).toBe(32);
+    expect(otkPriv.every(b => b === 0)).toBe(true); // consumed in place
+    expect(bob.privateKey).toEqual(idPrivBefore); // caller key intact
+    expect(bobSPK.keyPair.privateKey).toEqual(spkPrivBefore); // SPK intact
+  });
+
+  it('reuse of the wiped OTK derives a corrupted secret silently (no throw)', async () => {
+    const alice = randomIdentity();
+    const bob = randomIdentity();
+
+    const bobSPK = generateSignedPreKey(bob);
+    const bobOTK = generateX25519KeyPair();
+
+    const bundle: PreKeyBundle = {
+      identityPublicKey: bob.publicKey,
+      signedPreKeyPublicKey: bobSPK.keyPair.publicKey,
+      signedPreKeySignature: bobSPK.signature,
+      oneTimePreKeyPublicKey: bobOTK.publicKey,
+    };
+    verifySignedPreKey(bundle, bob.publicKey);
+
+    const r1 = await initiateX3DH(alice, bundle);
+    const otkPriv = new Uint8Array(bobOTK.privateKey);
+    const s1 = await completeX3DH(
+      bob,
+      bobSPK,
+      { keyPair: { privateKey: otkPriv, publicKey: bobOTK.publicKey } },
+      alice.publicKey,
+      r1.ephemeralPublicKey
+    );
+    expect(otkPriv.every(b => b === 0)).toBe(true);
+
+    // REUSE the wiped buffer with a second fresh ephemeral:
+    // no error is thrown — the corruption is silent.
+    const r2 = await initiateX3DH(alice, bundle);
+    const s2reused = await completeX3DH(
+      bob,
+      bobSPK,
+      { keyPair: { privateKey: otkPriv, publicKey: bobOTK.publicKey } },
+      alice.publicKey,
+      r2.ephemeralPublicKey
+    );
+
+    // Reference: what the INTACT OTK would derive for the same r2.
+    const s2ref = await completeX3DH(
+      bob,
+      bobSPK,
+      { keyPair: { privateKey: new Uint8Array(bobOTK.privateKey), publicKey: bobOTK.publicKey } },
+      alice.publicKey,
+      r2.ephemeralPublicKey
+    );
+
+    expect(s2reused).not.toEqual(s2ref); // corrupted ≠ canonical
+    expect(s2reused).not.toEqual(s1); // and ≠ the first session's secret
+  });
+});
+
+describe('X3DH error-path memory hygiene', () => {
+  it('malformed SPK public key (31B) in bundle → DH1 throws, partial intermediates wiped', async () => {
+    const alice = randomIdentity();
+    const bob = randomIdentity();
+
+    const bobSPK = generateSignedPreKey(bob);
+    const bobOTK = generateX25519KeyPair();
+
+    // A hostile bundle: the "SPK public key" is 31 bytes. The signature
+    // over those bytes is valid, so the MITM check passes — the DH
+    // length guard is what must stop it (and the finally-wipe must
+    // clean up everything derived before the throw).
+    const badSpkPub = bobSPK.keyPair.publicKey.slice(0, 31);
+    const badSig = signRaw(bob.privateKey, badSpkPub);
+
+    const bundle: PreKeyBundle = {
+      identityPublicKey: bob.publicKey,
+      signedPreKeyPublicKey: badSpkPub,
+      signedPreKeySignature: badSig,
+      oneTimePreKeyPublicKey: bobOTK.publicKey,
+    };
+
+    await expect(initiateX3DH(alice, bundle)).rejects.toThrow(CryptoError);
+  });
+
+  it('malformed ephemeral public key (31B) → DH1 throws on recipient side; unconsumed OTK stays usable', async () => {
+    const alice = randomIdentity();
+    const bob = randomIdentity();
+
+    const bobSPK = generateSignedPreKey(bob);
+    const bobOTK = generateX25519KeyPair();
+
+    const bundle: PreKeyBundle = {
+      identityPublicKey: bob.publicKey,
+      signedPreKeyPublicKey: bobSPK.keyPair.publicKey,
+      signedPreKeySignature: bobSPK.signature,
+      oneTimePreKeyPublicKey: bobOTK.publicKey,
+    };
+    verifySignedPreKey(bundle, bob.publicKey);
+
+    const result = await initiateX3DH(alice, bundle);
+
+    const badEkPub = result.ephemeralPublicKey.slice(0, 31);
+    const otkPriv = new Uint8Array(bobOTK.privateKey);
+
+    await expect(
+      completeX3DH(
+        bob,
+        bobSPK,
+        { keyPair: { privateKey: otkPriv, publicKey: bobOTK.publicKey } },
+        alice.publicKey,
+        badEkPub
+      )
+    ).rejects.toThrow(CryptoError);
+
+    // DH4 never ran — the OTK was NOT consumed: an earlier throw must
+    // leave the one-time pre-key usable for a real session.
+    expect(otkPriv.every(b => b === 0)).toBe(false);
   });
 });

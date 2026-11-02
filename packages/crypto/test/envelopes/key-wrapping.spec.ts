@@ -1,6 +1,8 @@
 // packages/crypto/test/envelopes/key-wrapping.spec.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { generateX25519KeyPair } from '../../src/index.js';
+import * as wipeNs from '../../src/core/wipe.js';
+import * as aeadNs from '../../src/core/aead.js';
 import { generateSignedPreKey, verifySignedPreKey } from '../../src/x3dh/protocol.js';
 import {
   wrapKeyForRecipient,
@@ -281,5 +283,119 @@ describe('wrapKeyForRecipient', () => {
         info: 'me2em/crypto/v1/group-key',
       })
     ).rejects.toThrow(CryptoError);
+  });
+});
+
+describe('memory hygiene on error paths (M1)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('encrypt failure → wrapKey + sharedSecret wiped (wrapKeyForRecipient)', async () => {
+    const alice = randomIdentity();
+    const bob = randomIdentity();
+
+    const bobSPK = generateSignedPreKey(bob);
+    const bobOTK = generateX25519KeyPair();
+
+    const bundle = makeBundle(bob, bobSPK, bobOTK.publicKey);
+    verifySignedPreKey(bundle, bob.publicKey);
+
+    const groupKey = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) groupKey[i] = i;
+
+    const wipeSpy = vi.spyOn(wipeNs, 'secureWipe');
+    let wipeCallsAtEncrypt = 0;
+    vi.spyOn(globalThis.crypto.subtle, 'encrypt').mockImplementation(
+      async (..._args: Parameters<typeof globalThis.crypto.subtle.encrypt>) => {
+        wipeCallsAtEncrypt = wipeSpy.mock.calls.length;
+        throw new Error('boom — simulated WebCrypto encrypt failure');
+      }
+    );
+
+    await expect(
+      wrapKeyForRecipient({
+        keyBytes: groupKey,
+        recipientBundle: bundle,
+        myIdentity: alice,
+        contextSalt: new TextEncoder().encode('wipe-test'),
+        info: 'me2em/crypto/v1/group-key',
+      })
+    ).rejects.toThrow('boom');
+
+    // Exactly two wipes must run on the error path AFTER the encrypt
+    // failure: the derived wrapKey (inner finally) and the X3DH shared
+    // secret (outer finally). The spy calls through, so both buffers
+    // must be zeroed by the time we inspect them.
+    const errorPathWipes = wipeSpy.mock.calls.slice(wipeCallsAtEncrypt);
+    expect(errorPathWipes.length).toBe(2);
+    const [wrapKeyBuf, sharedSecretBuf] = errorPathWipes.map(([b]) => b);
+    expect(wrapKeyBuf.length).toBe(32);
+    expect(sharedSecretBuf.length).toBe(32);
+    expect(wrapKeyBuf.every(b => b === 0)).toBe(true);
+    expect(sharedSecretBuf.every(b => b === 0)).toBe(true);
+    expect(wrapKeyBuf).not.toBe(sharedSecretBuf);
+  });
+
+  it('DECRYPTION_FAILED → wrapKey + sharedSecret wiped (unwrapKeyForMe)', async () => {
+    const alice = randomIdentity();
+    const bob = randomIdentity();
+
+    const bobSPK = generateSignedPreKey(bob);
+    const bobOTK = generateX25519KeyPair();
+
+    const bundle = makeBundle(bob, bobSPK, bobOTK.publicKey);
+
+    const groupKey = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) groupKey[i] = i;
+
+    const contextSalt = new TextEncoder().encode('wipe-unwrap-test');
+
+    const wrapped = await wrapKeyForRecipient({
+      keyBytes: groupKey,
+      recipientBundle: bundle,
+      myIdentity: alice,
+      contextSalt,
+      info: 'me2em/crypto/v1/group-key',
+    });
+
+    // Tamper one ciphertext byte → GCM auth failure → DECRYPTION_FAILED
+    const tampered = { ...wrapped, wrappedKey: new Uint8Array(wrapped.wrappedKey) };
+    tampered.wrappedKey[0] = (tampered.wrappedKey[0] + 1) % 256;
+
+    const bobOTKObj: OneTimePreKey = { keyPair: { privateKey: new Uint8Array(bobOTK.privateKey), publicKey: new Uint8Array(bobOTK.publicKey) } };
+
+    const wipeSpy = vi.spyOn(wipeNs, 'secureWipe');
+    const decryptOriginal = aeadNs.decryptAead;
+    let wipeCallsAtDecrypt = 0;
+    vi.spyOn(aeadNs, 'decryptAead').mockImplementation(
+      async (key, ciphertext, iv) => {
+        wipeCallsAtDecrypt = wipeSpy.mock.calls.length;
+        return decryptOriginal(key, ciphertext, iv);
+      }
+    );
+
+    await expect(
+      unwrapKeyForMe({
+        wrapped: tampered,
+        myIdentity: bob,
+        mySignedPreKey: bobSPK,
+        myOneTimePreKey: bobOTKObj,
+        contextSalt,
+        info: 'me2em/crypto/v1/group-key',
+      })
+    ).rejects.toThrow(CryptoError);
+
+    // completeX3DH's own wipes happened before decryptAead ran; on the
+    // DECRYPTION_FAILED path exactly two more wipes must run: the
+    // wrapKey (inner finally) then the shared secret (outer finally).
+    const errorPathWipes = wipeSpy.mock.calls.slice(wipeCallsAtDecrypt);
+    expect(errorPathWipes.length).toBe(2);
+    const [wrapKeyBuf, sharedSecretBuf] = errorPathWipes.map(([b]) => b);
+    expect(wrapKeyBuf.length).toBe(32);
+    expect(sharedSecretBuf.length).toBe(32);
+    expect(wrapKeyBuf.every(b => b === 0)).toBe(true);
+    expect(sharedSecretBuf.every(b => b === 0)).toBe(true);
+    expect(wrapKeyBuf).not.toBe(sharedSecretBuf);
   });
 });

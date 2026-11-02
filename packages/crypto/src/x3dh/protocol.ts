@@ -132,8 +132,15 @@ export function generateOneTimePreKeys(count: number): OneTimePreKey[] {
  * @param theirBundle - Recipient's PreKeyBundle (MUST be verified
  *   via verifySignedPreKey BEFORE calling this function).
  * @returns X3DHInitiationResult with shared secret and ephemeral pubkey.
+ *   The shared secret is the CALLER's responsibility — wipe it after
+ *   use (see `wrapKeyForRecipient` for the pattern).
  * @throws {CryptoError} 'VERIFICATION_FAILED' if SPK signature invalid,
  *   'INVALID_ARGUMENT' if bundle lacks OTK.
+ *
+ * Memory hygiene: every DH intermediate, the IKM, the derived
+ * Montgomery copy of the identity key and the ephemeral private key
+ * are wiped on ALL exit paths (success or throw) — a failed DH
+ * against a hostile bundle must not leak live key bytes.
  *
  * @example
  * ```ts
@@ -174,19 +181,38 @@ export async function initiateX3DH(
   const spkB_xPub = theirBundle.signedPreKeyPublicKey;
   const opkB_xPub = theirBundle.oneTimePreKeyPublicKey;
 
-  const dh1 = x25519SharedSecret(ikA_x, spkB_xPub);
-  const dh2 = x25519SharedSecret(ek.privateKey, ikB_xPub);
-  const dh3 = x25519SharedSecret(ek.privateKey, spkB_xPub);
-  const dh4 = x25519SharedSecret(ek.privateKey, opkB_xPub);
+  // Memory hygiene: dh1..dh4, the IKM, the derived Montgomery copy
+  // of our identity key and the ephemeral private key are wiped on
+  // ALL paths. NOT wiped (caller-owned, reused across sessions):
+  // the Ed25519 identity private key and the bundle's public keys.
+  let dh1: Uint8Array | undefined;
+  let dh2: Uint8Array | undefined;
+  let dh3: Uint8Array | undefined;
+  let dh4: Uint8Array | undefined;
+  let ikm: Uint8Array | undefined;
+  try {
+    dh1 = x25519SharedSecret(ikA_x, spkB_xPub);
+    // ikA_x is a derived single-use Montgomery copy (the Ed25519
+    // identity key itself is untouched) — wiped after its only use;
+    // the finally below re-wipes it idempotently if dh1 threw.
+    secureWipe(ikA_x);
+    dh2 = x25519SharedSecret(ek.privateKey, ikB_xPub);
+    dh3 = x25519SharedSecret(ek.privateKey, spkB_xPub);
+    dh4 = x25519SharedSecret(ek.privateKey, opkB_xPub);
 
-  const ikm = concat(dh1, dh2, dh3, dh4);
-  const sharedSecret = await hkdf(ikm, new Uint8Array(32), X3DH_INFO, 32);
+    ikm = concat(dh1, dh2, dh3, dh4);
+    const sharedSecret = await hkdf(ikm, new Uint8Array(32), X3DH_INFO, 32);
 
-  const usedOneTimePreKeyId = toBase64(opkB_xPub);
+    const usedOneTimePreKeyId = toBase64(opkB_xPub);
 
-  secureWipe(ek.privateKey);
-
-  return { sharedSecret, ephemeralPublicKey: ek.publicKey, usedOneTimePreKeyId };
+    return { sharedSecret, ephemeralPublicKey: ek.publicKey, usedOneTimePreKeyId };
+  } finally {
+    secureWipe(ikA_x);
+    secureWipe(ek.privateKey);
+    for (const buf of [dh1, dh2, dh3, dh4, ikm]) {
+      if (buf) secureWipe(buf);
+    }
+  }
 }
 
 /**
@@ -203,13 +229,27 @@ export async function initiateX3DH(
  * (zero-fallback prohibited on both sides). Passing undefined would
  * produce a different shared secret, breaking the protocol.
  *
+ * ⚠️ OTK CONSUMED: this function wipes
+ * `ourOneTimePreKey.keyPair.privateKey` IN PLACE after the DH that
+ * uses it (session-bound ephemeral-key model). Reusing the wiped
+ * buffer derives a corrupted secret SILENTLY — no error is thrown.
+ * Pass a copy if retention is needed. The identity and SPK private
+ * keys are NOT touched (they are reused across sessions).
+ *
  * @param ourIdentity - Recipient identity (private needed).
  * @param ourSignedPreKey - Recipient's SPK (private needed).
  * @param ourOneTimePreKey - The consumed OTK (private needed). Required.
  * @param theirIdentityPublicKey - Initiator identity public (32B Ed25519).
  * @param theirEphemeralPublicKey - From the first message (32B X25519).
  * @returns The same 32-byte shared secret as the initiator computed.
+ *   The shared secret is the CALLER's responsibility — wipe it after
+ *   use (see `unwrapKeyForMe` for the pattern).
  * @throws {CryptoError} 'INVALID_ARGUMENT' if ourOneTimePreKey is undefined.
+ *
+ * Memory hygiene: every DH intermediate, the IKM and the derived
+ * Montgomery copy of the identity key are wiped on ALL exit paths
+ * (success or throw); the OTK private key is wiped only after its
+ * DH actually ran — an unconsumed OTK stays usable.
  *
  * @example
  * ```ts
@@ -242,19 +282,35 @@ export async function completeX3DH(
   const spkB_xPriv = ourSignedPreKey.keyPair.privateKey;
   const ekA_xPub = theirEphemeralPublicKey;
 
-  const dh1 = x25519SharedSecret(spkB_xPriv, ikA_xPub);
-  const dh2 = x25519SharedSecret(ikB_x, ekA_xPub);
-  const dh3 = x25519SharedSecret(spkB_xPriv, ekA_xPub);
-  const dh4 = x25519SharedSecret(
-    ourOneTimePreKey.keyPair.privateKey,
-    ekA_xPub
-  );
-  secureWipe(ourOneTimePreKey.keyPair.privateKey);
+  // Memory hygiene: dh1..dh4 and the IKM are wiped on ALL paths;
+  // the derived Montgomery copy of our identity key (ikB_x) is
+  // wiped unconditionally. NOT wiped (caller-owned, reused across
+  // sessions): the identity private key and the SPK private key.
+  // The OTK private key is wiped in place ONLY after its DH ran —
+  // an unconsumed OTK (earlier throw) stays usable.
+  let dh1: Uint8Array | undefined;
+  let dh2: Uint8Array | undefined;
+  let dh3: Uint8Array | undefined;
+  let dh4: Uint8Array | undefined;
+  let ikm: Uint8Array | undefined;
+  try {
+    dh1 = x25519SharedSecret(spkB_xPriv, ikA_xPub);
+    dh2 = x25519SharedSecret(ikB_x, ekA_xPub);
+    dh3 = x25519SharedSecret(spkB_xPriv, ekA_xPub);
+    dh4 = x25519SharedSecret(
+      ourOneTimePreKey.keyPair.privateKey,
+      ekA_xPub
+    );
+    secureWipe(ourOneTimePreKey.keyPair.privateKey);
 
-  const ikm = concat(dh1, dh2, dh3, dh4);
-  const sharedSecret = await hkdf(ikm, new Uint8Array(32), X3DH_INFO, 32);
+    ikm = concat(dh1, dh2, dh3, dh4);
+    const sharedSecret = await hkdf(ikm, new Uint8Array(32), X3DH_INFO, 32);
 
-  secureWipe(ikB_x);
-
-  return sharedSecret;
+    return sharedSecret;
+  } finally {
+    secureWipe(ikB_x);
+    for (const buf of [dh1, dh2, dh3, dh4, ikm]) {
+      if (buf) secureWipe(buf);
+    }
+  }
 }
