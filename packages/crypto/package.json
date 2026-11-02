@@ -34,13 +34,12 @@
   },
   "dependencies": {
     "@me2em/core": "workspace:^",
+    "@noble/curves": "^1.8.1",
     "@scure/base": "^2.4.0",
     "@scure/bip39": "^1.6.0",
     "hash-wasm": "^4.12.0"
   },
   "devDependencies": {
-    "@noble/curves": "^1.8.1",
-    "@noble/hashes": "^2.2.0",
     "@vitest/coverage-v8": "^4.1.11",
     "tsup": "^8.0.0",
     "typedoc": "^0.26.11",
