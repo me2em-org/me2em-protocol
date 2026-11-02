@@ -115,4 +115,53 @@ describe('encryptMediaChunk / decryptMediaChunk', () => {
 
     expect(ivA).not.toEqual(ivB);
   });
+
+  it('DANGER: reusing fileKey + same recordingId + same chunkIndex leaks plaintext XOR (GCM keystream reuse)', async () => {
+    // ⚠️ This test documents WHY fileKey MUST be unique per file.
+    //
+    // AES-GCM: same key + same nonce → identical keystream. Two ciphertexts
+    // C1 = P1 ⊕ KS, C2 = P2 ⊕ KS → C1 ⊕ C2 = P1 ⊕ P2 — plaintext XOR leaks.
+    //
+    // `deriveChunkNonce` is deterministic by design (no IV storage). It is
+    // SAFE only because `generateFileKey()` returns a fresh random key per
+    // file. Reusing a fileKey across files — or regenerating it
+    // deterministically — reproduces the nonce under the same key, which is
+    // catastrophic for GCM. This test pins that danger.
+    const fileKey = generateFileKey();
+    const p1 = new Uint8Array(16).fill(0xaa);
+    const p2 = new Uint8Array(16).fill(0x55);
+
+    const { encrypted: c1 } = await encryptMediaChunk(fileKey, p1, 'same-rec', 0);
+    const { encrypted: c2 } = await encryptMediaChunk(fileKey, p2, 'same-rec', 0);
+
+    // C1 ⊕ C2 == P1 ⊕ P2 for the plaintext span (the rest is GCM tag,
+    // which differs — GCM uses key+nonce for the tag too, but the tag
+    // length makes byte-wise comparison only meaningful over plaintext).
+    const xorC = new Uint8Array(p1.length);
+    const xorP = new Uint8Array(p1.length);
+    for (let i = 0; i < p1.length; i++) {
+      xorC[i] = c1[i] ^ c2[i];
+      xorP[i] = p1[i] ^ p2[i];
+    }
+
+    expect(xorC).toEqual(xorP);
+    // If this test ever fails, the fileKey-reuse danger is gone (or the
+    // protocol has changed) — review before "fixing" it.
+  });
+
+  it('same fileKey + different recordingId → different ciphertext (recordingId is part of the nonce)', async () => {
+    // Integration-level pin of the recordingId domain separation: two
+    // encryptions with the same fileKey and chunkIndex but different
+    // recordingIds MUST produce different ciphertexts — otherwise the
+    // nonce would not depend on recordingId, and cross-recording reuse
+    // would leak.
+    const fileKey = generateFileKey();
+    const plaintext = new Uint8Array([1, 2, 3, 4, 5]);
+
+    const { encrypted: cA, iv: ivA } = await encryptMediaChunk(fileKey, plaintext, 'rec-A', 0);
+    const { encrypted: cB, iv: ivB } = await encryptMediaChunk(fileKey, plaintext, 'rec-B', 0);
+
+    expect(ivA).not.toEqual(ivB);          // nonce differs
+    expect(cA).not.toEqual(cB);            // ciphertext differs
+  });
 });

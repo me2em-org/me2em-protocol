@@ -1,7 +1,7 @@
 # Me2eM Protocol — Development Backlog
 
-Baseline: core · react · crypto all at **1.0.0-rc.1** (644 tests =
-core 364 · crypto 178 · react 102). tsc/build-docs clean per package.
+Baseline: core · react · crypto all at **1.0.0-rc.1** (646 tests =
+core 364 · crypto 180 · react 102). tsc/build-docs clean per package.
 The API-freeze release candidate of the LTS program (PR-12); the
 original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —

@@ -58,6 +58,13 @@ is frozen as of this version; additive changes land in 1.x minors.
   section now state that OTK consumption is destructive — the
   one-time pre-key private key is wiped IN PLACE after its DH;
   reuse derives a corrupted secret silently.
+- `media-chunks` (F4): tests pin the fileKey-reuse GCM danger and the
+  `recordingId` domain separation; README warns that `fileKey` MUST be
+  unique per file.
+- `toBase64` (M6): TSDoc warning — intermediate Latin-1 string is
+  immutable, safe for public data only.
+- `checkPasswordLeak` (M7): TSDoc warning — password + SHA-1 hash live
+  in memory until GC; fail-open is documented as advisory.
 
 ### Fixed
 - `generateSecurePassword` shuffle is now **unbiased**: rejection-
