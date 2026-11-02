@@ -54,6 +54,12 @@ development, not part of the shipped API contract.
   substitutes `workspace:*` with an EXACT version, which breaks
   consumers on every release (DR-4). Changesets adoption planned
   before 1.0.
+- Git tags: release tags are per-package — `<pkg>-v<version>`
+  (`crypto-v1.0.0-rc.1`, `react-v1.0.0-rc.1`, `crypto-v1.0.0-rc.2`,
+  …). Packages share version numbers but release from different
+  commits, so a bare `v<version>` is ambiguous. Historical exception:
+  `v1.0.0-rc.1` remains the core release tag; every tag created after
+  it uses the prefixed scheme.
 - Spec self-sufficiency: iteration specs must be executable in a fresh
   agent session — no references to prior conversations; all context
   inline.
