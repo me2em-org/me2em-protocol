@@ -1,5 +1,5 @@
 // packages/crypto/test/validation/password.spec.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   validatePasswordStrength,
   generateSecurePassword,
@@ -75,8 +75,8 @@ describe('generateSecurePassword', () => {
     // Uniformity of the shuffle distribution is verified OUTSIDE CI by
     // scripts/password-shuffle-bias.mjs (selection-corrected chi-square
     // over 50k samples, df = 87) — see the randomIntBelow JSDoc
-    // (F2: unbiased Fisher-Yates). CI pins only the charset and shape
-    // invariants.
+    // (F2: unbiased Fisher-Yates; BL-43: unbiased selection). CI pins
+    // only the charset and shape invariants.
     const lower = 'abcdefghijklmnopqrstuvwxyz';
     const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const digits = '0123456789';
@@ -87,6 +87,36 @@ describe('generateSecurePassword', () => {
       for (const ch of pw) {
         expect(allowed.has(ch)).toBe(true);
       }
+    }
+  });
+
+  it('selection is rejection-sampled, not modulo — BL-43 pin', () => {
+    // Deterministic, non-statistical. randomIntBelow draws 32-bit words
+    // from the global WebCrypto; the stub feeds a scripted queue and
+    // falls back to all-zero words. 0xffffffff sits in the final partial
+    // residue class for n=26 (max = 26·165191049 = 4294967274), so a
+    // correct implementation MUST discard it and redraw — the queued 0
+    // selects 'a'. A naive `word % n` would produce 0xffffffff % 26 = 21
+    // → 'v'; the pre-BL-43 byte-modulo path would take 255 % 26 = 21 →
+    // 'v' as well. Every later draw falls through to 0, so 'v' cannot
+    // enter through another lane: `not.toContain('v')` is exact, not
+    // statistical, and fails for ANY modulo-based selection.
+    const queue: number[] = [0xffffffff, 0];
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    spy.mockImplementation(
+      ((buf: Uint32Array) => {
+        buf.fill(queue.shift() ?? 0);
+        return buf;
+      }) as unknown as typeof globalThis.crypto.getRandomValues,
+    );
+    try {
+      const pw = generateSecurePassword(8);
+      expect(spy.mock.calls.length).toBeGreaterThan(0);
+      expect(pw.length).toBe(8);
+      expect(pw).toContain('a');
+      expect(pw).not.toContain('v');
+    } finally {
+      spy.mockRestore();
     }
   });
 });
