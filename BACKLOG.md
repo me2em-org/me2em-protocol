@@ -91,11 +91,15 @@ development, not part of the shipped API contract.
   `lint: eslint .` scripts; first pass triaged 940 findings to zero
   errors (generated TypeDoc assets ignored; 49 real findings fixed;
   three rationale line-disables in the freshly race-fixed hooks,
-  render-phase refactor tracked post-rc.2). Pending: the Lint step's
-  `continue-on-error: true` removal in `ci-security.yml` (diff
-  supplied in the PR-31 description; push needs Workflows scope),
-  audit blocking policy decision, branch protection after 2+ stable
-  green runs.
+  render-phase refactor tracked post-rc.2).
+  Shipped (PR-32): dependency audit is a **blocking gate**
+  (`pnpm audit --prod --audit-level high`), triage policy in
+  CONTRIBUTING.md → «Dependency audit policy»; the Lint
+  `continue-on-error` mask is removed (architect-applied hunks on
+  #31/#32; main green with both gates real: 1cf61fd, 5b3ff0f).
+  Pending: branch protection with required checks (Build & Test,
+  CodeQL, CodeQL SAST, gitleaks) — precondition (2+ stable green
+  runs) met.
 - **BL-37 · open · npm dist-tag maintenance.** `latest` for
   @me2em/core points at 0.4.1-alpha.1 and for @me2em/react at
   0.1.0-alpha.1, while new releases ship under the `alpha` tag. When
