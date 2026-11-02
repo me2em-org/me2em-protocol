@@ -63,10 +63,18 @@ export async function rotateChannel(channel: Channel): Promise<Channel> {
     role: channel.role,
   };
 
-  setInternals(newChannel, {
-    rootKeyMaterial: newRootMaterial,
-    lastDecryptedSeq: -1,
-  });
+  // Memory hygiene: if the internals hand-off fails, the fresh root
+  // material must not survive the failure — ownership flag + wipe.
+  let stored = false;
+  try {
+    setInternals(newChannel, {
+      rootKeyMaterial: newRootMaterial,
+      lastDecryptedSeq: -1,
+    });
+    stored = true;
+  } finally {
+    if (!stored) secureWipe(newRootMaterial);
+  }
 
   return newChannel;
 }

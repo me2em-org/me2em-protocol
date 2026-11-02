@@ -96,6 +96,13 @@ Canonical Signal X3DH key exchange.
 - **SPK/OTK management** — `generateSignedPreKey`, `generateOneTimePreKeys`, `verifySignedPreKey`.
 - **Replay guard** — OTK consumption ensures each envelope is unique.
 
+> ⚠️ **OTK consumption is destructive.** `completeX3DH` and
+> `unwrapKeyForMe` wipe `ourOneTimePreKey.keyPair.privateKey` IN PLACE
+> after the DH that uses it (session-bound ephemeral-key model). An OTK
+> is single-use: reusing the wiped buffer derives a corrupted secret
+> SILENTLY — no error is thrown. Pass a copy if retention is needed.
+> The identity and SPK private keys are never touched.
+
 ```ts
 import { initiateX3DH, completeX3DH, verifySignedPreKey } from '@me2em/crypto';
 

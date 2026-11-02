@@ -3,6 +3,7 @@
 import { hkdf } from '../core/hkdf.js';
 import { encryptAead, decryptAead } from '../core/aead.js';
 import { getInternals } from './state.js';
+import { secureWipe } from '../core/wipe.js';
 import { throwCryptoError } from '../errors.js';
 import type { Channel, ChannelMessage } from './types.js';
 
@@ -37,15 +38,20 @@ async function deriveMessageKey(
     32
   );
 
-  const keyBuf = await crypto.subtle.importKey(
-    'raw',
-    mkBytes.buffer as ArrayBuffer,
-    'AES-GCM',
-    false,  // non-extractable
-    ['encrypt', 'decrypt']
-  );
-
-  return keyBuf;
+  // importKey copies the buffer — the raw per-message key bytes are
+  // wiped right after the call, on every exit path (an import
+  // failure must not leave them behind).
+  try {
+    return await crypto.subtle.importKey(
+      'raw',
+      mkBytes.buffer as ArrayBuffer,
+      'AES-GCM',
+      false,  // non-extractable
+      ['encrypt', 'decrypt']
+    );
+  } finally {
+    secureWipe(mkBytes);
+  }
 }
 
 /**
