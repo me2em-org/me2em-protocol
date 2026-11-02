@@ -84,8 +84,9 @@ development, not part of the shipped API contract.
   Pending: eslint flat config for the whole workspace — devDep eslint
   v10 has NO `eslint.config.*` anywhere, so `pnpm -r lint` fails
   uniformly (masked by `continue-on-error`; found during PR-5),
-  audit blocking policy decision, branch protection after 2+ stable
-  green runs.
+  audit blocking policy decided (PR-32 — «Dependency audit policy» in
+  CONTRIBUTING; the gate hunk is architect-applied — Workflows scope),
+  branch protection after 2+ stable green runs.
 - **BL-37 · open · npm dist-tag maintenance.** `latest` for
   @me2em/core points at 0.4.1-alpha.1 and for @me2em/react at
   0.1.0-alpha.1, while new releases ship under the `alpha` tag. When
