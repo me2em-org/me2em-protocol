@@ -80,11 +80,12 @@ jobs:
       - name: Lint
         run: pnpm -r lint
 
-      # Информационный: advisory в глубине дерева не должны красить
-      # PR контрибьюторов. Блокирующий порог — отдельное решение.
+      # Блокирующий гейт (BL-34/P2): high/critical в prod-дереве не
+      # проходят. Dev-дерево информационное — не поставляется
+      # потребителям. Исключения — только с датой и обоснованием
+      # (CONTRIBUTING.md → «Dependency audit policy»).
       - name: Dependency audit
         run: pnpm audit --prod --audit-level high
-        continue-on-error: true
 
   # ─────────────────────────────────────────────────────────────
   # 3. CodeQL SAST — глубокий статический анализ

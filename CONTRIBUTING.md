@@ -134,6 +134,37 @@ Me2eM is a security-critical project. When working with crypto:
 - Aim for >90% coverage in `packages/core`.
 - Run coverage locally: `pnpm run test:coverage`
 
+## 🛡️ Dependency audit policy
+
+The CI gate is **blocking**: `pnpm audit --prod --audit-level high` must
+pass in `ci-security.yml` (Build & Test). The scope is the **prod tree** —
+the packages consumers actually install (`@noble/*`, `@scure/*`,
+`hash-wasm`). Advisories in the dev tree (test/build tooling) are
+informational: they never ship to consumers; keep them near zero with
+routine in-range refreshes (`pnpm -r up <pkg>`).
+
+When the gate fires on your PR:
+
+1. Open the GHSA from the audit output and decide whether the vulnerable
+   code path is reachable from our usage.
+2. A patched version exists → bump it: a direct dependency via
+   `pnpm -r up <pkg>`; a transitive one via a scoped `overrides` entry in
+   `pnpm-workspace.yaml` (the key matches the dependent's declared range,
+   the value forces the patched version). Keep the diff minimal.
+3. Unpatched **and** reachable → this is security work, not a CI fix:
+   follow [SECURITY.md](SECURITY.md) (acknowledgment ≤ 72 h, critical fix
+   ≤ 7 days) and coordinate with the maintainer.
+4. Unpatched **and** not reachable → force the known-good version via
+   `overrides` where semver-safe. If no safe pin exists, the gate may be
+   relaxed temporarily **only** with a dated comment in the workflow and
+   a tracking item stating the unblock condition — maintainer sign-off
+   required. Never silence an advisory without a dated justification.
+
+Note: upstream ignore lists (`audit.ignore` / `auditConfig.ignoreGhsas`)
+need a newer pnpm than our pinned 10.11.1 (verified: neither key is
+honored on 10.11.1); until `packageManager` is bumped, `overrides` is the
+only exception mechanism.
+
 ## 🤝 Review Process
 
 1. PR created → GitHub Actions CI runs automatically (lint, typecheck, test).

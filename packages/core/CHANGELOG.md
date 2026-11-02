@@ -396,6 +396,12 @@ mandate).
   `SubHandleMetadata` now DENY ALL instead of allowing everything
   (consistent with `AttestationGrant`). Use `undefined` for
   "unrestricted".
+- Dependency audit is now a **blocking CI gate** (BL-34/P2):
+  `pnpm audit --prod --audit-level high` fails the build on high/critical
+  advisories in the prod dependency tree. The shipped surface
+  (`@noble/*`, `@scure/*`, `hash-wasm`) is currently clean; dev-tree
+  (tooling) advisories stay informational. Triage protocol: CONTRIBUTING.md →
+  «Dependency audit policy».
 
 ### Fixed
 - `Attestation.verifySignature` returns `false` (instead of
