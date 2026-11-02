@@ -1,5 +1,5 @@
 // packages/react/src/headless/identity-context-storage.ts
-import { encryptContext, decryptContext, type ContextEnvelope } from './context-crypto.js';
+import { encryptContext, decryptContext } from './context-crypto.js';
 import type { IdentityContextData, IdentityContextStorage } from './identity-context-types.js';
 export type { IdentityContextData };
 
@@ -183,7 +183,7 @@ export class IdentityContextIDBStorage implements IdentityContextStorage {
     if (!db) {
       return null;
     }
-    return new Promise<CryptoKey | null>((resolve, reject) => {
+    return new Promise<CryptoKey | null>((resolve) => {
       const tx = db.transaction(KEYS_STORE_NAME, 'readonly');
       const store = tx.objectStore(KEYS_STORE_NAME);
       const request = store.get('cache');

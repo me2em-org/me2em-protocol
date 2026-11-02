@@ -1,5 +1,5 @@
 // packages/react/test/react/useSession.spec.tsx
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { Me2emProvider } from '../../src/react/Me2emProvider.js';
 import { useMe2emContext } from '../../src/react/context.js';

@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "lint": "eslint src",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "build-docs": "typedoc",
     "test:coverage": "vitest run --coverage"

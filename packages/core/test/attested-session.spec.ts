@@ -295,7 +295,7 @@ describe('verifyAttested: negative cases', () => {
     const A = await identity.attestHandle('station-001', grantA);
 
     const sub1 = await handle.deriveSubHandle('connector-1');
-    const sub2 = await handle.deriveSubHandle('connector-ccs');
+    await handle.deriveSubHandle('connector-ccs');
     const B = await handle.attestSubHandle('connector-ccs', grantB);
 
     const payloadBytes = new TextEncoder().encode(JSON.stringify({
@@ -320,14 +320,14 @@ describe('verifyAttested: negative cases', () => {
   });
 
   it('15. CHAIN_INCOMPLETE: subhandle с chain длины 1, handle с chain длины 2', async () => {
-    const { A, sub, session: subSession } = await makeSubSession();
+    const { A, session: subSession } = await makeSubSession();
     await expectCode(
       Session.verifyAttested(subSession.token, rootPub, [A.token], 'app.com'),
       'CHAIN_INCOMPLETE', 'FORMAT'
     );
 
     const { A: hA, session: hSession } = await makeHandleSession();
-    const subForExtra = await (await identity.deriveHandle('station-001')).deriveSubHandle('extra');
+    await (await identity.deriveHandle('station-001')).deriveSubHandle('extra');
     const extraB = await (await identity.deriveHandle('station-001')).attestSubHandle('extra', grantB);
     await expectCode(
       Session.verifyAttested(hSession.token, rootPub, [hA.token, extraB.token], 'app.com'),

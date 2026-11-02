@@ -10,7 +10,7 @@ const TEST_WORDS = ['abandon', 'ability', 'able', 'about', 'above', 'absent'];
 
 describe('SeedPhraseVerify', () => {
   it('renders grid buttons and progress text', () => {
-    const { container } = render(
+    render(
       <SeedPhraseVerify
         realWords={TEST_WORDS}
         gridSize={10}

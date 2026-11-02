@@ -14,7 +14,6 @@ import {
   Handle,
   Identity,
   Session,
-  SubHandle,
 } from '../src/index.js';
 import { TEST_SEED, createTestHandle } from './test-utils.js';
 

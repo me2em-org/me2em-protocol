@@ -8,8 +8,6 @@ let idCounter = 0;
 function makeId(): string {
   return `identity-test-${++idCounter}`;
 }
-const ID_A = makeId();
-const ID_B = makeId();
 
 function makeData(identityId: string): IdentityContextData {
   return {

@@ -1,7 +1,6 @@
 // packages/crypto/test/kdf/hash-identity.spec.ts
 import { describe, it, expect } from 'vitest';
 import { hashIdentityMaterial } from '../../src/kdf/hash-identity.js';
-import { CryptoError } from '../../src/errors.js';
 
 describe('hashIdentityMaterial', () => {
   it('is deterministic: same inputs produce same output', async () => {

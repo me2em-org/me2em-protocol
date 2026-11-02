@@ -1,7 +1,6 @@
 // packages/crypto/test/core/aead.spec.ts
 import { describe, it, expect } from 'vitest';
 import { importAeadKey, encryptAead, decryptAead } from '../../src/core/aead.js';
-import { CryptoError } from '../../src/errors.js';
 
 describe('importAeadKey', () => {
   it('accepts 32-byte key', async () => {
