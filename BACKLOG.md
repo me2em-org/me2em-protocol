@@ -91,7 +91,7 @@ development, not part of the shipped API contract.
   `lint: eslint .` scripts; first pass triaged 940 findings to zero
   errors (generated TypeDoc assets ignored; 49 real findings fixed;
   three rationale line-disables in the freshly race-fixed hooks,
-  render-phase refactor tracked post-rc.2).
+  render-phase refactor tracked post-1.0.0).
   Shipped (PR-32): dependency audit is a **blocking gate**
   (`pnpm audit --prod --audit-level high`), triage policy in
   CONTRIBUTING.md → «Dependency audit policy»; the Lint
