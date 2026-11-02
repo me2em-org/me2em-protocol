@@ -3,8 +3,20 @@
 /**
  * Encodes a Uint8Array to a standard Base64 string.
  *
- * Uses the Web API btoa which expects Latin-1 characters. Each byte is
+ * Uses the Web API `btoa` which expects Latin-1 characters. Each byte is
  * converted to its Latin-1 character before encoding.
+ *
+ * ⚠️ **Creates an intermediate Latin-1 string** (the `binary` accumulator
+ * below). JavaScript strings are immutable and cannot be zeroized — if the
+ * input contains secret bytes, the accumulator holds a copy until GC. The
+ * function is safe for PUBLIC data (signatures, public keys, OTK public
+ * keys) and for short-lived secrets already in transit; for long-lived
+ * secrets prefer `base64urlnopad.encode` (also allocates a string but is
+ * audited and doesn't grow the accumulator byte-by-byte) or keep the
+ * bytes raw and encode only at the transport boundary.
+ *
+ * See also: `fromBase64`, `signRawToBase64`, `randomBytesB64` — same caveat
+ * applies to any function returning a string derived from secret bytes.
  *
  * @param bytes - The byte array to encode.
  * @returns The Base64-encoded string.

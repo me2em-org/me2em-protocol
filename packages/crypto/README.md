@@ -140,8 +140,16 @@ X3DH-based key wrapping for offline recipients and deterministic media chunk enc
 - **wrapKeyForRecipient** — Wraps a 32-byte key (group key, file key) for an offline recipient via X3DH envelope. The envelope is self-contained: includes the initiator's Ed25519 identity public key so the recipient can complete X3DH.
 - **unwrapKeyForMe** — Recipient side: completes X3DH, derives the wrapping key, decrypts.
 - **generateFileKey** — Random 32-byte per-file key.
-- **deriveChunkNonce** — Deterministic 12-byte nonce from `(fileKey, recordingId, chunkIndex)` via HKDF. Safe because each file gets a unique key.
+- **deriveChunkNonce** — Deterministic 12-byte nonce from `(fileKey, recordingId, chunkIndex)` via HKDF. **Safety depends on `fileKey` uniqueness per file** — see the warning below.
 - **encryptMediaChunk / decryptMediaChunk** — Chunk-level AES-256-GCM with deterministic IVs. No IV storage needed — IV is recoverable from the file key.
+
+> ⚠️ **`fileKey` MUST be unique per file.** `deriveChunkNonce` is deterministic
+> (no IV storage) and safe ONLY because `generateFileKey()` returns a fresh
+> random 32-byte key per file. Reusing a `fileKey` with the same
+> `(recordingId, chunkIndex)` reproduces the nonce under the same key —
+> a catastrophic AES-GCM keystream reuse (ciphertext XOR leaks plaintext
+> XOR). Never re-derive, cache-and-share, or deterministically generate a
+> `fileKey` across files. Call `generateFileKey()` once per file.
 
 ```ts
 import { wrapKeyForRecipient, generateFileKey, encryptMediaChunk } from '@me2em/crypto';

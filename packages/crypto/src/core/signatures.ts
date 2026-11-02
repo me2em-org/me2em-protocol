@@ -71,6 +71,9 @@ export function verifyRaw(
  * @returns Base64-encoded 64-byte signature.
  * @throws {CryptoError} 'SIGNATURE_FAILED' if key length ≠ 32.
  *
+ * Note: signatures are public (not secret), so the string allocation in
+ * `toBase64` is safe here — see `toBase64`'s caveat.
+ *
  * @example
  * ```ts
  * const sigB64 = signRawToBase64(privKey, data);

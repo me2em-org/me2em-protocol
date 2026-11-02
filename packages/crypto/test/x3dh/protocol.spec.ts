@@ -122,6 +122,7 @@ describe('initiateX3DH', () => {
     expect(result.usedOneTimePreKeyId).not.toContain('=');
 
     // Round-trip: the id decodes back to the bundle's OTK public key.
+    expect(result.usedOneTimePreKeyId).toBeDefined();
     const decoded = base64urlnopad.decode(result.usedOneTimePreKeyId!);
     expect(decoded).toEqual(bobOTK.publicKey);
   });

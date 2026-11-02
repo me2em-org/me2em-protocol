@@ -50,6 +50,16 @@ const SEQUENTIAL_PATTERNS = [
  * and matches against the full response. Fail-open: network errors return
  * false (does not block the user).
  *
+ * ⚠️ **Memory hygiene:** the password string and its SHA-1 hash (both
+ * immutable JavaScript strings) live in memory until GC — they cannot be
+ * zeroized. This is inherent to the API (password is `string`, and
+ * `crypto.subtle.digest` returns a buffer we immediately hex-encode). For
+ * high-security flows prefer keeping the password as raw bytes and
+ * using a byte-level HIBP client — out of scope for this helper.
+ *
+ * Fail-open: on network error, timeout (3s), or non-OK response, returns
+ * `false`. This is intentional — HIBP is an advisory check, not a gate.
+ *
  * @param password - The password to check.
  * @returns true if the password was found in a breach.
  * @throws Never — always returns a boolean.
@@ -152,6 +162,9 @@ function isCommonPassword(password: string): boolean {
  * Performs 7 checks: length ≥14, 4 character types, unique chars ≥12,
  * no repeats, no sequential patterns, not in common list, entropy ≥80 bits,
  * and HIBP breach check.
+ *
+ * Note: HIBP check (see `checkPasswordLeak`) is fail-open and holds the
+ * password + SHA-1 hash in memory until GC — inherent to the string API.
  *
  * @param password - The password to validate.
  * @returns A detailed validation result.
