@@ -2,7 +2,7 @@
 
 import { hkdfWithInfo } from '../core/hkdf.js';
 import { toHex, concat } from '../utils/binary.js';
-import { setInternals } from './state.js';
+import { setInternals, brandChannel } from './state.js';
 import { secureWipe } from '../core/wipe.js';
 import { throwCryptoError } from '../errors.js';
 import type { Channel } from './types.js';
@@ -49,7 +49,8 @@ async function sha256Bytes(data: Uint8Array): Promise<Uint8Array> {
  * @param role - Direction role: 'initiator' or 'recipient'.
  *   Defaults to 'initiator'. Affects nothing cryptographically
  *   (X3DH is symmetric), but useful for application-side audit.
- * @returns A Channel with epoch=0 and hidden internals.
+ * @returns A Channel with epoch=0 and hidden internals. The object
+ *   is brand-validated (D1) and frozen (D2) — all fields readonly.
  * @throws {CryptoError} If sharedSecret length is not 32 bytes.
  *
  * @example
@@ -96,16 +97,20 @@ export async function establishChannel(
   // imported from it per operation (non-extractable CryptoKeys are
   // not kept on the channel object).
 
+  // D1: brand the object BEFORE freezing (defineProperty throws on
+  // a frozen object); D2: freeze so the public fields are immutable.
   const channel: Channel = {
     channelId,
     epoch: 0,
     role,
   };
 
+  brandChannel(channel);
+
   setInternals(channel, {
     rootKeyMaterial: rootMaterial,
-    lastDecryptedSeq: -1,
+    seenSeqs: new Set<number>(),
   });
 
-  return channel;
+  return Object.freeze(channel);
 }

@@ -90,7 +90,7 @@ describe('encryptChannelMessage → decryptChannelMessage', () => {
     }
   });
 
-  it('strictly increasing replay protection: out-of-order decrypt rejected', async () => {
+  it('replay window: out-of-order decrypt within window accepted (F7)', async () => {
     const secret = randomSecret();
     const channel = await establishChannel(secret, 'ooo-test');
     const msgs = [
@@ -103,14 +103,14 @@ describe('encryptChannelMessage → decryptChannelMessage', () => {
     const d2 = await decryptChannelMessage(channel, msgs[2]);
     expect(d2[0]).toBe(2);
 
-    // Now seq 1 is ≤ lastDecryptedSeq(2) → replay
-    await expect(decryptChannelMessage(channel, msgs[1])).rejects.toMatchObject({
-      code: 'REPLAY_DETECTED',
-      level: 'CIPHER',
-    });
+    // Sliding window: seq 1 and seq 0 are inside the window → accepted
+    const d1 = await decryptChannelMessage(channel, msgs[1]);
+    expect(d1[0]).toBe(1);
+    const d0 = await decryptChannelMessage(channel, msgs[0]);
+    expect(d0[0]).toBe(0);
   });
 
-  it('third decrypt of seq=0 → replay error (strictly increasing)', async () => {
+  it('duplicate decrypt of seq=0 → replay error (inside the window)', async () => {
     const secret = randomSecret();
     const channel = await establishChannel(secret, 'replay-test');
     const msg0 = await encryptChannelMessage(channel, 0, new Uint8Array([0]));
@@ -135,11 +135,71 @@ describe('encryptChannelMessage → decryptChannelMessage', () => {
     const d1 = await decryptChannelMessage(channel, msg1);
     expect(d1[0]).toBe(42);
 
-    // Second decrypt with same seq → replay
+    // Second decrypt with same seq → replay (sequence still in window)
     await expect(decryptChannelMessage(channel, msg2)).rejects.toMatchObject({
       code: 'REPLAY_DETECTED',
       level: 'CIPHER',
     });
+  });
+
+  it('failed decrypt attempt does not consume a window slot', async () => {
+    const secret = randomSecret();
+    const channel = await establishChannel(secret, 'slot-test');
+    const msg = await encryptChannelMessage(channel, 7, new Uint8Array([7]));
+
+    // Tampered ciphertext → authentication failure
+    const tampered = { ...msg, ciphertext: new Uint8Array(msg.ciphertext) };
+    tampered.ciphertext[0] ^= 0xff;
+    await expect(decryptChannelMessage(channel, tampered)).rejects.toMatchObject({
+      code: 'DECRYPTION_FAILED',
+      level: 'CIPHER',
+    });
+
+    // seq 7 was never recorded — the honest message still decrypts
+    const d = await decryptChannelMessage(channel, msg);
+    expect(d[0]).toBe(7);
+  });
+
+  it('replay window eviction: after 1001 messages the oldest sequence can replay (documented trade-off)', async () => {
+    const secret = randomSecret();
+    const channel = await establishChannel(secret, 'evict-test');
+    const msgs: Awaited<typeof encryptChannelMessage>[] = [];
+    for (let i = 0; i <= 1000; i++) {
+      msgs.push(
+        await encryptChannelMessage(channel, i, new Uint8Array([i % 256]))
+      );
+    }
+    for (const m of msgs) {
+      await decryptChannelMessage(channel, m);
+    }
+
+    // Window now holds seq 1..1000 — seq 0 was evicted (FIFO)
+    const d0 = await decryptChannelMessage(channel, msgs[0]);
+    expect(d0[0]).toBe(0);
+
+    // Adding seq 0 evicted seq 1 — it replays too
+    const d1 = await decryptChannelMessage(channel, msgs[1]);
+    expect(d1[0]).toBe(1);
+
+    // Sequences still inside the window stay replay-protected
+    await expect(decryptChannelMessage(channel, msgs[1000])).rejects.toMatchObject({
+      code: 'REPLAY_DETECTED',
+      level: 'CIPHER',
+    });
+  }, 30000);
+
+  it('rotate resets the replay window: new-epoch seq reuse accepted', async () => {
+    const { rotateChannel } = await import('../../src/index.js');
+    const secret = randomSecret();
+    const channel0 = await establishChannel(secret, 'window-rotate');
+
+    const m0 = await encryptChannelMessage(channel0, 0, new Uint8Array([10]));
+    await decryptChannelMessage(channel0, m0);
+
+    const channel1 = await rotateChannel(channel0);
+    const m1 = await encryptChannelMessage(channel1, 0, new Uint8Array([20]));
+    const d1 = await decryptChannelMessage(channel1, m1);
+    expect(d1[0]).toBe(20);
   });
 
   it('decryption with wrong channel (different salt) → DECRYPTION_FAILED', async () => {

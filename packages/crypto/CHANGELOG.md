@@ -11,7 +11,34 @@ Release-candidate alignment with `@me2em/core` 1.0.0-rc.1 (the
 API-freeze release of the LTS program). The public API of this package
 is frozen as of this version; additive changes land in 1.x minors.
 
+### Added
+- `destroyChannel(channel)` — explicit channel teardown (D4): wipes
+  the root key material with the two-pass secure wipe schedule,
+  clears the replay window and drops the internals. The channel
+  object is permanently dead afterwards — every further operation
+  (encrypt, decrypt, rotate, a repeated destroy) throws
+  `INVALID_KEY`. Complements rotation: `rotateChannel` invalidates
+  the old object implicitly, `destroyChannel` invalidates the given
+  object on purpose (logout, conversation deletion, compromise
+  response).
+
 ### Changed
+- Replay protection is now a **sliding window** (F7 — behavioral
+  change). Previously a strictly-increasing sequence policy rejected
+  any non-advancing sequence; now the last 1000 successfully
+  decrypted sequences are remembered per channel
+  (`REPLAY_WINDOW_SIZE`): duplicates inside the window are rejected
+  (`REPLAY_DETECTED`), bounded out-of-order delivery is ACCEPTED,
+  and sequences evicted from the window can replay again (keep
+  retry buffers within the window and rotate high-volume channels).
+  The window resets on rotation (fresh epoch → fresh sequence
+  space); failed decrypt attempts do not consume window slots.
+- `Channel` objects are immutable and brand-validated (D1, D2):
+  all fields are `readonly`, the object is frozen at
+  establish/rotate (mutation attempts throw in strict mode), and
+  every channel API rejects impostor objects (plain look-alikes,
+  spread-clones) with `INVALID_ARGUMENT` — rotated-away and
+  destroyed channels keep the more precise `INVALID_KEY`.
 - `engines.node` floor raised to `>=22.0.0` (A2, applied workspace-wide:
   root, core, crypto, react).
 - Docs: `completeX3DH`/`unwrapKeyForMe` TSDoc and the README x3dh

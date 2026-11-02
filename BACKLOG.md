@@ -65,12 +65,15 @@ development, not part of the shipped API contract.
 
 ## P2 — Robustness, Infrastructure & Package Strategy
 
-- **BL-31 · open · Replay window for channels.**
-  Current protection: strictly increasing seq per direction — delayed
-  out-of-order messages are rejected as replays. Window-based
-  acceptance (like Signal's sliding window) allows bounded
-  out-of-order delivery. Requires: window bitmap per channel,
-  interaction with epoch rotation. Implementer: @me2em/crypto.
+- **BL-31 · in-progress · Replay window for channels.**
+  Implemented in `crypto/replay-window` (security-batch item F7,
+  2026-11-03): sliding
+  window of the last 1000 successfully decrypted sequences per
+  channel — duplicates inside the window rejected (REPLAY_DETECTED),
+  bounded out-of-order delivery accepted, FIFO eviction (evicted
+  sequences can replay again — documented trade-off), failed decrypts
+  do not consume window slots, window resets on epoch rotation.
+  Closes on merge.
 - **BL-32 · open · PreKeyStorage IDB implementation.**
   The `PreKeyStorage` contract (persisted SPK/OTK batches under the
   non-extractable cache key) is defined but only the in-memory test
@@ -124,6 +127,14 @@ development, not part of the shipped API contract.
   (D7) before v1.0.0 (see the DR-6 entry). Architect-owned track
   (PLAN-LTS §9, outside agent scope); tracked here so the track is
   not lost between PRs.
+- **BL-41 · open · Reconcile `@me2em/crypto` dependency spec with
+  DR-4 before the crypto rc.1 publish (O2).**
+  `packages/crypto/package.json` declares `"@me2em/core":
+  "workspace:*"`; DR-4 mandates `workspace:^` for cross-package
+  deps — `pnpm publish` substitutes `workspace:*` with the EXACT
+  workspace version (the react 0.1.0-alpha.1 incident). Fix is a
+  one-line spec change + lockfile refresh; must land before the
+  crypto 1.0.0-rc.1 publish (flagged in the PR-B review, 2026-11-03).
 
 ## P3 — Protocol Extensions (0.8+)
 
@@ -137,6 +148,14 @@ development, not part of the shipped API contract.
   changes; requires a new normative section of the spec and new golden
   vectors. Tracked at the architect's direction as a potential v2.0
   item (2026-11-02, PR-5 review) — no v1.1 rework is planned.
+- **BL-42 · open · Media key reuse across files (M5 — explicitly
+  deferred).** Reusing one AEAD key (or key schedule) across a
+  session's files instead of `generateFileKey()` per file is a
+  performance idea, not a defect: the current per-file key is the
+  safe default. Requires a new public API (session-scoped key
+  registry) and is therefore out of rc scope — deferred per the
+  crypto security batch verdict (2026-11-03: "do not implement,
+  track in BACKLOG").
 - **BL-29 · open · `@me2em/messenger` package.** Target 0.9.
   First vertical: chats, groups (epoch/GK patterns), delivery
   receipts, @me2em/server integration. Pilot consumer: BeSafeChat.

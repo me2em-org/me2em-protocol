@@ -10,6 +10,16 @@ import type { Channel, ChannelMessage } from './types.js';
 const MSG_INFO = 'me2em/crypto/v1/channel-message';
 
 /**
+ * Sliding replay window size (F7): the number of most-recent
+ * successfully decrypted sequence numbers kept per channel. Duplicates
+ * inside the window are rejected (REPLAY_DETECTED); out-of-order
+ * delivery within the window is accepted; sequences evicted from the
+ * window CAN replay again — size your retry buffers accordingly and
+ * rotate high-volume channels. The window resets on rotateChannel.
+ */
+const REPLAY_WINDOW_SIZE = 1000;
+
+/**
  * Derives a per-message key from the channel root.
  *
  * MK = HKDF(rootKeyMaterial, salt=epoch ‖ seq, info=MSG_INFO)
@@ -61,7 +71,8 @@ async function deriveMessageKey(
  * (immutable design — React-friendly). Each call generates a fresh
  * random IV, so encrypting the same plaintext with the same seq
  * produces different ciphertexts. However, re-encrypting with a
- * seq already used for this channel will fail on decrypt (replay).
+ * seq already used for this channel will fail on decrypt (replay)
+ * while the sequence stays inside the receiver's replay window.
  *
  * @param channel - The channel to encrypt for.
  * @param seq - Sequence number (must be ≥ 0).
@@ -106,10 +117,19 @@ export async function encryptChannelMessage(
 /**
  * Decrypts a channel message, with replay protection and epoch checks.
  *
- * Replay protection: msg.sequence must be strictly greater than the
- * last successfully decrypted sequence in this direction. This is
- * a strict increasing-seq policy — out-of-order decryption is
- * rejected (window-based replay protection is a future track).
+ * Replay protection (F7 — sliding window): the last REPLAY_WINDOW_SIZE
+ * (1000) successfully decrypted sequence numbers are remembered per
+ * channel. A duplicate inside the window is rejected (REPLAY_DETECTED);
+ * out-of-order delivery WITHIN the window is accepted (breaking change
+ * vs the previous strictly-increasing-seq policy, which rejected any
+ * non-advancing sequence). Sequences evicted from the window can replay
+ * again — keep the window sized for the expected out-of-order delay and
+ * rotate high-volume channels. Failed decrypt attempts do not consume
+ * window slots (the sequence is recorded only after successful
+ * authentication).
+ *
+ * Window reset: rotateChannel starts a fresh epoch with a fresh
+ * sequence space — the window resets with it.
  *
  * Epoch check: msg.epoch must match the channel's current epoch.
  * Messages from previous epochs are rejected — that is the point
@@ -118,8 +138,8 @@ export async function encryptChannelMessage(
  * @param channel - The channel to decrypt for.
  * @param msg - The ChannelMessage to decrypt.
  * @returns The decrypted plaintext.
- * @throws {CryptoError} If channel is unknown, replay detected,
- *   or wrong epoch.
+ * @throws {CryptoError} If channel is unknown/destroyed, replay
+ *   detected, or wrong epoch.
  *
  * @example
  * ```ts
@@ -140,11 +160,11 @@ export async function decryptChannelMessage(
     );
   }
 
-  if (msg.sequence <= internals.lastDecryptedSeq) {
+  if (internals.seenSeqs.has(msg.sequence)) {
     throwCryptoError(
       'REPLAY_DETECTED',
       'CIPHER',
-      'Replay detected — sequence not increasing'
+      'Replay detected — sequence already processed in the current window'
     );
   }
 
@@ -156,7 +176,18 @@ export async function decryptChannelMessage(
 
   const plaintext = await decryptAead(mk, msg.ciphertext, msg.iv);
 
-  internals.lastDecryptedSeq = msg.sequence;
+  // Record the sequence AFTER successful decryption only — failed
+  // attempts (attacker-injected garbage) must not consume window slots.
+  internals.seenSeqs.add(msg.sequence);
+
+  // Sliding window: evict the oldest recorded sequence once the window
+  // overflows. Set iteration is insertion-ordered, so the first entry
+  // is the oldest. Invariant: size > REPLAY_WINDOW_SIZE >= 1, so the
+  // first entry always exists (the `as number` cast is safe here).
+  if (internals.seenSeqs.size > REPLAY_WINDOW_SIZE) {
+    const oldest = internals.seenSeqs.values().next().value as number;
+    internals.seenSeqs.delete(oldest);
+  }
 
   return plaintext;
 }
