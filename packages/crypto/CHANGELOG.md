@@ -23,6 +23,13 @@ is frozen as of this version; additive changes land in 1.x minors.
   response).
 
 ### Changed
+- `deriveKeyArgon2id` / `verifyArgon2` NFKC-normalize the password
+  before hashing/verification (consistent with `@me2em/core`
+  name/context canonicalization). The same logical password in
+  different Unicode forms (e.g. the ligature `ﬁ` vs `fi`, precomposed
+  vs decomposed accents) now produces the SAME key. **Breaking:**
+  Argon2id hashes produced before this change will not verify for
+  non-canonical passwords — re-derive.
 - Replay protection is now a **sliding window** (F7 — behavioral
   change). Previously a strictly-increasing sequence policy rejected
   any non-advancing sequence; now the last 1000 successfully
@@ -47,6 +54,16 @@ is frozen as of this version; additive changes land in 1.x minors.
   reuse derives a corrupted secret silently.
 
 ### Fixed
+- `generateSecurePassword` shuffle is now **unbiased**: rejection-
+  sampled Fisher-Yates with fresh random per swap (F2). The previous
+  implementation took modulo-biased swap indices and reused the same
+  random bytes for the first 8 characters and the shuffle. A
+  statistical distribution check ships as
+  `scripts/password-shuffle-bias.mjs` (runs outside CI — slow and
+  statistical by nature).
+- `normalizeSeedPhrase` NFKC-normalizes words (F5, consistent with
+  `@me2em/core`). Fullwidth and other compatibility-form mnemonics
+  validate the same as their ASCII spellings.
 - Memory hygiene on error paths (internal buffers only — no API
   change): `wrapKeyForRecipient`/`unwrapKeyForMe` wipe the X3DH shared
   secret and the derived wrapping key on EVERY exit path (previously

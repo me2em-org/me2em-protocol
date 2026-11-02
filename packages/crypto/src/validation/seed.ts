@@ -11,7 +11,15 @@ export interface SeedValidationResult {
 
 /**
  * Normalizes a mnemonic seed phrase by splitting on whitespace,
- * lowercasing, trimming, and filtering empty strings.
+ * NFKC-normalizing, lowercasing, trimming, and filtering empty
+ * strings.
+ *
+ * NFKC (consistent with `@me2em/core` name/context canonicalization)
+ * folds compatibility forms to their canonical ASCII form — a
+ * fullwidth or otherwise compatibility-decomposed mnemonic validates
+ * identically to its ASCII spelling. (`@scure/bip39` applies NFKD to
+ * the seed derivation itself per the BIP39 standard; this layer is
+ * about consistent valid/invalid answers for the wordlist check.)
  *
  * @param sp - The seed phrase as a string or array of words.
  * @returns Normalized array of lowercase words with duplicates preserved.
@@ -25,7 +33,7 @@ export interface SeedValidationResult {
 export function normalizeSeedPhrase(sp: string | string[]): string[] {
   const words = Array.isArray(sp) ? sp : sp.split(/\s+/);
   return words
-    .map((w) => w.toLowerCase().trim())
+    .map((w) => w.normalize('NFKC').toLowerCase().trim())
     .filter((w) => w.length > 0);
 }
 

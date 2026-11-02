@@ -266,11 +266,39 @@ export async function validatePasswordStrength(
 }
 
 /**
+ * Returns a uniformly random integer in `[0, n)` using rejection
+ * sampling (no modulo bias).
+ *
+ * A naive `randomByte % n` is biased whenever 256 is not an exact
+ * multiple of `n` — some residues become slightly more likely. This
+ * helper draws fresh 32-bit random words (one per call) and rejects
+ * values in the final partial residue class, which makes every
+ * residue exactly equiprobable.
+ *
+ * Statistical verification of the resulting shuffle distribution
+ * lives in `scripts/password-shuffle-bias.mjs` (not in CI — slow and
+ * statistical by nature).
+ *
+ * @param n - Upper exclusive bound; MUST be >= 1 (internal invariant).
+ * @returns A uniform integer in `[0, n)`.
+ */
+function randomIntBelow(n: number): number {
+  const max = Math.floor(0xffffffff / n) * n;
+  const buf = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(buf);
+  } while (buf[0] >= max);
+  return buf[0] % n;
+}
+
+/**
  * Generates a cryptographically secure random password.
  *
  * Guarantees at least 2 characters of each type (lowercase, uppercase,
  * digit, special) and fills the rest with Fisher-Yates shuffled
- * characters from the full charset.
+ * characters from the full charset. The shuffle is UNBIASED:
+ * rejection-sampled fresh random per swap (no modulo bias, no reuse
+ * of the selection bytes).
  *
  * @param length - Password length (default 16). Minimum 8.
  * @returns A random password string.
@@ -308,9 +336,13 @@ export function generateSecurePassword(length: number = 16): string {
     chars.push(all[bytes[i] % all.length]);
   }
 
-  // Fisher-Yates shuffle using the same random bytes
+  // Unbiased Fisher-Yates: fresh 4-byte random per swap,
+  // rejection-sampled (see randomIntBelow). The previous
+  // implementation reused the same random bytes that selected the
+  // first 8 characters (double-use) and took modulo-biased indices,
+  // which skewed the password distribution.
   for (let i = chars.length - 1; i > 0; i--) {
-    const j = bytes[(i + 8) % bytes.length] % (i + 1);
+    const j = randomIntBelow(i + 1);
     [chars[i], chars[j]] = [chars[j], chars[i]];
   }
 

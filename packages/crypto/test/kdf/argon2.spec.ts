@@ -77,14 +77,20 @@ describe('deriveKeyArgon2id', () => {
     await expect(deriveKeyArgon2id('pw', salt, 'UNKNOWN')).rejects.toThrow(CryptoError);
   });
 
-  it('NFKC normalization: ligature ﬁ folds to "fi"', async () => {
+  it('NFKC: ligature ﬁle and file produce the SAME key (canonicalized)', async () => {
     const salt = generateArgon2Salt('INTERACTIVE');
     const r1 = await deriveKeyArgon2id('\uFB01le', salt, 'INTERACTIVE');
     const r2 = await deriveKeyArgon2id('file', salt, 'INTERACTIVE');
-    // hash-wasm v4 does not do NFKC normalization automatically
-    // this test verifies the password is passed as-is
-    expect(typeof r1.key).toBe('object');
-    expect(r2.key.length).toBe(32);
+    // hash-wasm passes the password through as-is; the NFKC folding is
+    // OUR layer (consistent with @me2em/core canonicalization).
+    expect(r1.key).toEqual(r2.key);
+  });
+
+  it('NFKC: precomposed é and decomposed é produce the SAME key', async () => {
+    const salt = generateArgon2Salt('INTERACTIVE');
+    const nfc = await deriveKeyArgon2id('caf\u00e9', salt, 'INTERACTIVE');
+    const nfd = await deriveKeyArgon2id('cafe\u0301', salt, 'INTERACTIVE');
+    expect(nfd.key).toEqual(nfc.key);
   });
 });
 
@@ -125,5 +131,24 @@ describe('verifyArgon2', () => {
 
     const verified = await verifyArgon2('wrong-password', encodedHash);
     expect(verified).toBe(false);
+  });
+
+  it('NFKC: hash with "file", verify with "ﬁle" — same canonical password', async () => {
+    const salt = generateArgon2Salt('INTERACTIVE');
+
+    const { argon2id } = await import('hash-wasm');
+    const encodedHash = await argon2id({
+      password: 'file',
+      salt,
+      iterations: 3,
+      memorySize: 1 << 16,
+      parallelism: 4,
+      hashLength: 32,
+      outputType: 'encoded',
+    });
+
+    // verifyArgon2 applies the same NFKC canonicalization as
+    // deriveKeyArgon2id — Unicode forms must verify interchangeably.
+    expect(await verifyArgon2('\uFB01le', encodedHash)).toBe(true);
   });
 });

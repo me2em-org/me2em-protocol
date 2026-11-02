@@ -17,8 +17,8 @@
  * - `@me2em/react` additionally gets `eslint-plugin-react-hooks`
  *   (flat/recommended, v7 — includes the compiler-derived correctness
  *   rules alongside the classic rules-of-hooks / exhaustive-deps).
- * - `packages/core/scripts/*.mjs` are plain Node scripts (no TS): Node
- *   globals are declared for them.
+ * - `packages/{core,crypto}/scripts/*.mjs` are plain Node scripts
+ *   (no TS): Node globals are declared for them.
  */
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
@@ -66,7 +66,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['packages/core/scripts/**/*.mjs'],
+    files: ['packages/{core,crypto}/scripts/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node, console: 'readonly' },
     },
