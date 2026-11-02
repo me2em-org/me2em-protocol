@@ -3,7 +3,6 @@ import { useReducer, useCallback, useState, useEffect, useRef } from 'react';
 import {
   verifyFlowReducer,
   initVerifyState,
-  type VerifyState,
 } from '../headless/verify-flow.js';
 import { wordlist } from '@me2em/core';
 

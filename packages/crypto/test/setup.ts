@@ -2,5 +2,5 @@
 import { webcrypto } from 'node:crypto';
 
 if (!globalThis.crypto?.subtle) {
-  (globalThis as any).crypto = webcrypto;
+  Object.assign(globalThis, { crypto: webcrypto });
 }

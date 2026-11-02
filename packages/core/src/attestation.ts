@@ -7,7 +7,7 @@ import { normalizeName } from './canonical-name.js';
 import { base64urlEncode, base64urlDecode, randomUUID, safeJsonParse } from './util.js';
 import { ed } from './crypto/init.js';
 import type { Signer } from './types.js';
-import { AttestationError, type AttestationErrorCode, type AttestationLevel } from './errors.js';
+import { AttestationError, type AttestationErrorCode } from './errors.js';
 
 export { AttestationError, type AttestationErrorCode, type AttestationLevel } from './errors.js';
 

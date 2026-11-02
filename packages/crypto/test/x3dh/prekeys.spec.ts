@@ -1,6 +1,6 @@
 // packages/crypto/test/x3dh/prekeys.spec.ts
 import { describe, it, expect } from 'vitest';
-import { generateX25519KeyPair, verifyRaw } from '../../src/index.js';
+import { verifyRaw } from '../../src/index.js';
 import { generatePreKeyBatch, publishableBundle } from '../../src/x3dh/prekeys.js';
 import { CryptoError } from '../../src/errors.js';
 import { ed25519 } from '@noble/curves/ed25519.js';

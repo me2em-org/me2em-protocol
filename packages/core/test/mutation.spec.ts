@@ -5,7 +5,7 @@
 // internal state nor change later derivations. Every capability method
 // returns fresh bytes; inputs are copied on entry (PR-5).
 import { describe, expect, it } from 'vitest';
-import { Handle, Identity } from '../src/index.js';
+import { Identity } from '../src/index.js';
 
 const testSeed = new Uint8Array(64).fill(42);
 const identity = await Identity.fromSeed(testSeed);

@@ -1,8 +1,7 @@
 // packages/react/src/react/useSession.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Handle } from '@me2em/core';
-import { Session, type SessionOptions, type SessionPayload } from '@me2em/core';
-import { useMe2emContext } from './context.js';
+import { Session } from '@me2em/core';
 
 /**
  * Options for useSession, memoized via deep comparison of
@@ -74,7 +73,6 @@ export function useSession(
   options: UseSessionOptions,
   autoRenew: boolean = true
 ): UseSessionResult {
-  const { identity } = useMe2emContext();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,8 +80,11 @@ export function useSession(
   const optionsRef = useRef(options);
   const mountedRef = useRef(true);
 
-  // Update options ref without triggering re-renders
-  optionsRef.current = options;
+  // Mirror the latest options into the ref after every commit —
+  // ref writes belong in effects, not during render (react-hooks/refs).
+  useEffect(() => {
+    optionsRef.current = options;
+  });
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -128,6 +129,7 @@ export function useSession(
         const halfLife = Math.floor((s.expiresAt * 1000 - Date.now()) / 2);
         if (halfLife > 0) {
           timerRef.current = setTimeout(() => {
+            // eslint-disable-next-line react-hooks/immutability -- self-rescheduling renewal timer: the timer is cleared and re-created whenever renew itself changes (deps + clearTimer), so the captured binding is always the current one
             renew();
           }, Math.max(halfLife, 1000));
         }

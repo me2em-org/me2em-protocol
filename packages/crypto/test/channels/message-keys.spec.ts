@@ -5,7 +5,6 @@ import {
   encryptChannelMessage,
   decryptChannelMessage,
 } from '../../src/index.js';
-import { CryptoError } from '../../src/errors.js';
 
 function randomSecret(): Uint8Array {
   const bytes = new Uint8Array(32);

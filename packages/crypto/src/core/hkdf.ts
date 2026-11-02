@@ -1,5 +1,5 @@
 // packages/crypto/src/core/hkdf.ts
-import { throwCryptoError, type CryptoErrorCode, type CryptoErrorLevel } from '../errors.js';
+import { throwCryptoError } from '../errors.js';
 
 /**
  * Converts a Uint8Array to an ArrayBuffer with an explicit copy.

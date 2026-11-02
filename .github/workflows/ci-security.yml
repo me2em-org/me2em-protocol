@@ -77,11 +77,8 @@ jobs:
       - name: Test
         run: pnpm -r test:coverage
 
-      # Legacy-файлы вне пакетов не покрыты линт-конфигом —
-      # не блокер, чистка отдельным треком
       - name: Lint
         run: pnpm -r lint
-        continue-on-error: true
 
       # Блокирующий гейт (BL-34/P2): high/critical в prod-дереве не
       # проходят. Dev-дерево информационное — не поставляется

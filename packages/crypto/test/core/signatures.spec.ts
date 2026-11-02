@@ -33,7 +33,7 @@ describe('signRaw / verifyRaw', () => {
   });
 
   it('signature from wrong key fails verification', () => {
-    const { privateKey: privA, publicKey: pubA } = generateKeyPair();
+    const { privateKey: privA } = generateKeyPair();
     const { publicKey: pubB } = generateKeyPair();
     const message = new TextEncoder().encode('hello');
     const sig = signRaw(privA, message);

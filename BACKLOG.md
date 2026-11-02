@@ -17,11 +17,14 @@ development, not part of the shipped API contract.
   new versioned string (`/v2`) with a migration note — never in place.
 - Publishing: only from `packages/*` directories (`pnpm --filter`),
   never from the workspace root (root is `"private": true`).
-- Publication checklist (DR-4): fresh `pnpm build` before publish;
-  `pnpm publish --tag alpha`; post-checks — `npm view <pkg>@<ver>
-  dependencies`, tarball inspection, and a clean-install build of a
-  real consumer (workspace linking masks published-manifest issues).
-  npm serves metadata before the tarball (2–5 min) — not an error.
+- Publication checklist (DR-4): fresh `pnpm build` and a green
+  `pnpm --filter <pkg> lint` before publish (the per-package lint
+  gate works for a single-package publish exactly as for the
+  workspace-wide `pnpm -r lint`); `pnpm publish --tag alpha`;
+  post-checks — `npm view <pkg>@<ver> dependencies`, tarball
+  inspection, and a clean-install build of a real consumer
+  (workspace linking masks published-manifest issues). npm serves
+  metadata before the tarball (2–5 min) — not an error.
 - Status checks: pushing to `main` must never bypass required status
   checks — CI must actually run (lesson of 2026-10-30).
 - TSDoc is the source of the per-package API docs
@@ -81,12 +84,18 @@ development, not part of the shipped API contract.
   82/71 — raise react to the 90/90 target with its next test slice
   (this item); the CI wiring diff is supplied to the architect in the
   PR-4 description (wired into `ci-security.yml` from PR-13, A7 done).
-  Pending: eslint flat config for the whole workspace — devDep eslint
-  v10 has NO `eslint.config.*` anywhere, so `pnpm -r lint` fails
-  uniformly (masked by `continue-on-error`; found during PR-5),
-  audit blocking policy decided (PR-32 — «Dependency audit policy» in
-  CONTRIBUTING; the gate hunk is architect-applied — Workflows scope),
-  branch protection after 2+ stable green runs.
+  Shipped (PR-31): eslint flat config for the whole workspace —
+  root-owned toolchain (eslint, typescript-eslint, eslint-plugin-
+  react-hooks, globals in the ROOT devDependencies; core's own eslint
+  devDep removed), one root `eslint.config.mjs`, per-package
+  `lint: eslint .` scripts; first pass triaged 940 findings to zero
+  errors (generated TypeDoc assets ignored; 49 real findings fixed;
+  three rationale line-disables in the freshly race-fixed hooks,
+  render-phase refactor tracked post-rc.2). Pending: the Lint step's
+  `continue-on-error: true` removal in `ci-security.yml` (diff
+  supplied in the PR-31 description; push needs Workflows scope),
+  audit blocking policy decision, branch protection after 2+ stable
+  green runs.
 - **BL-37 · open · npm dist-tag maintenance.** `latest` for
   @me2em/core points at 0.4.1-alpha.1 and for @me2em/react at
   0.1.0-alpha.1, while new releases ship under the `alpha` tag. When

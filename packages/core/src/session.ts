@@ -456,7 +456,7 @@ export class Session {
 
     // Signature verification (wrapped to catch exceptions from the crypto lib)
     const publicKey = handle.getPublicKey();
-    let isValid = false;
+    let isValid: boolean;
     try {
       isValid = await Handle.verify(signatureBytes, payloadBytes, publicKey);
     } catch {
@@ -680,7 +680,7 @@ export class Session {
     const A = Attestation.decode(attestationChain[0]);
 
     // Step 6: Verify A signature against root
-    let sigOkA = false;
+    let sigOkA: boolean;
     try {
       sigOkA = await Attestation.verifySignature(attestationChain[0], rootPublicKey);
     } catch {
@@ -736,7 +736,7 @@ export class Session {
       throw new AttestationError('MALFORMED', 'FORMAT', 'Cannot decode root attestation subjectId');
     }
 
-    let sigOkB = false;
+    let sigOkB: boolean;
     try {
       sigOkB = await Attestation.verifySignature(attestationChain[1], signerPubABytes);
     } catch {
@@ -851,7 +851,7 @@ export class Session {
     if (!sessionPub) {
       throw new AttestationError('BAD_SIGNATURE', 'SESSION', 'Cannot decode session hId');
     }
-    let sigOk = false;
+    let sigOk: boolean;
     try {
       sigOk = await Handle.verify(signatureBytes, payloadBytes, sessionPub);
     } catch {

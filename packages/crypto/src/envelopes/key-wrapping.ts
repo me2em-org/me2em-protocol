@@ -5,7 +5,6 @@ import { hkdfWithInfo } from '../core/hkdf.js';
 import { importAeadKey, decryptAead } from '../core/aead.js';
 import { secureWipe } from '../core/wipe.js';
 import { throwCryptoError } from '../errors.js';
-import { toBase64 } from '../utils/binary.js';
 import type { PreKeyBundle, IdentityKeys, SignedPreKey, OneTimePreKey } from '../x3dh/types.js';
 
 /**

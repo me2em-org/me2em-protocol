@@ -95,7 +95,7 @@ describe('encryptMediaChunk / decryptMediaChunk', () => {
     const fileKey = generateFileKey();
     const chunkData = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 
-    const { encrypted, iv } = await encryptMediaChunk(fileKey, chunkData, 'tamper-test', 0);
+    const { encrypted } = await encryptMediaChunk(fileKey, chunkData, 'tamper-test', 0);
 
     const tampered = new Uint8Array(encrypted);
     tampered[2] ^= 0xff;

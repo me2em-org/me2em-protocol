@@ -1,5 +1,5 @@
 // packages/react/src/react/PassphraseInput.tsx
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 
 export interface PassphraseInputProps {
   onPassphraseChange: (p: string) => void;
