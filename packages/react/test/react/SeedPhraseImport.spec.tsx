@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { SeedPhraseImport } from '../../src/react/SeedPhraseImport.js';
-import { generateSeedPhrase } from '@me2em/core';
+import { generateSeedPhrase, wordlist, validateSeedPhrase } from '@me2em/core';
 import '@testing-library/jest-dom/vitest';
 
 describe('SeedPhraseImport', () => {
@@ -73,8 +73,30 @@ describe('SeedPhraseImport', () => {
   });
 
   it('bit checksum (valid words, wrong order) → Import disabled', () => {
-    const words = generateSeedPhrase(128);
-    const swapped = [words[1], words[0], ...words.slice(2)];
+    // ⚠️ DETERMINISTIC PHRASE — do not "randomize" this test.
+    //
+    // A previous version swapped words[0]/words[1] of a RANDOM
+    // generateSeedPhrase(128) phrase. That is flaky by construction:
+    // a 12-word BIP39 phrase is 128 entropy + 4 CHECKSUM bits, so a
+    // random two-word swap survives the checksum with probability
+    // ≈ 2^-4 (measured 6.10% over 20k trials) — and then the Import
+    // button is CORRECTLY enabled (the swapped phrase is valid),
+    // failing the assertion. CI hit this on the #39/#40 first runs.
+    //
+    // This fixed pair is a verified-valid mnemonic whose (0,1)-swap
+    // breaks the checksum — the premise "valid words, wrong order"
+    // holds ALWAYS, not 15 runs out of 16. The premise pins below
+    // fail loudly if the wordlist or the validator ever drifts.
+    const swapped = [
+      'marriage', 'cost', 'because', 'elbow', 'battle', 'belt',
+      'ginger', 'suggest', 'carpet', 'cruise', 'car', 'sausage',
+    ];
+
+    // Premise: every word is a real BIP39 word, and the swapped
+    // sequence is checksum-invalid — this test exercises the CHECKSUM
+    // gate, not the wordlist gate.
+    for (const w of swapped) expect(wordlist).toContain(w);
+    expect(validateSeedPhrase(swapped).isValid).toBe(false);
 
     render(<SeedPhraseImport expectedCount={12} onImported={vi.fn()} />);
 

@@ -85,7 +85,7 @@ development, not part of the shipped API contract.
   the PRODUCT decision + flow (opt-in encrypted seed backup in cloud).
   Requires: UI flow, envelope format for seed backup, recovery UX.
   Blocked on product priority, not engineering.
-- **BL-34 · in-progress · CI pipeline maintenance.**
+- **BL-34 · done · CI pipeline maintenance.**
   Shipped (CI1): gitleaks v3 (org license), build-first order (fixed
   TS2307 class), CodeQL v4 security-extended, pnpm store caching,
   ubuntu-24.04 pin. Coverage thresholds enforced in-repo via vitest
@@ -106,9 +106,15 @@ development, not part of the shipped API contract.
   CONTRIBUTING.md → «Dependency audit policy»; the Lint
   `continue-on-error` mask is removed (architect-applied hunks on
   #31/#32; main green with both gates real: 1cf61fd, 5b3ff0f).
-  Pending: branch protection with required checks (Build & Test,
-  CodeQL, CodeQL SAST, gitleaks) — precondition (2+ stable green
-  runs) met.
+  Closed (2026-11-03, this sweep): branch protection with the required
+  check set (Build & Test, CodeQL, CodeQL SAST, gitleaks) confirmed by
+  the architect (the protection API is admin-only — HTTP 403 for the
+  agent token, so the confirmation is the architect's; the
+  2+-stable-runs precondition was met long ago). Evidence since
+  confirmation: five consecutive security-batch PRs (#36–#40) merged
+  green with the full required set plus the Pages deploy, and the
+  test-count baseline in the header is kept live per-PR (646 as of
+  #40).
 - **BL-37 · in-progress · npm dist-tag maintenance.** Core half
   **done (2026-11-03)**: the @me2em/core rc.1 publish shipped with
   `--tag latest`, so a plain `npm install @me2em/core` resolves to
