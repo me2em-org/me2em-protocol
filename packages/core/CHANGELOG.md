@@ -37,9 +37,14 @@
   package-relative and machine-independent. The two previously
   committed absolute paths are normalized; `bench --compare` matching
   is by task name and unaffected.
-- Security-posture docs: SECURITY.md now states the PGP key
-  publication commitment (before v1.0.0) and points reporters to
-  email / GitHub private vulnerability reporting in the interim;
+- Security-posture docs: SECURITY.md now carries the published project
+  PGP key — `Me2eM Security <security@me2em.com>` (ed25519 primary +
+  ed25519 sign / cv25519 encr subkeys), live at
+  me2em.com/security/pgp-key.asc with the fingerprint pinned in the
+  document, expires 2028-11-01 (renewal re-exports the same
+  fingerprint); the interim "will be published before v1.0.0" promise
+  is replaced by the actual key. Reporters are pointed to
+  PGP-encrypted email / GitHub private vulnerability reporting;
   the CI security posture (gitleaks, CodeQL, typecheck,
   test:coverage thresholds, advisory lint/audit) is documented next
   to the audit-status table. USE_CASES.md Scenario 8 adds the

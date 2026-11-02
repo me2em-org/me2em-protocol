@@ -31,11 +31,18 @@ authentication. We take security seriously.
    - Steps to reproduce (if applicable)
    - Potential impact assessment
    - Suggested fix (optional but appreciated)
-3. **PGP encryption for reports** — the project PGP key will be
-   published at [me2em.com/security/pgp-key.asc](https://me2em.com/security/pgp-key.asc)
-   **before v1.0.0**. Until then, use the email address above or
+3. **PGP encryption for reports** — encrypt to the project PGP key,
+   published at
+   [me2em.com/security/pgp-key.asc](https://me2em.com/security/pgp-key.asc):
+   `Me2eM Security <security@me2em.com>`, ed25519 primary
+   (certification) with ed25519 signing and cv25519 encryption
+   subkeys, fingerprint
+   `5F43B6BA8B00A02B6E94A1AFFA6F767A77F45093`, expires 2028-11-01.
+   After importing, verify the fingerprint against the one above
+   (gpg prints it space-grouped; the hex characters must match).
+   If you prefer not to use email,
    [GitHub private vulnerability reporting](https://github.com/me2em-org/me2em-protocol/security/advisories/new)
-   (encrypted, free, zero ops).
+   is the equivalent alternative (encrypted, free, zero ops).
 
 ## 📬 What to Expect
 
