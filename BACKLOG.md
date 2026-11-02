@@ -171,17 +171,21 @@ development, not part of the shipped API contract.
   graph. Evidence: uniform-null χ² on the PRE-fix dist = 145–146
   (FAIL, bias detected); post-fix = 80 / 89 (PASS, E = df = 87).
   Blocks the crypto rc.1 publish until merged.
-- **BL-46 · open · `@noble/curves` and `@noble/hashes` are runtime
-  imports declared as devDependencies (same phantom class, non-breaking).**
-  `src/core/ecdh.ts` imports `@noble/curves/ed25519.js`; HKDF/Argon2
-  paths use `@noble/hashes` — both are devDeps, so tsup INLINES ~11
-  chunks of noble code into `dist/index.js` instead of externalizing
-  (dist works — noble is self-contained — but the published artifact
-  ships a private noble copy, the dep graph lies to consumers, and
-  dedup with `@me2em/core`'s noble is lost). Fix: move both to
-  `dependencies` (version ranges already match core's) + rebuild.
-  Non-blocking for rc.1 (runtime-safe); resolve before or with the
-  crypto publish — same file, same review pass as BL-45.
+- **BL-46 · done · `@noble/curves` was a runtime import declared as a
+  devDependency (same phantom class, non-breaking).**
+  Shipped (PR #47): `@noble/curves ^1.8.1` moved to `dependencies`
+  (the range already matched core's) — tsup externalizes it, so the
+  dist no longer ships a private noble copy; noble dedups with
+  `@me2em/core`'s. Entry correction: `@noble/hashes` was never
+  directly imported by crypto (HKDF is native WebCrypto, Argon2id is
+  hash-wasm) — it arrived transitively via `@noble/curves` (its own
+  `@noble/hashes@1.8.0`) and is dropped from devDependencies instead
+  of promoted. Evidence: `dist/index.js` 97.1 KB → 29.8 KB (−69%),
+  the bare `@noble/curves/ed25519.js` import preserved, zero noble
+  inlining left; pack check shows the new runtime dep; 648 tests
+  green. Non-breaking: devDeps never ship; rc.1 (published) keeps
+  the runtime-safe inlined copy — this lands with the next crypto
+  publish.
 
 ## P3 — Protocol Extensions (0.8+)
 
