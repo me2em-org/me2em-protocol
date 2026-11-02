@@ -33,7 +33,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@me2em/core": "workspace:*",
+    "@me2em/core": "workspace:^",
     "@scure/base": "^2.4.0",
     "@scure/bip39": "^1.6.0",
     "hash-wasm": "^4.12.0"

@@ -68,7 +68,7 @@ importers:
   packages/crypto:
     dependencies:
       '@me2em/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@scure/base':
         specifier: ^2.4.0
