@@ -2,87 +2,7 @@
 
 ## [Unreleased]
 
-### Changed
-- `Handle.getMetadata()` and the `Handle` constructor metadata input now
-  deep-copy custom metadata (JSON-safe structures up to depth 8);
-  non-plain values (Date, Map, functions) remain shared by reference —
-  same caveats as `getSubMetadata()`. Symmetry hardening (PR-7
-  direction): closes the last live-reference input in the Handle family
-  — the caller keeps no live reference. Non-breaking: code relying on
-  the previous shallow behavior sees only more isolation.
-- `specs/v1.0.md` §12 now enumerates the `crypto` namespace as actually
-  exported — the derivation functions, the documented raw Ed25519
-  wrappers (`getPublicKey`, `sign`, `verify` and their `*Async`
-  variants) and `hkdf` / `sha256` — and notes that `derivePassword` /
-  `deriveChannelKey` are `Handle` methods, not namespace members;
-  the seed-utilities list is completed (`generateSeedPhrase`,
-  `normalizeSeedPhrase`, `validateSeedPhrase`). §7/§8: API-misuse
-  `TypeError` cases (non-string name/context, non-`Signer` issuer,
-  raw private-key bytes) documented as outside the `AttestationError`
-  model. Docs+tests only, non-breaking; golden vectors untouched.
-- TSDoc completed for the raw wrappers (Async variants, `sha256`) and
-  the `crypto` namespace description added; README core documents the
-  raw-primitives group and the reasons the wrappers exist; the
-  five previously unpinned wrappers are pinned by arch-cycle parity
-  tests (noble-oracle agreement + sync/async byte-identity).
-- `vectors` script now runs `node --experimental-strip-types
-  scripts/generate-vectors.ts` and `engines.node` is bumped from
-  `>=22.0.0` to `>=22.6.0` (root and all packages): Node could not
-  execute a `.ts` entry point without the flag before 23.6, so the
-  documented regeneration flow failed on Node 22 (the CI major). The
-  flag is a no-op on ≥23.6; no new dependencies.
-- `bench:baseline` now normalizes `bench/baseline.json` after every
-  regeneration (`scripts/normalize-baseline.mjs`): vitest emits the
-  runner machine's absolute `filepath`; the committed baseline is
-  package-relative and machine-independent. The two previously
-  committed absolute paths are normalized; `bench --compare` matching
-  is by task name and unaffected.
-- Workspace-wide ESLint gate (BL-34): a single root `eslint.config.mjs`
-  (`@eslint/js` recommended + `typescript-eslint` recommended, plus
-  `eslint-plugin-react-hooks` v7 for `@me2em/react`) with the toolchain
-  in the ROOT devDependencies and per-package `lint: eslint .`
-  scripts — `pnpm -r lint` and every single-package run (e.g. before
-  `pnpm publish`) now execute the same rule set. First pass triaged
-  940 findings to zero errors: generated TypeDoc assets are ignored,
-  49 real findings fixed (unused imports/vars, three `any` casts
-  typed, one dead AEAD key import with its misleading comment
-  removed), and three rationale line-disables in the freshly
-  race-fixed hooks (`set-state-in-effect`, `immutability`) whose
-  render-phase refactor is tracked post-rc.2. Non-breaking: types,
-  API and golden vectors untouched.
-- Security-posture docs: SECURITY.md now carries the published project
-  PGP key — `Me2eM Security <security@me2em.com>` (ed25519 primary +
-  ed25519 sign / cv25519 encr subkeys), live at
-  me2em.com/security/pgp-key.asc with the fingerprint pinned in the
-  document, expires 2028-11-01 (renewal re-exports the same
-  fingerprint); the interim "will be published before v1.0.0" promise
-  is replaced by the actual key. Reporters are pointed to
-  PGP-encrypted email / GitHub private vulnerability reporting;
-  the CI security posture (gitleaks, CodeQL, typecheck,
-  test:coverage thresholds, advisory lint/audit) is documented next
-  to the audit-status table. USE_CASES.md Scenario 8 adds the
-  token-vault recipe on frozen primitives
-  (`deriveChannelKey('token-store/<service>')` + application-side
-  AES-256-GCM, with its two documented caveats). Docs-only,
-  non-breaking.
-
-### Fixed
-- Stricter validation at decode/parse time (iat/exp hardening):
-  non-finite `iat`/`exp` (e.g. `1e999`, which `JSON.parse` maps to
-  `Infinity` — such an `exp` previously defeated the expiry time check,
-  making a validly signed token never expire) and `exp <= iat` are now
-  rejected by `Attestation.decode` and `Session.parseSessionToken` with
-  `AttestationError` `MALFORMED`/`FORMAT`. Non-breaking: previously
-  valid tokens are unaffected; golden vectors untouched.
-- Passphrase normalization is performed by the BIP39 layer (`NFKD`,
-  per the standard); the previous explicit NFKC call in
-  `get64ByteSeedFromMnemonic` was redundant — output bytes are
-  identical for all inputs (UAX #15 identity `NFKD(NFKC(x)) = NFKD(x)`,
-  pinned by a new byte-identity test). Spec §2 prose corrected from
-  "NFKC-normalized" to "NFKD-normalized (by the BIP39 layer)" with an
-  explicit MUST NOT for additional normalization; JSDoc updated.
-
-## [1.0.0-rc.1] — 2026-11-01
+## [1.0.0-rc.1] — 2026-11-03
 
 First release candidate of the LTS line: everything in this block
 accumulated on `main` since 0.7.0-alpha.2 and ships together (no 0.8.0
@@ -338,6 +258,74 @@ mandate).
 - `engines.node` floor raised to `>=22.0.0` (A2): Node 18/20 are EOL, CI
   pins Node 22 (LTS maintenance to 2027-04). Applied workspace-wide — root,
   `@me2em/core`, `@me2em/crypto`, `@me2em/react`.
+- `Handle.getMetadata()` and the `Handle` constructor metadata input now
+  deep-copy custom metadata (JSON-safe structures up to depth 8);
+  non-plain values (Date, Map, functions) remain shared by reference —
+  same caveats as `getSubMetadata()`. Symmetry hardening (PR-7
+  direction): closes the last live-reference input in the Handle family
+  — the caller keeps no live reference. Non-breaking: code relying on
+  the previous shallow behavior sees only more isolation.
+- `specs/v1.0.md` §12 now enumerates the `crypto` namespace as actually
+  exported — the derivation functions, the documented raw Ed25519
+  wrappers (`getPublicKey`, `sign`, `verify` and their `*Async`
+  variants) and `hkdf` / `sha256` — and notes that `derivePassword` /
+  `deriveChannelKey` are `Handle` methods, not namespace members;
+  the seed-utilities list is completed (`generateSeedPhrase`,
+  `normalizeSeedPhrase`, `validateSeedPhrase`). §7/§8: API-misuse
+  `TypeError` cases (non-string name/context, non-`Signer` issuer,
+  raw private-key bytes) documented as outside the `AttestationError`
+  model. Docs+tests only, non-breaking; golden vectors untouched.
+- TSDoc completed for the raw wrappers (Async variants, `sha256`) and
+  the `crypto` namespace description added; README core documents the
+  raw-primitives group and the reasons the wrappers exist; the
+  five previously unpinned wrappers are pinned by arch-cycle parity
+  tests (noble-oracle agreement + sync/async byte-identity).
+- `vectors` script now runs `node --experimental-strip-types
+  scripts/generate-vectors.ts` and `engines.node` is bumped from
+  `>=22.0.0` to `>=22.6.0` (root and all packages): Node could not
+  execute a `.ts` entry point without the flag before 23.6, so the
+  documented regeneration flow failed on Node 22 (the CI major). The
+  flag is a no-op on ≥23.6; no new dependencies.
+- `bench:baseline` now normalizes `bench/baseline.json` after every
+  regeneration (`scripts/normalize-baseline.mjs`): vitest emits the
+  runner machine's absolute `filepath`; the committed baseline is
+  package-relative and machine-independent. The two previously
+  committed absolute paths are normalized; `bench --compare` matching
+  is by task name and unaffected.
+- Workspace-wide ESLint gate (BL-34): a single root `eslint.config.mjs`
+  (`@eslint/js` recommended + `typescript-eslint` recommended, plus
+  `eslint-plugin-react-hooks` v7 for `@me2em/react`) with the toolchain
+  in the ROOT devDependencies and per-package `lint: eslint .`
+  scripts — `pnpm -r lint` and every single-package run (e.g. before
+  `pnpm publish`) now execute the same rule set. First pass triaged
+  940 findings to zero errors: generated TypeDoc assets are ignored,
+  49 real findings fixed (unused imports/vars, three `any` casts
+  typed, one dead AEAD key import with its misleading comment
+  removed), and three rationale line-disables in the freshly
+  race-fixed hooks (`set-state-in-effect`, `immutability`) whose
+  render-phase refactor is tracked post-1.0.0. Non-breaking: types,
+  API and golden vectors untouched.
+- Security-posture docs: SECURITY.md now carries the published project
+  PGP key — `Me2eM Security <security@me2em.com>` (ed25519 primary +
+  ed25519 sign / cv25519 encr subkeys), live at
+  me2em.com/security/pgp-key.asc with the fingerprint pinned in the
+  document, expires 2028-11-01 (renewal re-exports the same
+  fingerprint); the interim "will be published before v1.0.0" promise
+  is replaced by the actual key. Reporters are pointed to
+  PGP-encrypted email / GitHub private vulnerability reporting;
+  the CI security posture (gitleaks, CodeQL, typecheck,
+  test:coverage thresholds, blocking lint/audit (BL-34)) is documented next
+  to the audit-status table. USE_CASES.md Scenario 8 adds the
+  token-vault recipe on frozen primitives
+  (`deriveChannelKey('token-store/<service>')` + application-side
+  AES-256-GCM, with its two documented caveats). Docs-only,
+  non-breaking.
+- Dependency audit is now a **blocking CI gate** (BL-34/P2):
+  `pnpm audit --prod --audit-level high` fails the build on high/critical
+  advisories in the prod dependency tree. The shipped surface
+  (`@noble/*`, `@scure/*`, `hash-wasm`) is currently clean; dev-tree
+  (tooling) advisories stay informational. Triage protocol: CONTRIBUTING.md →
+  «Dependency audit policy».
 
 ### Dependencies
 - Added `@scure/base: ^2.4.0` (PR-7, A3): audited base64url codec replacing
@@ -349,6 +337,20 @@ mandate).
 - `index.ts` module JSDoc example passed a mnemonic string directly to
   `Identity.fromSeed` (would throw at runtime); the example now derives
   the seed first.
+- Stricter validation at decode/parse time (iat/exp hardening):
+  non-finite `iat`/`exp` (e.g. `1e999`, which `JSON.parse` maps to
+  `Infinity` — such an `exp` previously defeated the expiry time check,
+  making a validly signed token never expire) and `exp <= iat` are now
+  rejected by `Attestation.decode` and `Session.parseSessionToken` with
+  `AttestationError` `MALFORMED`/`FORMAT`. Non-breaking: previously
+  valid tokens are unaffected; golden vectors untouched.
+- Passphrase normalization is performed by the BIP39 layer (`NFKD`,
+  per the standard); the previous explicit NFKC call in
+  `get64ByteSeedFromMnemonic` was redundant — output bytes are
+  identical for all inputs (UAX #15 identity `NFKD(NFKC(x)) = NFKD(x)`,
+  pinned by a new byte-identity test). Spec §2 prose corrected from
+  "NFKC-normalized" to "NFKD-normalized (by the BIP39 layer)" with an
+  explicit MUST NOT for additional normalization; JSDoc updated.
 
 ## 0.7.0-alpha.2
 
@@ -396,12 +398,6 @@ mandate).
   `SubHandleMetadata` now DENY ALL instead of allowing everything
   (consistent with `AttestationGrant`). Use `undefined` for
   "unrestricted".
-- Dependency audit is now a **blocking CI gate** (BL-34/P2):
-  `pnpm audit --prod --audit-level high` fails the build on high/critical
-  advisories in the prod dependency tree. The shipped surface
-  (`@noble/*`, `@scure/*`, `hash-wasm`) is currently clean; dev-tree
-  (tooling) advisories stay informational. Triage protocol: CONTRIBUTING.md →
-  «Dependency audit policy».
 
 ### Fixed
 - `Attestation.verifySignature` returns `false` (instead of

@@ -116,8 +116,9 @@ When implementing Me2eM in your application:
 **CI security posture** (automated on every push/PR and a weekly
 schedule): CI runs gitleaks, CodeQL, typecheck, test:coverage
 (thresholds enforced: core/crypto 90/90, react ratcheted 82/71 —
-BL-34), lint (advisory), audit (advisory); blocking lint/audit are
-pre-v1.0.0 items.
+BL-34), lint and dependency audit — both **blocking** (BL-34/P1/P2):
+audit fails the build on high/critical advisories in the prod tree;
+triage protocol in CONTRIBUTING.md → «Dependency audit policy».
 
 ## 📜 Responsible Disclosure Policy
 
