@@ -116,16 +116,19 @@ const result = await initiateX3DH(aliceIdentity, bundle);
 
 Long-lived E2EE channels derived from X3DH shared secrets.
 
-- **establishChannel** — Creates a channel with a `channelId`, initial `epoch: 0`, and per-message key derivation.
-- **encrypt/decryptChannelMessage** — Per-message keys derived via HKDF from the root key material. Sequence-based replay protection per direction.
-- **rotateChannel** — Epoch rotation with forward secrecy at rotation points. Derives new root material, wipes old.
+- **establishChannel** — Creates a channel with a `channelId`, initial `epoch: 0`, and per-message key derivation. The returned object is frozen (readonly fields) and brand-validated.
+- **encrypt/decryptChannelMessage** — Per-message keys derived via HKDF from the root key material. Sliding-window replay protection per direction: the last 1000 decrypted sequences are remembered — duplicates are rejected (`REPLAY_DETECTED`), bounded out-of-order delivery is accepted, the window resets on rotate.
+- **rotateChannel** — Epoch rotation with forward secrecy at rotation points. Derives new root material, wipes old, resets the replay window.
+- **destroyChannel** — Explicit teardown: wipes the root key material, clears the replay window, drops the internals. The channel object is permanently dead afterwards (`INVALID_KEY` on every further operation).
 
 ```ts
-import { establishChannel, encryptChannelMessage, decryptChannelMessage } from '@me2em/crypto';
+import { establishChannel, encryptChannelMessage, decryptChannelMessage, destroyChannel } from '@me2em/crypto';
 
 const channel = await establishChannel(sharedSecret, 'chat-42');
 const msg = await encryptChannelMessage(channel, 0, plaintext);
 const decrypted = await decryptChannelMessage(channel, msg);
+
+destroyChannel(channel); // explicit teardown (logout, deletion, compromise response)
 ```
 
 ### envelopes/
@@ -169,7 +172,7 @@ All errors are `CryptoError` instances with `code` and `level`:
 | `DERIVATION_FAILED` | KDF | HKDF/KDF failure |
 | `ENCRYPTION_FAILED` | CIPHER | AES-GCM encrypt failure |
 | `DECRYPTION_FAILED` | CIPHER | AES-GCM auth failure or corrupt data |
-| `REPLAY_DETECTED` | CIPHER | Sequence counter violation |
+| `REPLAY_DETECTED` | CIPHER | Duplicate sequence within the replay window |
 | `SIGNATURE_FAILED` | SIGNATURE | Ed25519 signing error |
 | `VERIFICATION_FAILED` | SIGNATURE | SPK/signature verification failed |
 | `UNSUPPORTED_VERSION` | FORMAT | Unknown envelope version |
@@ -189,8 +192,7 @@ try {
 
 ## Roadmap
 
-- **BL-14** — Double Ratchet (message-key evolution per message)
-- **BL-14** — Window-based replay protection (beyond per-message sequence)
+- **BL-14** — Double Ratchet (message-key evolution per message; window-based replay protection shipped in 1.0.0-rc.1)
 - **PreKeyStorage** — IndexedDB implementation for messenger-layer persistence
 - **attRef** — Attestation reference for envelope origin verification
 

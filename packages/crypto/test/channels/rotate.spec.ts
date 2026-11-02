@@ -96,7 +96,7 @@ describe('rotateChannel', () => {
       messages.push(await encryptChannelMessage(ch0, i, new Uint8Array([i])));
     }
 
-    // Decrypt first one to advance lastDecryptedSeq
+    // Decrypt first one to populate the replay window (F7)
     await decryptChannelMessage(ch0, messages[0]);
 
     // Rotate

@@ -1,7 +1,7 @@
 // packages/crypto/src/channels/rotate.ts
 
 import { hkdf } from '../core/hkdf.js';
-import { getInternals, setInternals, dropInternals } from './state.js';
+import { getInternals, setInternals, dropInternals, brandChannel } from './state.js';
 import type { Channel } from './types.js';
 import { secureWipe } from '../core/wipe.js';
 
@@ -24,8 +24,10 @@ import { secureWipe } from '../core/wipe.js';
  * become undecryptable — that is the point.
  *
  * @param channel - The channel to rotate (mutated in place, new object returned).
- * @returns A NEW Channel object with epoch+1 and fresh internals.
- *   The old channel object is immediately invalidated (internals dropped).
+ * @returns A NEW Channel object with epoch+1 and fresh internals
+ *   (fresh replay window — the sequence space restarts). The object
+ *   is brand-validated (D1) and frozen (D2). The old channel object
+ *   is immediately invalidated (internals dropped).
  *
  * @example
  * ```ts
@@ -57,24 +59,29 @@ export async function rotateChannel(channel: Channel): Promise<Channel> {
   dropInternals(channel);
 
   // channelId is stable across rotations (derived from original sharedSecret)
+  // D1: brand BEFORE freezing (defineProperty throws on frozen); D2: freeze.
   const newChannel: Channel = {
     channelId: channel.channelId,
     epoch: newEpoch,
     role: channel.role,
   };
 
+  brandChannel(newChannel);
+
+  // Fresh replay window: the new epoch restarts the sequence space,
+  // so sequences seen in previous epochs must not reject it (F7).
   // Memory hygiene: if the internals hand-off fails, the fresh root
   // material must not survive the failure — ownership flag + wipe.
   let stored = false;
   try {
     setInternals(newChannel, {
       rootKeyMaterial: newRootMaterial,
-      lastDecryptedSeq: -1,
+      seenSeqs: new Set<number>(),
     });
     stored = true;
   } finally {
     if (!stored) secureWipe(newRootMaterial);
   }
 
-  return newChannel;
+  return Object.freeze(newChannel);
 }

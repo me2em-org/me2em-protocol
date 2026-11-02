@@ -50,6 +50,7 @@ export {
 } from './kdf/argon2.js';
 export { establishChannel } from './channels/establish.js';
 export { rotateChannel } from './channels/rotate.js';
+export { destroyChannel } from './channels/destroy.js';
 export {
   encryptChannelMessage,
   decryptChannelMessage,
