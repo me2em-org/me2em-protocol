@@ -1,23 +1,6 @@
 # Changelog
 
-## [Unreleased]
-
-### Fixed
-- `useIdentityContext`: `save()`/`clear()` no longer commit their state
-  change when the active identity switched while the storage operation
-  was in flight. The generation ticket from the rc.1 load-race fix only
-  orders these operations against in-flight loads; it does not know
-  about identity switches — a slow `save()` resolving after a logout
-  (or an identity switch) would surface identity A's context under the
-  new state, and a slow `clear()` could blank identity B's freshly
-  loaded context. Both commits are now guarded by the identity the
-  operation started for (render-mirrored ref); a stale commit is
-  dropped and the new identity's load effect owns the state.
-- `useIdentityContext`: a successful `save()`/`clear()` now resets a
-  previously set load `error` (parity with the load success path,
-  which already cleared it).
-
-## [1.0.0-rc.1] — 2026-11-03
+## [1.0.0-rc.1] — 2026-11-04
 
 Release-candidate alignment with `@me2em/core` 1.0.0-rc.1 (the
 API-freeze release of the LTS program). The public API of this package
@@ -26,6 +9,13 @@ is frozen as of this version; additive changes land in 1.x minors.
 ### Changed
 - `engines.node` floor raised to `>=22.0.0` (A2, applied workspace-wide:
   root, core, crypto, react).
+- Identity Context Cache envelope codec: base64url encoding now goes
+  through the audited `@scure/base` codec re-exported by `@me2em/core`
+  (`base64urlEncode`/`base64urlDecode`), replacing the hand-rolled
+  `btoa`/`atob` wrapper (audit R4) — one base64 implementation across
+  packages. The persisted envelope format is unchanged (unpadded
+  URL-safe base64); `deriveCacheKey` / `encryptContext` /
+  `decryptContext` signatures are untouched.
 - Test hygiene in the `useIdentityContext` spec: a fresh fake-IndexedDB
   factory per test. The tests derive the same identity from the same
   mnemonic, so their storage DB name is identical — a shared database
@@ -43,6 +33,26 @@ is frozen as of this version; additive changes land in 1.x minors.
   clobbering newer state. Pinned by a deterministic regression test
   that holds the pre-save load snapshot in a gated storage proxy and
   releases it after the save.
+- `useIdentityContext`: `save()`/`clear()` no longer commit their state
+  change when the active identity switched while the storage operation
+  was in flight. The generation ticket from the load-race fix only
+  orders these operations against in-flight loads; it does not know
+  about identity switches — a slow `save()` resolving after a logout
+  (or an identity switch) would surface identity A's context under the
+  new state, and a slow `clear()` could blank identity B's freshly
+  loaded context. Both commits are now guarded by the identity the
+  operation started for (render-mirrored ref); a stale commit is
+  dropped and the new identity's load effect owns the state.
+- `useIdentityContext`: a successful `save()`/`clear()` now resets a
+  previously set load `error` (parity with the load success path,
+  which already cleared it).
+- `SeedPhraseDisplay`: a failed clipboard copy now distinguishes a
+  permanent failure (async Clipboard API unavailable — non-secure
+  context, unsupported browser: the message points at manual word
+  selection and the copy button is disabled) from a transient one
+  (the write was rejected — retry stays possible and a successful
+  retry clears the error). The error element carries a
+  `data-kind="transient"|"permanent"` attribute (audit R8).
 
 ## 0.1.0-alpha.2
 
