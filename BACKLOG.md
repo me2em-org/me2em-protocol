@@ -202,6 +202,49 @@ development, not part of the shipped API contract.
   green. Non-breaking: devDeps never ship; rc.1 (published) keeps
   the runtime-safe inlined copy — this lands with the next crypto
   publish.
+- **BL-47 · open · react: dispose parity on identity swap/clear (react
+  rc.2).** `Me2emProvider` drops the previous `Identity` without
+  `dispose()` on both lifecycle exits — `activateIdentity()` overwrites
+  the handle, `clearIdentity()` nulls it — so old key material is never
+  zeroed even though core rc.2 ships an idempotent `dispose()` +
+  `DisposedError`. Verdict (2026-11-04, PR #53 follow-up): code fix in
+  react rc.2 — ref-mirror + dispose before swap and in
+  `clearIdentity()`, never inside state updaters (StrictMode
+  double-invoke, F3/R15 pattern); needs a generation counter on
+  `activateIdentity` (load-race class: two in-flight `fromSeed` may
+  land out of order and dispose the newer handle). No API change;
+  ~25 LOC + 2–3 tests. Slotted for the react rc.2 train with the
+  JSDoc fold (BL-48/BL-49, R5–R7).
+- **BL-48 · open · react: identitySeed retention in flow state — docs
+  now, opt-in consume in v1.1.** The reducer keeps raw seed bytes in
+  state after activation (`identity-flow.ts:59` 'verified',
+  `:35` 'imported'); no react hook reads it past 'seed-generated', so
+  retention is pure exposure surface (R15 class). Verdict
+  (2026-11-04): rc.2 = JSDoc contract on
+  `IdentityFlowState.identitySeed` ("retained by design, does not
+  self-consume"); auto-nulling at CONFIRM_WORDS is an observable
+  behavior change for headless consumers (public state type) → v1.1,
+  as an explicit `discardSeed()` action so the app decides when to
+  drop the material.
+- **BL-49 · open → won't-fix (by design) · react: deterministic grid
+  seed in SeedPhraseVerify.** `baseSeed = 42`
+  (`SeedPhraseVerify.tsx:28`) drives only the cosmetic verification
+  grid shuffle — decoys come from the public wordlist, retry already
+  varies it (`baseSeed + retryCount + 1`); not a security control,
+  determinism aids tests/SSR. Verdict (2026-11-04): keep as-is, no
+  `randomSeed` prop in 1.0 (no driver during freeze); one JSDoc line
+  in rc.2 ("grid shuffle is deterministic by design, not a security
+  control"); revisit a prop only on a real consumer request (v1.1+).
+- **BL-50 · open · react: structured errors ({handle, error}) instead
+  of string error — post-freeze v1.1.** Flow hooks surface `error` as
+  `string | null`; a `{handle, error}` union would let apps branch on
+  failure cause. Observable shape change at rc → v1.1 (verdict
+  2026-11-04, PR #53 follow-up).
+- **BL-51 · open · react: seed/clipboard hygiene on tab hide
+  (visibilitychange).** External-agent remark #7 (PR #53 follow-up,
+  2026-11-04): real but out of F-scope; needs a design verdict
+  (auto-clear on `visibilitychange` vs leaving it to the app) before
+  scheduling.
 
 ## P3 — Protocol Extensions (0.8+)
 
