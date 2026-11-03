@@ -14,18 +14,32 @@ import {
   identityFlowReducer,
   initialIdentityFlowState,
 } from '../headless/identity-flow.js';
-import type { IdentityFlowState, IdentityFlowEvent, IdentityFlowStatus } from '../headless/types.js';
+import type {
+  IdentityFlowState,
+  IdentityFlowEvent,
+  IdentityFlowStatus,
+  Me2emFlowError,
+  Me2emFlowErrorCode,
+} from '../headless/types.js';
 import { useMe2emContext } from './context.js';
 
 export interface UseCreateIdentityResult {
   status: IdentityFlowStatus;
   seedWords: string[] | null;
   identity: Identity | null;
-  error: string | null;
+  /** Structured failure (BL-50, v1.1) — match on `code`, not `message`. */
+  error: Me2emFlowError | null;
   generate: (opts?: { strength?: SeedStrength }) => void;
   confirmWords: () => Promise<void>;
+  /**
+   * BL-48 (v1.1): drops the retained seed material from the flow state
+   * once the app no longer needs it (after `confirmWords`). No-op from
+   * other statuses; the underlying buffer is not zeroed (R6).
+   */
+  discardSeed: () => void;
   reset: () => void;
-  fail: (message: string) => void;
+  /** Surface an app-driven failure; `code` defaults to `APP_FAILURE`. */
+  fail: (message: string, code?: Me2emFlowErrorCode) => void;
 }
 
 export function useCreateIdentity(): UseCreateIdentityResult {
@@ -40,7 +54,11 @@ export function useCreateIdentity(): UseCreateIdentityResult {
       get64ByteSeedFromMnemonic(words).then((derivedSeed) => {
         dispatch({ type: 'GENERATE', words, seed: derivedSeed });
       }).catch(() => {
-        dispatch({ type: 'FAIL', message: 'Failed to generate seed' });
+        dispatch({
+          type: 'FAIL',
+          code: 'GENERATE_FAILED',
+          message: 'Failed to generate seed',
+        });
       });
     },
     []
@@ -51,17 +69,27 @@ export function useCreateIdentity(): UseCreateIdentityResult {
     dispatch({ type: 'CONFIRM_WORDS' });
     const ok = await activateIdentity(state.identitySeed);
     if (!ok) {
-      dispatch({ type: 'FAIL', message: 'Identity activation failed' });
+      dispatch({
+        type: 'FAIL',
+        code: 'ACTIVATION_FAILED',
+        message: 'Identity activation failed',
+      });
     }
   }, [state.status, state.identitySeed, activateIdentity]);
+
+  const discardSeed = useCallback(() => {
+    // BL-48 (v1.1): seed hygiene — the app decides when the material
+    // is no longer needed (typically right after `confirmWords`).
+    dispatch({ type: 'DISCARD_SEED' });
+  }, []);
 
   const reset = useCallback(() => {
     dispatch({ type: 'RESET' });
     clearIdentity();
   }, [clearIdentity]);
 
-  const fail = useCallback((message: string) => {
-    dispatch({ type: 'FAIL', message });
+  const fail = useCallback((message: string, code?: Me2emFlowErrorCode) => {
+    dispatch({ type: 'FAIL', message, code });
   }, []);
 
   return {
@@ -71,6 +99,7 @@ export function useCreateIdentity(): UseCreateIdentityResult {
     error: state.error,
     generate,
     confirmWords,
+    discardSeed,
     reset,
     fail,
   };

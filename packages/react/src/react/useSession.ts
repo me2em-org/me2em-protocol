@@ -37,6 +37,16 @@ export interface UseSessionResult {
 }
 
 /**
+ * BL-52: the single half-life definition for both renewal paths — the
+ * timer delay and the `visibilitychange` check read the same fixed
+ * point (`expiresAt − ttl/2`), so the two paths cannot drift apart
+ * when `ttl` changes between session creation and a renewal decision.
+ */
+function halfLifePointMs(expiresAt: number, ttlSeconds: number): number {
+  return (expiresAt - ttlSeconds / 2) * 1000;
+}
+
+/**
  * Hook that creates and manages a signed session token for a Handle.
  *
  * When `handle` is provided, creates a Session with the given options.
@@ -128,15 +138,18 @@ export function useSession(
       setIsLoaded(true);
       setError(null);
 
-      // Schedule auto-renewal at half-life
+      // Schedule auto-renewal at half-life (BL-52: same threshold as
+      // the visibility path; fires within 1s even if already past the
+      // point, instead of never scheduling).
       if (autoRenew) {
-        const halfLife = Math.floor((s.expiresAt * 1000 - Date.now()) / 2);
-        if (halfLife > 0) {
-          timerRef.current = setTimeout(() => {
-            // eslint-disable-next-line react-hooks/immutability -- self-rescheduling renewal timer: the timer is cleared and re-created whenever renew itself changes (deps + clearTimer), so the captured binding is always the current one
-            renew();
-          }, Math.max(halfLife, 1000));
-        }
+        const delay = Math.max(
+          halfLifePointMs(s.expiresAt, opts.ttl) - Date.now(),
+          1000
+        );
+        timerRef.current = setTimeout(() => {
+          // eslint-disable-next-line react-hooks/immutability -- self-rescheduling renewal timer: the timer is cleared and re-created whenever renew itself changes (deps + clearTimer), so the captured binding is always the current one
+          renew();
+        }, delay);
       }
     }).catch((err) => {
       if (!mountedRef.current) return;
@@ -168,7 +181,7 @@ export function useSession(
       if (document.visibilityState !== 'visible') return;
       const s = session;
       if (!s) return;
-      const halfLifePoint = (s.expiresAt - optionsRef.current.ttl / 2) * 1000;
+      const halfLifePoint = halfLifePointMs(s.expiresAt, optionsRef.current.ttl);
       if (Date.now() >= halfLifePoint) {
         renew();
       }

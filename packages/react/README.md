@@ -55,6 +55,20 @@ function CreateIdentityScreen() {
 }
 ```
 
+### Seed hygiene (v1.1)
+
+After the user confirms (or imports) the phrase, call `discardSeed()` —
+the flow stops holding the raw seed material in state. Call it once you
+no longer need the phrase, typically right after `confirmWords()` or a
+successful `importWords()`:
+
+```tsx
+const { status, seedWords, generate, confirmWords, discardSeed } = useCreateIdentity();
+
+// in the 'verified' branch:
+discardSeed(); // identitySeed is dropped from the flow state
+```
+
 ## Layers
 
 The package has two strict layers:
@@ -156,7 +170,13 @@ The `useSession` hook creates and auto-renews signed session tokens for a Handle
 import { useHandle, useSession } from '@me2em/react';
 
 function ChatScreen() {
-  const handle = useHandle('alice');
+  const { handle, error } = useHandle('alice');
+
+  if (error) {
+    // Machine-readable cause: 'NO_IDENTITY', core AttestationErrorCode
+    // (e.g. 'DISPOSED', 'MALFORMED'), or 'UNKNOWN'.
+    return <p>Handle unavailable: {error.code}</p>;
+  }
 
   const { session, isExpired, renew } = useSession(handle, {
     audience: 'chat.example.com',
@@ -172,7 +192,11 @@ function ChatScreen() {
 }
 ```
 
-The hook auto-renews at half the session TTL by default. Set `autoRenew: false` to disable.
+Since 1.1 the derivation hooks return a structured result instead of
+`Handle | null`: `{ handle, error: null }` on success,
+`{ handle: null, error }` on failure, and `{ handle: null, error: null }
+while the derivation is still in flight. The hook auto-renews at half the
+session TTL by default. Set `autoRenew: false` to disable.
 
 ## Identity Context Cache
 
@@ -228,6 +252,10 @@ Each identity gets a separate IndexedDB database (name = SHA-256 hash of identit
 
 ## Status
 
-Alpha. API may change between 0.1.x releases. See [packages/core/README.md](../../packages/core/README.md) for the underlying protocol.
+1.x. The 1.0 contract is frozen; 1.1 accepts a one-time early break for
+structured derivation errors and adds opt-in seed hygiene (see
+[CHANGELOG](./CHANGELOG.md)). See
+[packages/core/README.md](../../packages/core/README.md) for the
+underlying protocol.
 
 Roadmap: `@me2em/crypto` shipped (0.1.0-alpha.1); `@me2em/messenger` planned (BACKLOG BL-29).

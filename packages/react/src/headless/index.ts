@@ -3,6 +3,8 @@ export type {
   IdentityFlowState,
   IdentityFlowStatus,
   IdentityFlowEvent,
+  Me2emFlowError,
+  Me2emFlowErrorCode,
 } from './types.js';
 export {
   buildVerificationGrid,

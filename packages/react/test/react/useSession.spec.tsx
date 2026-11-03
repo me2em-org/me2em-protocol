@@ -47,7 +47,7 @@ describe('useSession', () => {
   it('with handle → session', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();
-      const handle = useHandle('test-handle');
+      const { handle } = useHandle('test-handle');
       const { session } = useSession(handle, {
         audience: 'test.audience',
         scopes: ['read', 'write'],
@@ -79,7 +79,7 @@ describe('useSession', () => {
   it('renew → jti changed', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();
-      const handle = useHandle('renew-handle');
+      const { handle } = useHandle('renew-handle');
       const { session, isLoaded, renew } = useSession(handle, {
         audience: 'renew.test',
         scopes: ['write'],
@@ -119,7 +119,7 @@ describe('useSession', () => {
   it('auto-renew ttl:2 → jti changed', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();
-      const handle = useHandle('autorenew-handle');
+      const { handle } = useHandle('autorenew-handle');
       const { session } = useSession(handle, {
         audience: 'auto.test',
         scopes: ['read'],
@@ -147,18 +147,21 @@ describe('useSession', () => {
 
     const firstJti = result.current.session!.sessionId;
 
-    // Wait for auto-renewal (half of 2s TTL = ~1s, plus buffer)
-    await new Promise((r) => setTimeout(r, 3000));
-
-    await waitFor(() => {
-      expect(result.current.session!.sessionId).not.toBe(firstJti);
-    });
+    // Wait for auto-renewal (half of 2s TTL = ~1s). BL-53: waitFor
+    // polls, so the test ends as soon as the renewal lands instead of
+    // sleeping a fixed 3 s.
+    await waitFor(
+      () => {
+        expect(result.current.session!.sessionId).not.toBe(firstJti);
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('autoRenew:false + ttl:1 → isExpired', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();
-      const handle = useHandle('expiry-handle');
+      const { handle } = useHandle('expiry-handle');
       const { session, isLoaded } = useSession(handle, {
         audience: 'expiry.test',
         scopes: ['read'],
@@ -187,16 +190,20 @@ describe('useSession', () => {
     // Initially not expired
     expect(result.current.session!.isExpired()).toBe(false);
 
-    // Wait for TTL to expire (1 second)
-    await new Promise((r) => setTimeout(r, 2000));
-
-    expect(result.current.session!.isExpired()).toBe(true);
+    // Wait for TTL to expire (1 second). BL-53: bounded waitFor
+    // replaces a fixed 2 s sleep.
+    await waitFor(
+      () => {
+        expect(result.current.session!.isExpired()).toBe(true);
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('renews on return to visibility when past half-life (BL-51)', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();
-      const handle = useHandle('visibility-handle');
+      const { handle } = useHandle('visibility-handle');
       const { session } = useSession(handle, {
         audience: 'vis.test',
         scopes: ['read'],
@@ -232,7 +239,10 @@ describe('useSession', () => {
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'));
       });
-      await new Promise((r) => setTimeout(r, 50));
+      // Absence window (BL-53): a real-timer pause — waitFor cannot
+      // prove a renewal did NOT happen; a buggy renew would flip the
+      // jti assert below within this window.
+      await new Promise((r) => setTimeout(r, 25));
       expect(result.current.session!.sessionId).toBe(firstJti);
 
       // Visible again → proactive renewal, no overdue-timer wait.
@@ -252,7 +262,7 @@ describe('useSession', () => {
   it('no renewal on visibility before half-life (BL-51)', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();
-      const handle = useHandle('vis-early-handle');
+      const { handle } = useHandle('vis-early-handle');
       const { session } = useSession(handle, {
         audience: 'vis-early.test',
         scopes: ['read'],
@@ -282,7 +292,10 @@ describe('useSession', () => {
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'));
       });
-      await new Promise((r) => setTimeout(r, 50));
+      // Absence window (BL-53): a real-timer pause — waitFor cannot
+      // prove a renewal did NOT happen; a buggy renew would flip the
+      // jti assert below within this window.
+      await new Promise((r) => setTimeout(r, 25));
       expect(result.current.session!.sessionId).toBe(firstJti);
     } finally {
       vi.useRealTimers();
@@ -292,7 +305,7 @@ describe('useSession', () => {
   it('autoRenew:false opts out of visibility renewal (BL-51)', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();
-      const handle = useHandle('vis-optout-handle');
+      const { handle } = useHandle('vis-optout-handle');
       const { session } = useSession(handle, {
         audience: 'vis-optout.test',
         scopes: ['read'],
@@ -322,7 +335,10 @@ describe('useSession', () => {
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'));
       });
-      await new Promise((r) => setTimeout(r, 50));
+      // Absence window (BL-53): a real-timer pause — waitFor cannot
+      // prove a renewal did NOT happen; a buggy renew would flip the
+      // jti assert below within this window.
+      await new Promise((r) => setTimeout(r, 25));
       expect(result.current.session!.sessionId).toBe(firstJti);
     } finally {
       vi.useRealTimers();

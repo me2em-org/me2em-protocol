@@ -9,8 +9,19 @@ export const initialIdentityFlowState: IdentityFlowState = {
 
 const UNEXPECTED_EVENTS: Record<string, string> = {
   CONFIRM_WORDS: 'CONFIRM_WORDS called from idle — no seed to confirm',
+  DISCARD_SEED: 'DISCARD_SEED called from idle — no seed to discard',
   RESET: 'RESET called from idle — nothing to reset',
 };
+
+function flowFailure(event: Extract<IdentityFlowEvent, { type: 'FAIL' }>): IdentityFlowState {
+  return {
+    status: 'error',
+    seedWords: null,
+    identitySeed: null,
+    // BL-50 (v1.1): structured failure — match on code, not message.
+    error: { code: event.code ?? 'APP_FAILURE', message: event.message },
+  };
+}
 
 export function identityFlowReducer(
   state: IdentityFlowState,
@@ -37,12 +48,7 @@ export function identityFlowReducer(
         };
       }
       if (type === 'FAIL') {
-        return {
-          status: 'error',
-          seedWords: null,
-          identitySeed: null,
-          error: event.message,
-        };
+        return flowFailure(event);
       }
       if (UNEXPECTED_EVENTS[type]) {
         console.warn(UNEXPECTED_EVENTS[type]);
@@ -61,12 +67,7 @@ export function identityFlowReducer(
         };
       }
       if (type === 'FAIL') {
-        return {
-          status: 'error',
-          seedWords: null,
-          identitySeed: null,
-          error: event.message,
-        };
+        return flowFailure(event);
       }
       if (type === 'RESET') {
         return initialIdentityFlowState;
@@ -77,16 +78,18 @@ export function identityFlowReducer(
 
     case 'verified':
     case 'imported': {
+      if (type === 'DISCARD_SEED') {
+        // BL-48 (v1.1): drop the retained seed material on the app's
+        // explicit request. The buffer itself is not zeroed (mixed
+        // caller/library ownership, R6); the flow simply stops holding
+        // a reference, making the bytes GC-eligible.
+        return { ...state, identitySeed: null };
+      }
       if (type === 'RESET') {
         return initialIdentityFlowState;
       }
       if (type === 'FAIL') {
-        return {
-          status: 'error',
-          seedWords: null,
-          identitySeed: null,
-          error: event.message,
-        };
+        return flowFailure(event);
       }
       console.warn(`Unexpected event ${type} in ${state.status}`);
       return state;

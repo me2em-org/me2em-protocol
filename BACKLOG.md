@@ -215,17 +215,18 @@ development, not part of the shipped API contract.
   land out of order and dispose the newer handle). No API change;
   ~25 LOC + 2–3 tests. Slotted for the react rc.2 train with the
   JSDoc fold (BL-48/BL-49, R5–R7).
-- **BL-48 · open · react: identitySeed retention in flow state — docs
-  now, opt-in consume in v1.1.** The reducer keeps raw seed bytes in
-  state after activation (`identity-flow.ts:59` 'verified',
-  `:35` 'imported'); no react hook reads it past 'seed-generated', so
-  retention is pure exposure surface (R15 class). Verdict
-  (2026-11-04): rc.2 = JSDoc contract on
-  `IdentityFlowState.identitySeed` ("retained by design, does not
-  self-consume"); auto-nulling at CONFIRM_WORDS is an observable
-  behavior change for headless consumers (public state type) → v1.1,
-  as an explicit `discardSeed()` action so the app decides when to
-  drop the material.
+- **BL-48 · done · react: identitySeed retention in flow state —
+  explicit `discardSeed()` shipped in v1.1.** The reducer keeps raw
+  seed bytes in state after activation ('verified'/'imported'); no
+  react hook reads them past 'seed-generated', so retention is pure
+  exposure surface (R15 class). Verdict (2026-11-04): rc.2 shipped the
+  JSDoc contract ("retained by design, does not self-consume"); v1.1
+  ships the app-initiated hygiene action — `discardSeed()` on
+  `useCreateIdentity`/`useImportSeed` (headless `DISCARD_SEED` event)
+  nulls `identitySeed` from 'verified'/'imported' and keeps the
+  status; no-op while the words are still on screen (RESET is the
+  abort path there); the underlying buffer is not zeroed (mixed
+  caller/library ownership, R6). Shipped in the v1.1 train.
 - **BL-49 · open → won't-fix (by design) · react: deterministic grid
   seed in SeedPhraseVerify.** `baseSeed = 42`
   (`SeedPhraseVerify.tsx:28`) drives only the cosmetic verification
@@ -235,11 +236,19 @@ development, not part of the shipped API contract.
   `randomSeed` prop in 1.0 (no driver during freeze); one JSDoc line
   in rc.2 ("grid shuffle is deterministic by design, not a security
   control"); revisit a prop only on a real consumer request (v1.1+).
-- **BL-50 · open · react: structured errors ({handle, error}) instead
-  of string error — post-freeze v1.1.** Flow hooks surface `error` as
-  `string | null`; a `{handle, error}` union would let apps branch on
-  failure cause. Observable shape change at rc → v1.1 (verdict
-  2026-11-04, PR #53 follow-up).
+- **BL-50 · done · react: structured errors ({handle, error}) instead
+  of string error — early break accepted, shipped in v1.1.** Flow
+  hooks surfaced `error` as `string | null`; `useHandle`/`useSubHandle`
+  failed silently (console.error + null, R7). Verdict (2026-11-04,
+  architect): **early break** — no dual-shape deprecation window (the
+  ecosystem at rc.3 is empty). Shipped in the v1.1 train:
+  `HandleResult`/`SubHandleResult` discriminated unions with
+  machine-readable codes (`AttestationErrorCode` pass-through from
+  core + `NO_IDENTITY`/`UNKNOWN`); flow errors are
+  `Me2emFlowError { code, message }` (GENERATE_FAILED /
+  INVALID_WORDS / DERIVATION_FAILED / ACTIVATION_FAILED /
+  APP_FAILURE); the previously ignored `activateIdentity` result in
+  `useImportSeed` now surfaces as `ACTIVATION_FAILED`.
 - **BL-51 · done · react: `useSession` does not renew on return to
   visibility.** External-agent remark #8 (PR #53 follow-up,
   2026-11-04). Entry correction: the record originally filed here
@@ -257,7 +266,7 @@ development, not part of the shipped API contract.
   reschedules the timer, so no double-renewal. Pinned by 3 tests
   (renew past half-life incl. hidden-event no-op, no-op before
   half-life, opt-out).
-- **BL-52 · open · react: unify the half-life formula in `useSession`
+- **BL-52 · done · react: unify the half-life formula in `useSession`
   (timer vs visibility paths).** PR #56 review follow-up, non-blocking
   (2026-11-04). The timer path schedules
   `Math.floor((expiresAt*1000 − Date.now()) / 2)`
@@ -270,18 +279,21 @@ development, not part of the shipped API contract.
   window — code smell, not a bug). Fix: extract a
   `halfLifePointMs(session, ttl)` helper and drive **both** paths from
   it (timer delay `max(halfLifePointMs − now, 1000)`); one formula, no
-  future drift.
-- **BL-53 · open · react: replace real-timer sleeps in the BL-51
-  visibility tests with `waitFor`.** PR #56 review follow-up,
-  non-blocking (2026-11-04). The three new tests assert the
-  hidden-event no-op behind
-  `await new Promise((r) => setTimeout(r, 50))`
-  (`useSession.spec.tsx:235/285/325`) — ~150 ms of real-wait overhead
-  per run (safe only because the fake timers fake `Date` but not
-  `setTimeout`). Swap each for a `waitFor` on the same assertion — no
-  semantic change, no sleeps. Optional same-file extension: the older
-  timer-path tests sleep 2–3 s (`useSession.spec.tsx:151/191`) and can
-  move to bounded `waitFor` too.
+  future drift. Shipped in the v1.1 train; the timer additionally
+  schedules (min 1s delay) when already past the point instead of
+  never scheduling.
+- **BL-53 · done · react: replace real-timer sleeps in the BL-51
+  visibility tests with bounded waits.** PR #56 review follow-up,
+  non-blocking (2026-11-04). The three new tests asserted the
+  hidden-event no-op behind `await new Promise((r) => setTimeout(r,
+  50))` (~150 ms of real-wait overhead; safe only because the fake
+  timers fake `Date` but not `setTimeout`). Shipped in the v1.1 train
+  with a deliberate split: the two old timer-path tests (fixed 2–3 s
+  sleeps) moved to bounded `waitFor` (renewal is a *presence*
+  assertion — polls end it early), while the absence windows shrink
+  to 25 ms with an explicit rationale — waitFor cannot prove a
+  renewal did NOT happen, so a sleep stays the only honest form
+  there.
 
 ## P3 — Protocol Extensions (0.8+)
 

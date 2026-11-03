@@ -62,7 +62,7 @@ describe('identityFlowReducer', () => {
     expect(result.status).toBe('idle');
   });
 
-  it('FAIL from seed-generated clears everything and sets error', () => {
+  it('FAIL from seed-generated clears everything and sets structured error', () => {
     const words = makeWords(1);
     const seed = makeSeed(1);
     const generated: IdentityFlowEvent = { type: 'GENERATE', words, seed };
@@ -74,7 +74,65 @@ describe('identityFlowReducer', () => {
     expect(result.status).toBe('error');
     expect(result.seedWords).toBeNull();
     expect(result.identitySeed).toBeNull();
-    expect(result.error).toBe('user cancelled');
+    expect(result.error).toEqual({ code: 'APP_FAILURE', message: 'user cancelled' });
+  });
+
+  it('FAIL with an explicit code carries it through (BL-50)', () => {
+    const fail: IdentityFlowEvent = {
+      type: 'FAIL',
+      code: 'INVALID_WORDS',
+      message: 'checksum mismatch',
+    };
+    const result = identityFlowReducer(initialIdentityFlowState, fail);
+
+    expect(result.status).toBe('error');
+    expect(result.error).toEqual({ code: 'INVALID_WORDS', message: 'checksum mismatch' });
+  });
+
+  it('DISCARD_SEED from verified nulls the seed, keeps status (BL-48)', () => {
+    const words = makeWords(1);
+    const seed = makeSeed(1);
+    const generated: IdentityFlowEvent = { type: 'GENERATE', words, seed };
+    const confirmed = identityFlowReducer(
+      identityFlowReducer(initialIdentityFlowState, generated),
+      { type: 'CONFIRM_WORDS' }
+    );
+    expect(confirmed.identitySeed).toEqual(seed);
+
+    const result = identityFlowReducer(confirmed, { type: 'DISCARD_SEED' });
+
+    expect(result.status).toBe('verified');
+    expect(result.identitySeed).toBeNull();
+    expect(result.seedWords).toBeNull();
+    expect(result.error).toBeNull();
+  });
+
+  it('DISCARD_SEED from imported nulls the seed, keeps status (BL-48)', () => {
+    const seed = makeSeed(7);
+    const imported = identityFlowReducer(initialIdentityFlowState, {
+      type: 'IMPORT',
+      seed,
+    });
+
+    const result = identityFlowReducer(imported, { type: 'DISCARD_SEED' });
+
+    expect(result.status).toBe('imported');
+    expect(result.identitySeed).toBeNull();
+  });
+
+  it('DISCARD_SEED from seed-generated is a no-op (words still on screen)', () => {
+    const words = makeWords(1);
+    const seed = makeSeed(1);
+    const generated = identityFlowReducer(initialIdentityFlowState, {
+      type: 'GENERATE',
+      words,
+      seed,
+    });
+
+    const result = identityFlowReducer(generated, { type: 'DISCARD_SEED' });
+
+    expect(result).toBe(generated);
+    expect(result.identitySeed).toEqual(seed);
   });
 
   it('RESET after verified returns to initial state', () => {

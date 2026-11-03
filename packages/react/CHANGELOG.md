@@ -1,5 +1,57 @@
 # Changelog
 
+## [1.1.0] — 2026-11-04
+
+Seed hygiene (BL-48) and structured errors (BL-50) — the post-freeze
+train. **Early break accepted** (verdict 2026-11-04): the derivation
+hook and flow error shapes change in a minor release; the ecosystem at
+rc.3 is empty, so no deprecation window is provided.
+
+### Breaking (early break — BL-50)
+- `useHandle` returns a discriminated union instead of
+  `Handle | null`: `{ handle, error: null }` on success,
+  `{ handle: null, error }` on failure, `{ handle: null, error: null }`
+  while the derivation is in flight. `error.code` is machine-readable:
+  `AttestationErrorCode` from core passes through verbatim, plus
+  `NO_IDENTITY` (no activated identity in the provider) and `UNKNOWN`
+  (outside the core error model). Failures no longer go only to the
+  console (R7 resolved).
+- `useSubHandle` returns the same union under `subHandle`
+  (`SubHandleResult`).
+- Flow hooks (`useCreateIdentity`, `useImportSeed`) surface `error` as
+  `Me2emFlowError | null` (`{ code, message }`) instead of
+  `string | null`; `IdentityFlowState.error` and the `FAIL` event
+  carry the same shape (`FAIL` gains an optional `code`, defaulting to
+  `APP_FAILURE`). Flow codes: `GENERATE_FAILED`, `INVALID_WORDS`,
+  `DERIVATION_FAILED`, `ACTIVATION_FAILED`, `APP_FAILURE`.
+- Migration: destructure `const { handle } = useHandle('name')` and
+  branch on `error.code`; replace string comparisons against `error`
+  with code matches.
+
+### Added
+- BL-48: `discardSeed()` on `useCreateIdentity` and `useImportSeed`
+  (and the headless `DISCARD_SEED` event) — the app-initiated seed
+  hygiene action drops the retained `identitySeed` from the flow state
+  after activation, making the bytes GC-eligible. Valid from
+  'verified'/'imported' (no-op while the words are still on screen);
+  the underlying buffer is not zeroed (mixed caller/library ownership,
+  R6).
+
+### Fixed
+- `useImportSeed` no longer swallows activation failures: the
+  `activateIdentity` result was ignored, so a failed activation left
+  the flow in 'imported' with no error and no identity. It now
+  surfaces as a structured `ACTIVATION_FAILED` failure.
+- BL-52: the half-life threshold is defined once
+  (`halfLifePointMs(expiresAt, ttl)`); the timer and the
+  `visibilitychange` path read the same fixed point, so they cannot
+  drift when `ttl` changes mid-session. The timer now also schedules
+  (min 1s delay) when the session is already past the point, instead
+  of never scheduling.
+- BL-53: test hygiene — bounded `waitFor` replaces the fixed 2–3 s
+  sleeps in the renewal tests; the BL-51 absence windows shrink to
+  25 ms with an explicit rationale (waitFor cannot prove absence).
+
 ## [1.0.0-rc.3] — 2026-11-04
 
 Session renewal on return to visibility (BL-51). No public API

@@ -7,6 +7,12 @@ export { useImportSeed } from './useImportSeed.js';
 export type { UseImportSeedResult } from './useImportSeed.js';
 export { useHandle } from './useHandle.js';
 export { useSubHandle } from './useSubHandle.js';
+export type {
+  HandleResult,
+  SubHandleResult,
+  Me2emHookError,
+  Me2emHookErrorCode,
+} from './hook-results.js';
 export { SeedPhraseDisplay } from './SeedPhraseDisplay.js';
 export type { SeedPhraseDisplayProps } from './SeedPhraseDisplay.js';
 export { SeedPhraseVerify } from './SeedPhraseVerify.js';
