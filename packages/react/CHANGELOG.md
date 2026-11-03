@@ -1,9 +1,11 @@
 # Changelog
 
-## [1.0.0] — 2026-11-04
+## [1.0.0-rc.4] — 2026-11-04
 
-General availability. Promotion of the rc line — no code changes since
-[1.0.0-rc.3]. The API surface frozen across rc.1–rc.3 (dispose parity
+Snapshot promotion of the frozen rc line — no code changes since
+[1.0.0-rc.3]. The rc line stays on `latest` while no stable release
+exists on npm; the audit-gated stable release follows PLAN-LTS-v1
+(§9–10, D7). The API surface frozen across rc.1–rc.3 (dispose parity
 BL-47, visibility renewal BL-51, the R5–R7 documentation contracts) is
 the 1.0 contract. Post-freeze evolution resumes in [1.1.0] (BL-48 seed
 hygiene, BL-50 structured errors with the accepted early break).
