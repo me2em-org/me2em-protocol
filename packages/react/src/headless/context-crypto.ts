@@ -24,7 +24,9 @@ export interface ContextEnvelope {
  * Raw key bytes exist only transiently during importKey.
  *
  * @param loginMaterial - high-entropy bytes available at login
- *   (derived from the seed while it is still in memory).
+ *   (derived from the seed while it is still in memory). Caller-owned:
+ *   deriveCacheKey reads but never wipes them — zero the buffer (and
+ *   the seed it came from) when done (R6).
  * @param salt - FRESH random bytes for this login. Never reuse a
  *   salt across logins: the whole point is that a compromised
  *   cacheKey from session N is useless in session N+1.

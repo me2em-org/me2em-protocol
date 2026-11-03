@@ -16,6 +16,15 @@ export interface IdentityContextStorage {
   save(data: IdentityContextData): Promise<void>;
   load(): Promise<IdentityContextData | null>;
   clear(): Promise<void>;
+  /**
+   * Closes the IDB connection. Caller-owned lifecycle (R5): close()
+   * also drops the in-memory cache key and the open identity binding,
+   * so every further operation throws "Storage not opened" until the
+   * storage is reopened via open()/openAndLoad() and the cache key is
+   * set again. open() with a different identityId closes the previous
+   * connection automatically; same-identity open() after close()
+   * simply opens a fresh connection.
+   */
   close(): Promise<void>;
   /** Open storage for identity and atomically load cached context. */
   openAndLoad(identityId: string): Promise<IdentityContextData | null>;
