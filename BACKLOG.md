@@ -257,6 +257,31 @@ development, not part of the shipped API contract.
   reschedules the timer, so no double-renewal. Pinned by 3 tests
   (renew past half-life incl. hidden-event no-op, no-op before
   half-life, opt-out).
+- **BL-52 · open · react: unify the half-life formula in `useSession`
+  (timer vs visibility paths).** PR #56 review follow-up, non-blocking
+  (2026-11-04). The timer path schedules
+  `Math.floor((expiresAt*1000 − Date.now()) / 2)`
+  (`useSession.ts:133`) — a dynamic half of the *remaining* TTL from
+  the moment of scheduling — while the visibility path checks the
+  fixed point `(expiresAt − ttl/2) * 1000`
+  (`useSession.ts:171`). Equivalent while `options.ttl` is constant;
+  they diverge if `ttl` changes mid-session before the
+  `useEffect([handle, renew])` renew re-creates the session (narrow
+  window — code smell, not a bug). Fix: extract a
+  `halfLifePointMs(session, ttl)` helper and drive **both** paths from
+  it (timer delay `max(halfLifePointMs − now, 1000)`); one formula, no
+  future drift.
+- **BL-53 · open · react: replace real-timer sleeps in the BL-51
+  visibility tests with `waitFor`.** PR #56 review follow-up,
+  non-blocking (2026-11-04). The three new tests assert the
+  hidden-event no-op behind
+  `await new Promise((r) => setTimeout(r, 50))`
+  (`useSession.spec.tsx:235/285/325`) — ~150 ms of real-wait overhead
+  per run (safe only because the fake timers fake `Date` but not
+  `setTimeout`). Swap each for a `waitFor` on the same assertion — no
+  semantic change, no sleeps. Optional same-file extension: the older
+  timer-path tests sleep 2–3 s (`useSession.spec.tsx:151/191`) and can
+  move to bounded `waitFor` too.
 
 ## P3 — Protocol Extensions (0.8+)
 
