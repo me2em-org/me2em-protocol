@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react';
 import { type SubHandle } from '@me2em/core';
 import { useMe2emContext } from './context.js';
 
+/**
+ * Derives the named SubHandle under the given Handle.
+ *
+ * Silent-failure contract (R7): on derivation failure the hook logs
+ * via console.error and keeps returning null — there is no thrown or
+ * returned error signal. The structured `{ handle, error }` shape is
+ * a post-freeze v1.1 candidate (BL-50).
+ */
 export function useSubHandle(
   handleName: string,
   subName: string

@@ -9,6 +9,13 @@ export type IdentityFlowStatus =
 export interface IdentityFlowState {
   status: IdentityFlowStatus;
   seedWords: string[] | null;
+  /**
+   * Raw seed material, retained in state after 'verified'/'imported'
+   * by design — the flow does NOT self-consume it (BL-48): headless
+   * consumers may still read it at this point. Reachable via devtools
+   * in this window (R15 category). An explicit `discardSeed()` action
+   * is the planned v1.1 opt-in; until then the app owns dropping it.
+   */
   identitySeed: Uint8Array | null;
   error: string | null;
 }

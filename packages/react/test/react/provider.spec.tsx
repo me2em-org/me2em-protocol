@@ -5,7 +5,7 @@ import { useMe2emContext } from '../../src/react/context.js';
 import { useHandle } from '../../src/react/useHandle.js';
 import { useCreateIdentity } from '../../src/react/useCreateIdentity.js';
 import { useImportSeed } from '../../src/react/useImportSeed.js';
-import { get64ByteSeedFromMnemonic } from '@me2em/core';
+import { get64ByteSeedFromMnemonic, Identity, DisposedError } from '@me2em/core';
 describe('Me2emProvider', () => {
   it('returns hasIdentity=false when no identity', () => {
     const { result } = renderHook(() => useMe2emContext(), {
@@ -59,6 +59,152 @@ describe('Me2emProvider', () => {
       expect(() => renderHook(() => useMe2emContext())).toThrow(
         'Me2em hooks must be used inside <Me2emProvider>'
       );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+const MNEMONIC_2 =
+  'legal winner thank year wave sausage worth useful legal winner thank yellow';
+
+describe('Me2emProvider — BL-47 dispose parity', () => {
+  it('re-activation disposes the replaced identity', async () => {
+    const seed1 = await get64ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
+    const seed2 = await get64ByteSeedFromMnemonic(MNEMONIC_2);
+
+    const { result } = renderHook(() => useMe2emContext(), {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await result.current.activateIdentity(seed1);
+    await waitFor(() => {
+      expect(result.current.hasIdentity).toBe(true);
+    });
+    const first = result.current.identity!;
+
+    await result.current.activateIdentity(seed2);
+    await waitFor(() => {
+      expect(result.current.identity).not.toBe(first);
+    });
+    // The replaced handle is zeroed: capability methods reject loudly
+    // with DisposedError (core contract) instead of silently working.
+    await expect(first.deriveHandle('probe')).rejects.toThrow(DisposedError);
+    // The replacement itself keeps working.
+    await expect(
+      result.current.identity!.deriveHandle('probe')
+    ).resolves.not.toBeNull();
+  });
+
+  it('clearIdentity disposes the identity', async () => {
+    const seed = await get64ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
+
+    const { result } = renderHook(() => useMe2emContext(), {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await result.current.activateIdentity(seed);
+    await waitFor(() => {
+      expect(result.current.hasIdentity).toBe(true);
+    });
+    const id = result.current.identity!;
+
+    result.current.clearIdentity();
+    await waitFor(() => {
+      expect(result.current.hasIdentity).toBe(false);
+    });
+    await expect(id.deriveHandle('probe')).rejects.toThrow(DisposedError);
+  });
+
+  it('unmount disposes the active identity', async () => {
+    const seed = await get64ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
+
+    const { result, unmount } = renderHook(() => useMe2emContext(), {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await result.current.activateIdentity(seed);
+    await waitFor(() => {
+      expect(result.current.hasIdentity).toBe(true);
+    });
+    const id = result.current.identity!;
+
+    unmount();
+    await expect(id.deriveHandle('probe')).rejects.toThrow(DisposedError);
+  });
+
+  it('superseded in-flight activation resolves false and disposes its own handle', async () => {
+    const seed1 = await get64ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
+    const seed2 = await get64ByteSeedFromMnemonic(MNEMONIC_2);
+    const lateIdentity = await Identity.fromSeed(seed1); // loser, lands late
+
+    let resolveSlow!: (id: Identity) => void;
+    const slow = new Promise<Identity>((res) => {
+      resolveSlow = res;
+    });
+    const realFromSeed = Identity.fromSeed.bind(Identity);
+    let calls = 0;
+    const spy = vi
+      .spyOn(Identity, 'fromSeed')
+      .mockImplementation(async (s: Uint8Array) => {
+        calls += 1;
+        if (calls === 1) return slow;
+        return realFromSeed(s);
+      });
+
+    try {
+      const { result } = renderHook(() => useMe2emContext(), {
+        wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+      });
+
+      const slowActivation = result.current.activateIdentity(seed1);
+      await result.current.activateIdentity(seed2);
+      await waitFor(() => {
+        expect(result.current.hasIdentity).toBe(true);
+      });
+      const winner = result.current.identity!;
+
+      resolveSlow(lateIdentity); // the slow result lands after the fast one
+      await expect(slowActivation).resolves.toBe(false);
+
+      // Newer state survived; the late loser was disposed by the
+      // provider, not leaked into state.
+      expect(result.current.identity).toBe(winner);
+      await expect(
+        lateIdentity.deriveHandle('probe')
+      ).rejects.toThrow(DisposedError);
+      await expect(
+        winner.deriveHandle('probe')
+      ).resolves.not.toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('failed derivation resolves false and leaves no identity', async () => {
+    const seed = await get64ByteSeedFromMnemonic(
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    );
+    const spy = vi
+      .spyOn(Identity, 'fromSeed')
+      .mockRejectedValueOnce(new Error('derive failed'));
+
+    try {
+      const { result } = renderHook(() => useMe2emContext(), {
+        wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+      });
+
+      await expect(result.current.activateIdentity(seed)).resolves.toBe(false);
+      expect(result.current.hasIdentity).toBe(false);
+      expect(result.current.identity).toBeNull();
     } finally {
       spy.mockRestore();
     }

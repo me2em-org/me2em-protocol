@@ -188,6 +188,15 @@ import {
 function ContextPanel() {
   const storage = useMemo(() => new IdentityContextIDBStorage(), []);
 
+  // Caller-owned lifecycle (R5): close the IDB connection on unmount.
+  // close() also drops the in-memory cache key — reopen + setCacheKey
+  // before the next use.
+  useEffect(() => {
+    return () => {
+      void storage.close();
+    };
+  }, [storage]);
+
   // At login time, derive and set the cache key:
   useEffect(() => {
     const salt = crypto.getRandomValues(new Uint8Array(32));
@@ -215,7 +224,7 @@ function ContextPanel() {
 }
 ```
 
-Each identity gets a separate IndexedDB database (name = SHA-256 hash of identity ID), guaranteeing full isolation between identities.
+Each identity gets a separate IndexedDB database (name = SHA-256 hash of identity ID), guaranteeing full isolation between identities. The storage connection is caller-owned: `close()` on unmount (as above) also drops the in-memory cache key — `open()`/`openAndLoad()` plus `setCacheKey()` are required before the next use.
 
 ## Status
 

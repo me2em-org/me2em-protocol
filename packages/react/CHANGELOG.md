@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.0.0-rc.2] — 2026-11-04
+
+Dispose parity for the identity lifecycle (BL-47) plus the JSDoc
+contract fold promised in the rc.1 follow-up (BL-48/BL-49, R5–R7).
+No public API changes.
+
+### Fixed
+- `Me2emProvider` never disposed the replaced identity: re-activating
+  over an active identity (`activateIdentity`) and `clearIdentity()`
+  dropped the previous `Identity` without calling `dispose()`, so its
+  key material was never zeroed (BL-47, external review #1). The
+  replaced (or cleared) handle is now disposed at the swap; stale
+  references fail loudly with `DisposedError` per the core contract
+  instead of silently operating on zeroed keys. In-flight activations
+  are generation-ordered (the same load-race class fixed for
+  `useIdentityContext` in rc.1): a result landing after a newer
+  activation, `clearIdentity()` or unmount disposes its own handle
+  and resolves `false` instead of overwriting newer state. Unmount
+  runs a cleanup-only dispose. Dispose never happens inside state
+  updaters (StrictMode double-invokes them); the ref is mutated only
+  in event handlers and cleanup effects, always alongside
+  `setIdentity`.
+
+### Changed
+- Documentation contracts (no behavior change): `Me2emContextValue` —
+  replacement/clear disposes the previous identity, and
+  `activateIdentity` does not consume the caller's seed buffer
+  (BL-48); `IdentityFlowState.identitySeed` — retained in state after
+  'verified'/'imported' by design, the flow does not self-consume it;
+  an explicit `discardSeed()` action is the planned v1.1 opt-in
+  (BL-48); `SeedPhraseVerify` — the grid shuffle is deterministic by
+  design, not a security control (BL-49);
+  `IdentityContextStorage.close()` — caller-owned reopen contract
+  (R5, README example now closes the storage on unmount);
+  `deriveCacheKey` — `loginMaterial` is caller-owned and never wiped
+  by the implementation (R6); `useHandle`/`useSubHandle` —
+  silent-failure contract documented, the structured
+  `{ handle, error }` shape is post-freeze BL-50 (R7).
+
 ## [1.0.0-rc.1] — 2026-11-04
 
 Release-candidate alignment with `@me2em/core` 1.0.0-rc.1 (the

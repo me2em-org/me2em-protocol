@@ -16,6 +16,15 @@ export interface SeedPhraseVerifyProps {
 
 const DEFAULT_GRID_SIZE_OFFSET = 8;
 
+/**
+ * Confirmation grid for a generated seed phrase.
+ *
+ * The grid shuffle is deterministic by design (fixed base seed 42;
+ * each retry shifts it by `+retryCount + 1`) for testability and SSR
+ * stability — it is NOT a security control: decoy words come from the
+ * public wordlist, so the layout leaks nothing (BL-49). A
+ * `randomSeed` prop is deliberately not offered in the frozen 1.0 API.
+ */
 export function SeedPhraseVerify({
   realWords,
   gridSize,
