@@ -21,8 +21,8 @@ me2em-protocol/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
-- pnpm 9+ (We strictly use `pnpm`, not `npm` or `yarn`)
+- Node.js 22+
+- pnpm 10.11.1 (pinned by the root `packageManager` field; we strictly use `pnpm`, not `npm` or `yarn` — the `npm` CLI is reserved for registry maintenance `pnpm` does not cover: `unpublish`, `dist-tag`)
 
 ### Local Development Setup
 ```bash
@@ -46,28 +46,34 @@ pnpm run build-docs
 
 ## 📦 Publishing to npm
 
-Publishing is done manually to ensure strict version control. **Always use `pnpm`, never `npm`**, to maintain lockfile consistency.
+Publishing is manual and performed by the maintainer only. **Always use `pnpm`, never `npm`**, to maintain lockfile consistency. Never publish with `--no-git-checks`: the git checks are the gate that proves you are publishing the merged state of `main`, not a local branch.
 
-1. **Authenticate with pnpm registry:**
-   Ensure you are logged in. If not, run:
+1. **Prepare the release in a PR.** Bump the `"version"` field in `packages/<pkg>/package.json`, update `packages/<pkg>/CHANGELOG.md`, and carry any required consumer migration in the same PR (the `workspace:^` ranges publish as `^X.Y.Z`). Publishing happens only from the merge commit on `main` with a clean working tree — if `pnpm publish` fails a git check, fix the git state, do not bypass it.
+2. **Smoke-test the packed artifact in a clean directory** (the packages are ESM-only, so verify via dynamic `import()`):
    ```bash
-   pnpm login
+   pnpm --filter @me2em/<pkg> pack
+   # in a fresh temp directory:
+   #   pnpm init && pnpm add <path-to-the-tarball>
+   #   node -e "import('@me2em/<pkg>').then(m => console.log(Object.keys(m)))"
    ```
-2. **Update versions manually:** You must update the `"version"` field in **two** places to keep the workspace in sync:
-   - `package.json` (root)
-   - `packages/core/package.json`
-3. **Commit the version bump:**
+3. **Publish with an explicit `--tag` on every publish** (`pnpm publish` defaults to `latest`, and a prerelease must never take `latest` over):
    ```bash
-   git add package.json packages/core/package.json
-   git commit -m "chore: bump version to X.Y.Z"
-   git push origin main
+   # stable releases (including GA):
+   pnpm publish --filter @me2em/<pkg> --access public --tag latest
+
+   # prereleases published after the first stable:
+   pnpm publish --filter @me2em/<pkg> --access public --tag next
    ```
-4. **Publish the package:**
-   Run the publish command specifically for the core package:
-   ```bash
-   pnpm publish --filter @me2em/core --access public
-   ```
-   *(Alternatively, from within the `packages/core` directory, you can run `pnpm publish --access public`)*
+4. **Tag the release:** create the `<pkg>-v<version>` tag (e.g. `react-v1.0.0`) on the merge commit and push it.
+
+### Version policy
+
+Every published version is immutable, and its number is spent forever — npm never allows the same `package@version` to be published again, even after an unpublish. Therefore:
+
+- **Do not publish to iterate.** During a review round, install the packed tarball (step 2) or wire the consumer to the workspace via `pnpm link` / a `file:` override. Publish only when external consumers must receive the change.
+- **Batch.** One prerelease bump per review round (rc.N collecting several fixes), not one version per fix.
+- **Semver after 1.0.0.** Fixes ship as patches, additive API as minors; prerelease iterations go out as `1.x.y-rc.N` under `--tag next` and land as the next patch/minor.
+- **Never unpublish to rewind a release** — unpublishing does not free the version number, it permanently blocks it. If a stable release regresses, ship a fix; if it must be pulled from `latest`, move the tag back: `npm dist-tag add @me2em/<pkg>@<previous-version> latest`.
 
 ## 📝 Documentation Pipeline
 
