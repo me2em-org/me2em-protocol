@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Fixed
+- `useIdentityContext`: `save()`/`clear()` no longer commit their state
+  change when the active identity switched while the storage operation
+  was in flight. The generation ticket from the rc.1 load-race fix only
+  orders these operations against in-flight loads; it does not know
+  about identity switches — a slow `save()` resolving after a logout
+  (or an identity switch) would surface identity A's context under the
+  new state, and a slow `clear()` could blank identity B's freshly
+  loaded context. Both commits are now guarded by the identity the
+  operation started for (render-mirrored ref); a stale commit is
+  dropped and the new identity's load effect owns the state.
+- `useIdentityContext`: a successful `save()`/`clear()` now resets a
+  previously set load `error` (parity with the load success path,
+  which already cleared it).
+
 ## [1.0.0-rc.1] — 2026-11-03
 
 Release-candidate alignment with `@me2em/core` 1.0.0-rc.1 (the

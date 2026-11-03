@@ -12,6 +12,10 @@ import { get64ByteSeedFromMnemonic, Identity } from '@me2em/core';
 
 const MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+// Second standard BIP39 test vector — a different identity for
+// identity-switch tests.
+const MNEMONIC_B =
+  'legal winner thank year wave sausage worth useful legal winner thank yellow';
 
 function publicKeyToId(publicKey: Uint8Array): string {
   return Array.from(publicKey)
@@ -31,6 +35,45 @@ async function setupIdentity(
   await storage.open(identityId);
   storage.setCacheKey(key);
   return identityId;
+}
+
+// In-memory storage whose first openAndLoad rejects — drives the
+// error state so the tests can pin that a successful save()/clear()
+// resets it.
+class FailOnceLoadStorage implements IdentityContextStorage {
+  private failed = false;
+  private saved: IdentityContextData | null = null;
+
+  async openAndLoad(): Promise<IdentityContextData | null> {
+    if (!this.failed) {
+      this.failed = true;
+      throw new Error('load boom');
+    }
+    return this.saved;
+  }
+
+  async save(data: IdentityContextData): Promise<void> {
+    this.saved = data;
+  }
+
+  async load(): Promise<IdentityContextData | null> {
+    return this.saved;
+  }
+
+  async clear(): Promise<void> {
+    this.saved = null;
+  }
+
+  async open(): Promise<void> {}
+  async close(): Promise<void> {}
+  setCacheKey(): void {}
+  getCacheKey(): CryptoKey | null {
+    return null;
+  }
+  async persistCacheKey(): Promise<void> {}
+  async loadPersistedKey(): Promise<CryptoKey | null> {
+    return null;
+  }
 }
 
 describe('useIdentityContext', () => {
@@ -205,6 +248,222 @@ describe('useIdentityContext', () => {
     });
     rerender();
     expect(result.current.ic.context!.handles[0].name).toBe('persistent-handle');
+  });
+
+  it('save resolving after an identity switch does not surface the previous identity context', async () => {
+    await setupIdentity(storage, MNEMONIC);
+
+    // Gate save() so its commit lands strictly after the identity is
+    // gone: the generation ticket only orders save against in-flight
+    // loads, so without the identity guard the late commit would write
+    // identity A's context over the cleared state.
+    let releaseSave!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseSave = resolve; });
+    const gated = new Proxy(storage, {
+      get(target, prop, receiver) {
+        if (prop === 'save') {
+          return async (data: IdentityContextData) => {
+            const pending = target.save(data);
+            await gate;
+            await pending;
+          };
+        }
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown).bind(target)
+          : value;
+      },
+    }) as IdentityContextStorage;
+
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const ic = useIdentityContext(gated);
+      return { ctx, ic };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+    await waitFor(() => {
+      expect(result.current.ctx.identity).not.toBeNull();
+    });
+
+    const dataA: IdentityContextData = {
+      identityId: publicKeyToId(result.current.ctx.identity!.getPublicKey()),
+      handles: [{ name: 'identity-a-handle' }],
+      savedAt: Date.now(),
+    };
+
+    let savePromise!: Promise<void>;
+    await act(async () => {
+      savePromise = result.current.ic.save(dataA);
+    });
+
+    await act(async () => {
+      result.current.ctx.clearIdentity();
+    });
+    await waitFor(() => {
+      expect(result.current.ic.context).toBeNull();
+    });
+
+    await act(async () => {
+      releaseSave();
+      await savePromise;
+    });
+    expect(result.current.ic.context).toBeNull();
+  });
+
+  it('clear resolving after an identity switch does not blank the new identity loaded context', async () => {
+    // Pre-seed identity B's database so the switch has a real cached
+    // context to load (persisted key included, since openAndLoad on the
+    // reopened storage reads it back from KEYS_STORE).
+    const seedB = await get64ByteSeedFromMnemonic(MNEMONIC_B);
+    const identityB = await Identity.fromSeed(seedB);
+    const identityIdB = publicKeyToId(identityB.getPublicKey());
+    await storage.open(identityIdB);
+    storage.setCacheKey(await deriveCacheKey(seedB, new Uint8Array(32)));
+    const dataB: IdentityContextData = {
+      identityId: identityIdB,
+      handles: [{ name: 'identity-b-handle' }],
+      savedAt: Date.now(),
+    };
+    await storage.save(dataB);
+    await storage.persistCacheKey();
+    await storage.close();
+
+    const identityIdA = await setupIdentity(storage, MNEMONIC);
+
+    // Gate clear() so it resolves strictly after identity B is active
+    // and has its context loaded.
+    let releaseClear!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseClear = resolve; });
+    const gated = new Proxy(storage, {
+      get(target, prop, receiver) {
+        if (prop === 'clear') {
+          return async () => {
+            const pending = target.clear();
+            await gate;
+            await pending;
+          };
+        }
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown).bind(target)
+          : value;
+      },
+    }) as IdentityContextStorage;
+
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const ic = useIdentityContext(gated);
+      return { ctx, ic };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+    await waitFor(() => {
+      expect(result.current.ctx.identity).not.toBeNull();
+    });
+
+    const dataA: IdentityContextData = {
+      identityId: identityIdA,
+      handles: [{ name: 'identity-a-handle' }],
+      savedAt: Date.now(),
+    };
+    await act(async () => {
+      await result.current.ic.save(dataA);
+    });
+
+    let clearPromise!: Promise<void>;
+    await act(async () => {
+      clearPromise = result.current.ic.clear();
+    });
+
+    await act(async () => {
+      await result.current.ctx.activateIdentity(seedB);
+    });
+    await waitFor(() => {
+      expect(result.current.ic.context?.handles[0].name).toBe('identity-b-handle');
+    });
+
+    await act(async () => {
+      releaseClear();
+      await clearPromise;
+    });
+    expect(result.current.ic.context!.handles[0].name).toBe('identity-b-handle');
+  });
+
+  it('save resets a previous load error', async () => {
+    // One stable instance: an inline `new` in the wrapper would change
+    // the effect's [identity, storage] deps every render and re-run the
+    // load (and its rejection) after save() has already reset the error.
+    const stub = new FailOnceLoadStorage();
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const ic = useIdentityContext(stub);
+      return { ctx, ic };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+    await waitFor(() => {
+      expect(result.current.ic.error).toBe('load boom');
+    });
+
+    const testData: IdentityContextData = {
+      identityId: 'any',
+      handles: [{ name: 'after-error' }],
+      savedAt: Date.now(),
+    };
+    await act(async () => {
+      await result.current.ic.save(testData);
+    });
+    expect(result.current.ic.error).toBeNull();
+    expect(result.current.ic.context!.handles[0].name).toBe('after-error');
+  });
+
+  it('clear resets a previous load error', async () => {
+    const stub = new FailOnceLoadStorage();
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const ic = useIdentityContext(stub);
+      return { ctx, ic };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+    await waitFor(() => {
+      expect(result.current.ic.error).toBe('load boom');
+    });
+
+    await act(async () => {
+      await result.current.ic.clear();
+    });
+    expect(result.current.ic.error).toBeNull();
+    expect(result.current.ic.context).toBeNull();
   });
 
   it('clear → null', async () => {
