@@ -1,31 +1,12 @@
 // packages/react/src/headless/context-crypto.ts
+import { base64urlEncode, base64urlDecode } from '@me2em/core';
 import type { IdentityContextData } from './identity-context-types.js';
 
-function toB64(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-function fromB64(s: string): Uint8Array {
-  let base64 = s
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  while (base64.length % 4 !== 0) {
-    base64 += '=';
-  }
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
+// Base64url encoding for ContextEnvelope fields goes through the audited
+// @scure/base codec re-exported by @me2em/core (audit A3 / R4) — one
+// base64 implementation across packages, no hand-rolled alphabet handling.
+// Envelope fields are always unpadded: the only writer is encryptContext
+// below, so base64urlDecode's strict no-padding rule never bites.
 
 export interface ContextEnvelope {
   v: 1;
@@ -75,8 +56,8 @@ export async function encryptContext(
   const ct = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv as BufferSource }, key, pt
   );
-  return { v: 1, salt: toB64(salt), iv: toB64(iv),
-           ct: toB64(new Uint8Array(ct)) };
+  return { v: 1, salt: base64urlEncode(salt), iv: base64urlEncode(iv),
+           ct: base64urlEncode(new Uint8Array(ct)) };
 }
 
 export async function decryptContext(
@@ -84,8 +65,8 @@ export async function decryptContext(
 ): Promise<IdentityContextData> {
   if (envelope.v !== 1) throw new Error('Unsupported envelope version');
   const pt = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: fromB64(envelope.iv) as BufferSource },
-    key, fromB64(envelope.ct) as BufferSource
+    { name: 'AES-GCM', iv: base64urlDecode(envelope.iv) as BufferSource },
+    key, base64urlDecode(envelope.ct) as BufferSource
   );
   return JSON.parse(new TextDecoder().decode(pt)) as IdentityContextData;
 }
