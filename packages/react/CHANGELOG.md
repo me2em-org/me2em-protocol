@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0] — 2026-11-04
+
+General availability. Promotion of the rc line — no code changes since
+[1.0.0-rc.3]. The API surface frozen across rc.1–rc.3 (dispose parity
+BL-47, visibility renewal BL-51, the R5–R7 documentation contracts) is
+the 1.0 contract. Post-freeze evolution resumes in [1.1.0] (BL-48 seed
+hygiene, BL-50 structured errors with the accepted early break).
+
 ## [1.0.0-rc.3] — 2026-11-04
 
 Session renewal on return to visibility (BL-51). No public API
