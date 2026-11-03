@@ -1,5 +1,5 @@
 // packages/react/test/react/useSession.spec.tsx
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { Me2emProvider } from '../../src/react/Me2emProvider.js';
 import { useMe2emContext } from '../../src/react/context.js';
@@ -9,6 +9,20 @@ import { get64ByteSeedFromMnemonic } from '@me2em/core';
 
 const MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+
+function setVisibility(state: 'visible' | 'hidden'): void {
+  Object.defineProperty(document, 'visibilityState', {
+    value: state,
+    configurable: true,
+  });
+}
+
+afterEach(() => {
+  // drop any per-test visibilityState override (jsdom default: visible)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete (document as any).visibilityState;
+  vi.useRealTimers();
+});
 
 describe('useSession', () => {
   it('without handle → null', async () => {
@@ -177,5 +191,141 @@ describe('useSession', () => {
     await new Promise((r) => setTimeout(r, 2000));
 
     expect(result.current.session!.isExpired()).toBe(true);
+  });
+
+  it('renews on return to visibility when past half-life (BL-51)', async () => {
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const handle = useHandle('visibility-handle');
+      const { session } = useSession(handle, {
+        audience: 'vis.test',
+        scopes: ['read'],
+        ttl: 3600,
+      });
+      return { ctx, handle, session };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+
+    await waitFor(() => {
+      expect(result.current.session).not.toBeNull();
+    });
+
+    const firstJti = result.current.session!.sessionId;
+
+    // The half-life timer (30 min) must not fire during this test —
+    // fake only Date so the half-life gate evaluates against a
+    // controlled clock while the real timer stays pending.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 1_801_000); // just past ttl/2
+
+      // Hidden → the handler must ignore the event.
+      setVisibility('hidden');
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(result.current.session!.sessionId).toBe(firstJti);
+
+      // Visible again → proactive renewal, no overdue-timer wait.
+      setVisibility('visible');
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => {
+        expect(result.current.session!.sessionId).not.toBe(firstJti);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('no renewal on visibility before half-life (BL-51)', async () => {
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const handle = useHandle('vis-early-handle');
+      const { session } = useSession(handle, {
+        audience: 'vis-early.test',
+        scopes: ['read'],
+        ttl: 3600,
+      });
+      return { ctx, handle, session };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+
+    await waitFor(() => {
+      expect(result.current.session).not.toBeNull();
+    });
+
+    const firstJti = result.current.session!.sessionId;
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 60_000); // 1 min — before ttl/2
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(result.current.session!.sessionId).toBe(firstJti);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('autoRenew:false opts out of visibility renewal (BL-51)', async () => {
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const handle = useHandle('vis-optout-handle');
+      const { session } = useSession(handle, {
+        audience: 'vis-optout.test',
+        scopes: ['read'],
+        ttl: 3600,
+      }, false);
+      return { ctx, handle, session };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+
+    await waitFor(() => {
+      expect(result.current.session).not.toBeNull();
+    });
+
+    const firstJti = result.current.session!.sessionId;
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 3_500_000); // far past half-life
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(result.current.session!.sessionId).toBe(firstJti);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

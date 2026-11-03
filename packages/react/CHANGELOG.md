@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.0-rc.3] — 2026-11-04
+
+Session renewal on return to visibility (BL-51). No public API
+changes.
+
+### Fixed
+- `useSession`: auto-renewal ran on the half-life `setTimeout` alone.
+  Background tabs throttle timers (clamped wakeups after ~5 minutes
+  hidden) and fully suspend them while frozen (Memory Saver, mobile
+  backgrounds), so on returning to a long-hidden tab the session
+  could already be past its half-life — or expired — while the
+  overdue timer had not yet fired, leaving the first user actions
+  racing an expiring session (BL-51, external review #8). The hook now
+  also listens for `visibilitychange`: when the document becomes
+  visible and the session is past its half-life point
+  (`expiresAt − ttl/2`, the same threshold the timer uses), it renews
+  proactively. `autoRenew: false` opts out, exactly like the timer
+  path; `renew()` clears and reschedules the timer, so the overdue
+  timer cannot double-renew.
+
 ## [1.0.0-rc.2] — 2026-11-04
 
 Dispose parity for the identity lifecycle (BL-47) plus the JSDoc
