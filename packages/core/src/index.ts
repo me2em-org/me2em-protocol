@@ -43,3 +43,4 @@ export {
   type SeedValidationResult
 } from './seed.js';
 export { wordlist } from '@scure/bip39/wordlists/english';
+export { base64urlEncode, base64urlDecode } from './util.js';

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] — 2026-11-03
+
+### Added
+- `base64urlEncode` / `base64urlDecode` are exported from the package
+  root. These are the audited `@scure/base` wrappers (PR-7, A3) that
+  the token layer uses internally — present in `src/util.ts` since
+  1.0.0-rc.1 but not on the public surface. The motivation is
+  `@me2em/react` 1.0.0-rc.1: its context-envelope codec switches from
+  a hand-rolled `btoa`/`atob` pair to these functions, so no package
+  in the stack hand-rolls base64 alphabet handling. Purely additive —
+  no behavior change, golden vectors untouched.
+
 ## [1.0.0-rc.1] — 2026-11-03
 
 First release candidate of the LTS line: everything in this block
