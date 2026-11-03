@@ -1,5 +1,6 @@
 // packages/react/test/headless/context-crypto.spec.ts
 import { describe, it, expect } from 'vitest';
+import { base64urlDecode } from '@me2em/core';
 import {
   deriveCacheKey,
   encryptContext,
@@ -83,5 +84,28 @@ describe('context-crypto', () => {
     const d2 = await decryptContext(key, env2);
     expect(d1).toEqual(d2);
     expect(d1).toEqual(data);
+  });
+
+  it('envelope fields are unpadded URL-safe base64 decodable by @me2em/core', async () => {
+    const material = makeMaterial(1);
+    const salt = new Uint8Array(32);
+    const key = await deriveCacheKey(material, salt);
+
+    const envelope = await encryptContext(key, makeData('test-id'));
+
+    // Codec contract (R4): envelope persists to IDB, so its fields must stay
+    // within the unpadded URL-safe alphabet that base64urlDecode accepts —
+    // no `+`, no `/`, no `=` padding.
+    const urlSafe = /^[A-Za-z0-9_-]+$/;
+    expect(envelope.salt).toMatch(urlSafe);
+    expect(envelope.iv).toMatch(urlSafe);
+    expect(envelope.ct).toMatch(urlSafe);
+
+    // Byte-length contract survives the codec swap: core's decoder must see
+    // exactly the lengths encryptContext produced (iv 12B for AES-GCM,
+    // salt 32B, ct = plaintext || 16B GCM tag).
+    expect(base64urlDecode(envelope.iv)).toHaveLength(12);
+    expect(base64urlDecode(envelope.salt)).toHaveLength(32);
+    expect(base64urlDecode(envelope.ct).length).toBeGreaterThanOrEqual(16);
   });
 });
