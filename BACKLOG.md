@@ -240,11 +240,23 @@ development, not part of the shipped API contract.
   `string | null`; a `{handle, error}` union would let apps branch on
   failure cause. Observable shape change at rc → v1.1 (verdict
   2026-11-04, PR #53 follow-up).
-- **BL-51 · open · react: seed/clipboard hygiene on tab hide
-  (visibilitychange).** External-agent remark #7 (PR #53 follow-up,
-  2026-11-04): real but out of F-scope; needs a design verdict
-  (auto-clear on `visibilitychange` vs leaving it to the app) before
-  scheduling.
+- **BL-51 · done · react: `useSession` does not renew on return to
+  visibility.** External-agent remark #8 (PR #53 follow-up,
+  2026-11-04). Entry correction: the record originally filed here
+  ("seed/clipboard hygiene on tab hide", citing remark #7) was a
+  mislabel — the tracked issue is #8, session renewal; seed-display
+  reachability stays R15 "by design". Mechanics: auto-renewal ran on
+  the half-life `setTimeout` alone; background tabs throttle timers
+  (clamped wakeups) and fully suspend them while frozen (Memory
+  Saver, mobile backgrounds), so on return the session could already
+  be past half-life or expired while the overdue timer had not yet
+  fired. Shipped (PR #56): a `visibilitychange` listener renews
+  proactively when the document becomes visible and the session is
+  past its half-life point (`expiresAt − ttl/2`, the same threshold
+  the timer uses); respects `autoRenew: false`; `renew()` clears and
+  reschedules the timer, so no double-renewal. Pinned by 3 tests
+  (renew past half-life incl. hidden-event no-op, no-op before
+  half-life, opt-out).
 
 ## P3 — Protocol Extensions (0.8+)
 

@@ -43,7 +43,11 @@ export interface UseSessionResult {
  * Supports auto-renewal: when `autoRenew` is true (default), a timer
  * fires at half the session TTL to create a fresh session with a new
  * jti (the previous token remains valid until its own expiry, but the
- * lineage identity is preserved through `handle`).
+ * lineage identity is preserved through `handle`). Background tabs
+ * throttle (clamped wakeups) or fully suspend timers, so on return to
+ * visibility the hook additionally renews proactively when the session
+ * is already past its half-life point (BL-51) — the overdue timer path
+ * alone could leave the first user actions racing an expired session.
  *
  * On unmount, all timers are cleaned up to prevent state updates after
  * the component is gone.
@@ -148,6 +152,32 @@ export function useSession(
       renew();
     }
   }, [handle, renew]);
+
+  // BL-51: background tabs throttle (clamped wakeups) or fully
+  // suspend timers (Memory Saver, mobile backgrounds), so the half-life
+  // setTimeout alone can fire late — or not at all until the tab
+  // resumes. When the document becomes visible again and the session
+  // is already past its half-life point (expiresAt − ttl/2, the same
+  // threshold the timer uses; expired is a superset), renew
+  // proactively. renew() clears and reschedules the timer, so the
+  // overdue timer cannot double-renew. autoRenew:false opts out
+  // entirely, exactly like the timer path.
+  useEffect(() => {
+    if (!autoRenew || typeof document === 'undefined') return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      const s = session;
+      if (!s) return;
+      const halfLifePoint = (s.expiresAt - optionsRef.current.ttl / 2) * 1000;
+      if (Date.now() >= halfLifePoint) {
+        renew();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [autoRenew, renew, session]);
 
   return {
     session,
