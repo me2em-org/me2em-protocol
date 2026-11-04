@@ -89,7 +89,7 @@ const B = await work.attestSubHandle('connector-1', grantB, {
 // the subject Handle's public key (32-byte ed25519 → base58), NOT a
 // wallet actually derived from subjectWalletPath (the Handle key comes
 // from HKDF, not the SLIP tree); real path→address derivation is pinned
-// by @me2em/solano tests (Phantom cross-check). No adapter is registered
+// by @me2em/solana tests (Phantom cross-check). No adapter is registered
 // in the generator context, so only the structural checks apply — the
 // description states this honestly.
 const W = await Attestation.issue(identity, work.getPublicKey(), 'work', grantA, {
@@ -285,7 +285,7 @@ const vectors = {
   ],
   attestation_wallet: [
     {
-      description: "v1 optional extensions (§5.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath — real path→address derivation is pinned by @me2em/solano tests (Phantom cross-check)",
+      description: "v1 optional extensions (§5.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath — real path→address derivation is pinned by @me2em/solana tests (Phantom cross-check)",
       seed_hex: seed12Hex,
       subject_handle_name: 'work',
       grant: grantA,
