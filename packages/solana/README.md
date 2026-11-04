@@ -1,5 +1,6 @@
 [![npm version](https://img.shields.io/npm/v/@me2em/solana.svg)](https://www.npmjs.com/package/@me2em/solana)
 [![License](https://img.shields.io/npm/l/@me2em/solana.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-solana.me2em.com-blue)](https://solana.me2em.com)
 
 # @me2em/solana
 
