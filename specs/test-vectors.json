@@ -1,7 +1,7 @@
 {
   "spec": "Me2eM core protocol",
   "spec_version": "1.0",
-  "vector_file_version": 1,
+  "vector_file_version": 2,
   "algorithm": "BIP39 (seed) + HKDF-SHA256 (RFC 5869, derivation) + Ed25519 (RFC 8032, signatures) + X25519 (RFC 7748, ECDH)",
   "notes": [
     "All derived keys are 32 bytes and used directly as Ed25519 seeds (RFC 8032).",
@@ -171,6 +171,34 @@
         "jti": "vector-b-subhandle-0001",
         "expected_payload_json": "{\"typ\":\"me2em/attestation/v1\",\"subjectName\":\"connector-1\",\"subjectId\":\"IDPFLxBkwKhiALdyWnmKYxa-bueojoFK9R1B6lfTvpg\",\"grant\":{\"audiences\":[\"ev-app.com\"],\"scopes\":[\"charge:start\"],\"maxSessionTtl\":3600},\"iat\":1767225600,\"exp\":1767227400,\"jti\":\"vector-b-subhandle-0001\"}",
         "expected_token": "eyJ0eXAiOiJtZTJlbS9hdHRlc3RhdGlvbi92MSIsInN1YmplY3ROYW1lIjoiY29ubmVjdG9yLTEiLCJzdWJqZWN0SWQiOiJJRFBGTHhCa3dLaGlBTGR5V25tS1l4YS1idWVvam9GSzlSMUI2bGZUdnBnIiwiZ3JhbnQiOnsiYXVkaWVuY2VzIjpbImV2LWFwcC5jb20iXSwic2NvcGVzIjpbImNoYXJnZTpzdGFydCJdLCJtYXhTZXNzaW9uVHRsIjozNjAwfSwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjc0MDAsImp0aSI6InZlY3Rvci1iLXN1YmhhbmRsZS0wMDAxIn0.toSNsn0js4iTB72V3sSQb7jUnEZ11rSTq9QHQrmFgUjwMIDhNsmdRf8-wVepvITL-koz5oYBxa4oBZvd0GEyDA"
+      }
+    ],
+    "attestation_wallet": [
+      {
+        "description": "v1 optional extensions (§5.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath — real path→address derivation is pinned by @me2em/solano tests (Phantom cross-check)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "subject_handle_name": "work",
+        "grant": {
+          "audiences": [
+            "ev-app.com"
+          ],
+          "scopes": [
+            "charge:start",
+            "charge:stop"
+          ],
+          "maxSessionTtl": 7200,
+          "subNamePatterns": [
+            "connector-*"
+          ]
+        },
+        "ttl_seconds": 31536000,
+        "now": 1767225600,
+        "jti": "vector-a-handle-wallet-0001",
+        "subject_wallet": "2uugVTL5LEpox2xgDYSQpB24KtHNcazLTkWxcRQAtJh8",
+        "subject_wallet_chain": "solana:mainnet-beta",
+        "subject_wallet_path": "m/44'/501'/0'/0'",
+        "expected_payload_json": "{\"typ\":\"me2em/attestation/v1\",\"subjectName\":\"work\",\"subjectId\":\"HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M\",\"grant\":{\"audiences\":[\"ev-app.com\"],\"scopes\":[\"charge:start\",\"charge:stop\"],\"maxSessionTtl\":7200,\"subNamePatterns\":[\"connector-*\"]},\"iat\":1767225600,\"exp\":1798761600,\"jti\":\"vector-a-handle-wallet-0001\",\"subjectWallet\":\"2uugVTL5LEpox2xgDYSQpB24KtHNcazLTkWxcRQAtJh8\",\"subjectWalletChain\":\"solana:mainnet-beta\",\"subjectWalletPath\":\"m/44'/501'/0'/0'\"}",
+        "expected_token": "eyJ0eXAiOiJtZTJlbS9hdHRlc3RhdGlvbi92MSIsInN1YmplY3ROYW1lIjoid29yayIsInN1YmplY3RJZCI6IkhHbDBtR1FzV2dpWHNHU1NFbndtR2x6VTVsb0k4SXg1TG9wTm9lbWlILU0iLCJncmFudCI6eyJhdWRpZW5jZXMiOlsiZXYtYXBwLmNvbSJdLCJzY29wZXMiOlsiY2hhcmdlOnN0YXJ0IiwiY2hhcmdlOnN0b3AiXSwibWF4U2Vzc2lvblR0bCI6NzIwMCwic3ViTmFtZVBhdHRlcm5zIjpbImNvbm5lY3Rvci0qIl19LCJpYXQiOjE3NjcyMjU2MDAsImV4cCI6MTc5ODc2MTYwMCwianRpIjoidmVjdG9yLWEtaGFuZGxlLXdhbGxldC0wMDAxIiwic3ViamVjdFdhbGxldCI6IjJ1dWdWVEw1TEVwb3gyeGdEWVNRcEIyNEt0SE5jYXpMVGtXeGNSUUF0Smg4Iiwic3ViamVjdFdhbGxldENoYWluIjoic29sYW5hOm1haW5uZXQtYmV0YSIsInN1YmplY3RXYWxsZXRQYXRoIjoibS80NCcvNTAxJy8wJy8wJyJ9.iTIxag89BTExOQmBN1-OkCAby7-1ZSkU3JlVjgbhqvbmLWJnFTj4qXN3g9saXv-nXrMs_rzK0jMGdoO4XinWBw"
       }
     ],
     "session_handle": [

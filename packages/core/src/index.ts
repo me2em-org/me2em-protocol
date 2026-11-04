@@ -5,6 +5,20 @@ export { DisposedError } from './disposed-error.js';
 export type { Signer } from './types.js';
 export { Session, type SessionOptions, type SessionPayload, type RevocationChecker } from './session.js';
 export { Attestation, AttestationError, ATTESTATION_TYPE, ATTESTATION_MAX_PAYLOAD, type AttestationGrant, type AttestationPayload, type AttestationErrorCode, type AttestationLevel } from './attestation.js';
+export {
+  registerWalletAdapter,
+  getWalletAdapter,
+  isValidChain,
+  parseChain,
+  type WalletDescriptor,
+  type WalletEntityRef,
+  type WalletAdapter,
+  type PaymentAdapter,
+  type PaymentFailureReason,
+  type PaymentRequest,
+  type PaymentResult,
+} from './payment.js';
+export { verifyWalletBinding, type WalletBindingOptions } from './wallet-binding.js';
 export * as crypto from './crypto/index.js';
 
 /**

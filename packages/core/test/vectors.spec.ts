@@ -182,6 +182,49 @@ describe('specs/test-vectors.json golden test', () => {
     }
   });
 
+  describe('attestation_wallet (v1 optional extensions §5.1, byte-deterministic)', () => {
+    for (const [i, v] of (doc.vectors.attestation_wallet ?? []).entries()) {
+      it(`row ${i}: re-issue with wallet opts reproduces the token byte-for-byte`, async () => {
+        const identity = await Identity.fromSeed(fromHex(v.seed_hex as string));
+        const handle = await identity.deriveHandle(v.subject_handle_name as string);
+        const att = await Attestation.issue(
+          identity,
+          handle.getPublicKey(),
+          v.subject_handle_name as string,
+          v.grant as Parameters<typeof identity.attestHandle>[1],
+          {
+            ttlSeconds: v.ttl_seconds as number,
+            jti: v.jti as string,
+            now: v.now as number,
+            subjectWallet: v.subject_wallet as string,
+            subjectWalletChain: v.subject_wallet_chain as string,
+            subjectWalletPath: v.subject_wallet_path as string,
+          }
+        );
+        expect(att.token).toBe(v.expected_token);
+        expect(JSON.stringify(att.payload)).toBe(v.expected_payload_json);
+        // Canonical tail order (§5.1 rule 1): the wallet fields follow
+        // jti in exactly this order.
+        expect(Object.keys(att.payload)).toEqual([
+          'typ', 'subjectName', 'subjectId', 'grant', 'iat', 'exp', 'jti',
+          'subjectWallet', 'subjectWalletChain', 'subjectWalletPath',
+        ]);
+        expect(await Attestation.verifySignature(att.token, identity.getPublicKey()))
+          .toBe(true);
+        // Byte-identity regression (§5.1 rule 1): the same inputs
+        // WITHOUT wallet opts must reproduce the walletless handle
+        // attestation row exactly (the tail is simply absent).
+        const noWallet = await identity.attestHandle(
+          v.subject_handle_name as string,
+          v.grant as Parameters<typeof identity.attestHandle>[1],
+          { ttlSeconds: v.ttl_seconds as number, jti: 'vector-a-handle-0001', now: v.now as number }
+        );
+        const handleRow = (doc.vectors.attestation_handle ?? [])[0];
+        expect(noWallet.token).toBe(handleRow.expected_token);
+      });
+    }
+  });
+
   for (const kind of ['session_handle', 'session_subhandle'] as const) {
     describe(`${kind} (pinned payload + Ed25519)`, () => {
       for (const [i, v] of (doc.vectors[kind] ?? []).entries()) {

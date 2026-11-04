@@ -1,8 +1,10 @@
 // Attestation unit tests
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   Attestation,
   ATTESTATION_TYPE,
+  registerWalletAdapter,
+  type WalletAdapter,
 } from '../src/index.js';
 import { base64urlDecode, base64urlEncode } from '../src/util.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
@@ -518,6 +520,152 @@ describe('Attestation: decode rejects non-finite iat/exp and exp <= iat', () => 
       { jti: 'inf-iat', now: 1700000000, ttlSeconds: 3600 }
     );
     const tampered = tamperPayloadJson(att.token, (json) => json.replace(/"iat":\d+/, '"iat":1e999'));
+    expectAttestationErrorSync(() => Attestation.decode(tampered), 'MALFORMED', 'FORMAT');
+  });
+});
+
+describe('Attestation: wallet fields in issue (v1 optional extensions §5.1)', () => {
+  const CHAIN = 'solana:devnet';
+  const GOOD_ADDRESS = 'GoodSolanaDevnetAddress';
+  const grant = { scopes: ['read'], maxSessionTtl: 3600 };
+
+  const issueWith = (walletOpts: Record<string, string>): Promise<Attestation> => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    return Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test',
+      grant,
+      { jti: 'wallet-opts', now: 1700000000, ttlSeconds: 3600, ...walletOpts }
+    );
+  };
+
+  // Fake adapter for the fail-closed tests; registered per-test,
+  // disposed in afterEach (registry hygiene — §5.1 rule 5).
+  const fakeAdapter: WalletAdapter = {
+    chain: CHAIN,
+    resolveWallet: async () => {
+      throw new Error('resolveWallet is not exercised by issue-time validation');
+    },
+    isValidAddress: (address: string) => address === GOOD_ADDRESS,
+  };
+  let disposeAdapter: (() => void) | undefined;
+  afterEach(() => {
+    disposeAdapter?.();
+    disposeAdapter = undefined;
+  });
+
+  it('subjectWallet + subjectWalletChain (no adapter registered) → ok, structural only', async () => {
+    const att = await issueWith({
+      subjectWallet: GOOD_ADDRESS,
+      subjectWalletChain: CHAIN,
+      subjectWalletPath: "m/44'/501'/0'/0'",
+    });
+    expect(att.payload.subjectWallet).toBe(GOOD_ADDRESS);
+    expect(att.payload.subjectWalletChain).toBe(CHAIN);
+    expect(att.payload.subjectWalletPath).toBe("m/44'/501'/0'/0'");
+    // Canonical tail order: wallet fields follow jti.
+    expect(Object.keys(att.payload).slice(-3)).toEqual(
+      ['subjectWallet', 'subjectWalletChain', 'subjectWalletPath']
+    );
+  });
+
+  it('byte-identity: the same inputs without wallet opts emit no tail fields', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    const base = { scopes: ['read'], maxSessionTtl: 3600 };
+    const plain = await Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test', base,
+      { jti: 'same', now: 1700000000, ttlSeconds: 3600 }
+    );
+    const withEmptyWalletOpts = await Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test', base,
+      { jti: 'same', now: 1700000000, ttlSeconds: 3600, subjectWallet: undefined }
+    );
+    expect(withEmptyWalletOpts.token).toBe(plain.token);
+    expect(Object.keys(plain.payload)).not.toContain('subjectWallet');
+  });
+
+  it('subjectWalletChain without subjectWallet → MALFORMED/FORMAT', async () => {
+    await expectAttestationError(
+      issueWith({ subjectWalletChain: CHAIN }),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('subjectWallet without subjectWalletChain → MALFORMED/FORMAT', async () => {
+    await expectAttestationError(
+      issueWith({ subjectWallet: GOOD_ADDRESS }),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('subjectWalletPath without subjectWallet → MALFORMED/FORMAT', async () => {
+    await expectAttestationError(
+      issueWith({ subjectWalletPath: "m/44'/501'/0'/0'" }),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('whitespace in subjectWallet — space run, inner space, NBSP, trailing newline → MALFORMED/FORMAT', async () => {
+    for (const bad of ['  ', 'abc def', '\u00a0', 'abc\n']) {
+      await expectAttestationError(
+        issueWith({ subjectWallet: bad, subjectWalletChain: CHAIN }),
+        'MALFORMED', 'FORMAT'
+      );
+    }
+  });
+
+  it('invalid CAIP-2 in subjectWalletChain → MALFORMED/FORMAT', async () => {
+    for (const badChain of ['solana', 'Solana:mainnet-beta', 'solana:', 's:mainnet-beta']) {
+      await expectAttestationError(
+        issueWith({ subjectWallet: GOOD_ADDRESS, subjectWalletChain: badChain }),
+        'MALFORMED', 'FORMAT'
+      );
+    }
+  });
+
+  it('fail-closed: registered adapter rejects a bad address → MALFORMED/FORMAT', async () => {
+    disposeAdapter = registerWalletAdapter(fakeAdapter);
+    await expectAttestationError(
+      issueWith({ subjectWallet: 'OffCurveOrGarbage', subjectWalletChain: CHAIN }),
+      'MALFORMED', 'FORMAT'
+    );
+  });
+
+  it('fail-closed positive: registered adapter accepts a good address → ok', async () => {
+    disposeAdapter = registerWalletAdapter(fakeAdapter);
+    const att = await issueWith({ subjectWallet: GOOD_ADDRESS, subjectWalletChain: CHAIN });
+    expect(att.payload.subjectWallet).toBe(GOOD_ADDRESS);
+  });
+
+  it('decode tolerates wallet fields (string type only — no pairing/grammar at decode)', () => {
+    // Hand-built payload with deliberately odd-but-string values:
+    // decode must NOT re-run pairing or CAIP-2 checks (§5.1 rule 7).
+    const payload = {
+      typ: ATTESTATION_TYPE,
+      subjectName: 'test',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      grant: { scopes: ['read'], maxSessionTtl: 3600 },
+      iat: 1700000000,
+      exp: 1700003600,
+      jti: 'decode-tolerance',
+      subjectWalletChain: 'not-a-caip2',
+    };
+    const payloadB64 = base64urlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+    const token = `${payloadB64}.${base64urlEncode(new Uint8Array(64))}`;
+    const decoded = Attestation.decode(token);
+    expect(decoded.subjectWalletChain).toBe('not-a-caip2');
+  });
+
+  it('decode rejects a non-string subjectWallet → MALFORMED/FORMAT', async () => {
+    const signerKey = crypto.getRandomValues(new Uint8Array(32));
+    const signerPub = ed25519.getPublicKey(signerKey);
+    const att = await Attestation.issue(
+      signerFromKey(signerKey), signerPub, 'test', grant,
+      { jti: 'decode-type', now: 1700000000, ttlSeconds: 3600,
+        subjectWallet: GOOD_ADDRESS, subjectWalletChain: CHAIN }
+    );
+    const tampered = tamperPayload(att.token, (p) => { p.subjectWallet = 42; });
     expectAttestationErrorSync(() => Attestation.decode(tampered), 'MALFORMED', 'FORMAT');
   });
 });

@@ -8,6 +8,7 @@ import { base64urlEncode, base64urlDecode, randomUUID, safeJsonParse } from './u
 import { ed } from './crypto/init.js';
 import type { Signer } from './types.js';
 import { AttestationError, type AttestationErrorCode } from './errors.js';
+import { getWalletAdapter, isValidChain } from './payment.js';
 
 export { AttestationError, type AttestationErrorCode, type AttestationLevel } from './errors.js';
 
@@ -50,6 +51,17 @@ export interface AttestationPayload {
   iat: number;
   exp: number;
   jti: string;
+  /**
+   * v1 optional extensions (specs/v1.0.md §5.1) — the canonical tail of
+   * the serialization order: `…, jti, subjectWallet, subjectWalletChain,
+   * subjectWalletPath`. Absent fields are omitted entirely (never
+   * `null`, never `""`); tokens without them are byte-identical to the
+   * pre-extension format. Pairing (address ⇔ chain, path ⇒ address) is
+   * enforced at issue time; decode tolerates any string values.
+   */
+  subjectWallet?: string;
+  subjectWalletChain?: string;
+  subjectWalletPath?: string;
 }
 
 function throwFormat(code: AttestationErrorCode, msg: string): never {
@@ -110,6 +122,104 @@ function parseToken(token: string): ParseResult {
   }
 
   return { payloadBytes, signatureBytes, payload };
+}
+
+/**
+ * Validates the v1 optional wallet extensions (§5.1) passed in
+ * `Attestation.issue` opts. No-op when all three are absent. Order is
+ * normative:
+ *
+ * 1. Pairing (§5.1 rule 2) — `subjectWallet` and `subjectWalletChain`
+ *    together or not at all (a chain without an address is invalid);
+ *    `subjectWalletPath` only with an address. These checks PRECEDE any
+ *    adapter lookup.
+ * 2. Structural (rule 4) — every present field is a non-empty string
+ *    without any whitespace character (the full `\s` class: space, tab,
+ *    newline, vertical tab, form feed, carriage return, NBSP and other
+ *    Unicode space separators).
+ * 3. CAIP-2 grammar (rule 4) — `subjectWalletChain` via
+ *    `isValidChain` (namespace `[-a-z0-9]{3,8}`, reference
+ *    `[-a-zA-Z0-9]{1,64}`).
+ * 4. Adapter-aware, fail-closed (rule 5) — when an adapter is
+ *    registered for the exact chain value, the address MUST pass
+ *    `adapter.isValidAddress()`; otherwise issuance applies rules 1–3
+ *    only (identity-only context). On-curve is deliberately not checked
+ *    here — it belongs to wallet-binding verification.
+ */
+function validateWalletOpts(
+  opts?: { subjectWallet?: string; subjectWalletChain?: string; subjectWalletPath?: string }
+): { subjectWallet?: string; subjectWalletChain?: string; subjectWalletPath?: string } {
+  const { subjectWallet, subjectWalletChain, subjectWalletPath } = opts ?? {};
+
+  // 1. Pairing — before any adapter lookup: the wallet fields are issued
+  // in pairs (both or none), and a derivation path requires an address.
+  // The nested guards keep every failure message distinct and let the
+  // compiler narrow `subjectWallet` / `subjectWalletChain` to `string`
+  // for steps 2–4 (no casts).
+  if (subjectWallet === undefined) {
+    if (subjectWalletChain !== undefined) {
+      throwFormat(
+        'MALFORMED',
+        'subjectWalletChain without subjectWallet — the wallet fields are issued in pairs (both or none)'
+      );
+    }
+    if (subjectWalletPath !== undefined) {
+      throwFormat(
+        'MALFORMED',
+        'subjectWalletPath without subjectWallet — a derivation path requires an address'
+      );
+    }
+    return {};
+  }
+  if (subjectWalletChain === undefined) {
+    throwFormat(
+      'MALFORMED',
+      'subjectWallet without subjectWalletChain — the wallet fields are issued in pairs (both or none)'
+    );
+  }
+
+  // 2. Structural: string type, non-empty, no whitespace (full \s class).
+  // The wallet and chain are both present here (pairing above); the typeof
+  // checks stay as a fail-closed runtime defense for untyped JS callers.
+  const present: Array<[string, string]> = [
+    ['subjectWallet', subjectWallet],
+    ['subjectWalletChain', subjectWalletChain],
+  ];
+  if (subjectWalletPath !== undefined) present.push(['subjectWalletPath', subjectWalletPath]);
+  for (const [field, value] of present) {
+    if (typeof value !== 'string') {
+      throwFormat('MALFORMED', `${field} must be a string`);
+    }
+    if (value.length === 0) {
+      throwFormat('MALFORMED', `${field} must not be empty`);
+    }
+    if (/\s/.test(value)) {
+      throwFormat(
+        'MALFORMED',
+        `${field} must not contain whitespace (space, tab, newline, NBSP or any other \\s character)`
+      );
+    }
+  }
+
+  // 3. CAIP-2 grammar for the chain (grammar lives in core — v1.2 §0.3).
+  if (!isValidChain(subjectWalletChain)) {
+    throwFormat(
+      'MALFORMED',
+      `subjectWalletChain is not a valid CAIP-2 chain id: ${JSON.stringify(subjectWalletChain)}`
+    );
+  }
+
+  // 4. Adapter-aware validation, fail-closed (§5.1 rule 5). Exact-CAIP-2
+  // registry lookup; without a registered adapter only rules 1–3 apply.
+  const adapter = getWalletAdapter(subjectWalletChain);
+  if (adapter !== null && !adapter.isValidAddress(subjectWallet)) {
+    throwFormat(
+      'MALFORMED',
+      `subjectWallet failed adapter address validation for ${adapter.chain}`
+    );
+  }
+
+  return { subjectWallet, subjectWalletChain, subjectWalletPath };
 }
 
 /**
@@ -237,6 +347,21 @@ export class Attestation {
       throwFormat('MALFORMED', `jti exceeds the maximum length of ${MAX_JTI_LENGTH} characters`);
     }
 
+    // v1 optional extensions (§5.1) — decode tolerance: when present,
+    // the fields must be strings; pairing, grammar and on-curve checks
+    // are deliberately NOT repeated at decode. A verifier that does not
+    // implement the extension MUST NOT reject tokens carrying it — the
+    // fields are payload bytes covered by the signature (§4).
+    if (payload.subjectWallet !== undefined && typeof payload.subjectWallet !== 'string') {
+      throwFormat('MALFORMED', 'Invalid field: subjectWallet');
+    }
+    if (payload.subjectWalletChain !== undefined && typeof payload.subjectWalletChain !== 'string') {
+      throwFormat('MALFORMED', 'Invalid field: subjectWalletChain');
+    }
+    if (payload.subjectWalletPath !== undefined && typeof payload.subjectWalletPath !== 'string') {
+      throwFormat('MALFORMED', 'Invalid field: subjectWalletPath');
+    }
+
     return payload;
   }
 
@@ -314,7 +439,14 @@ export class Attestation {
    * @param grant - Constraints enforced by verifiers (Mode 2).
    * @param opts - Lifetime control: `ttlSeconds` (default one year),
    *   `expiresAt` (overrides `ttlSeconds`), `jti` (default random UUID),
-   *   `now` (fixed clock for deterministic tests).
+   *   `now` (fixed clock for deterministic tests). Optional wallet
+   *   extensions (specs/v1.0.md §5.1): `subjectWallet`,
+   *   `subjectWalletChain` (exact CAIP-2) and `subjectWalletPath` —
+   *   emitted in that canonical order after `jti`; absent fields are
+   *   omitted (byte-identity for tokens without them). Pairing and
+   *   structural rules are enforced at issue time; when an adapter is
+   *   registered for the chain, the address must pass
+   *   `adapter.isValidAddress()` (fail-closed).
    * @returns The attestation with `payload`, `token` and `jti` accessors.
    * @throws {AttestationError} `MALFORMED`/`FORMAT` if the grant is
    *   structurally invalid (bad scopes/TTL/audiences or a wildcard
@@ -335,7 +467,10 @@ export class Attestation {
     subjectPublicKey: Uint8Array,
     subjectName: string,
     grant: AttestationGrant,
-    opts?: { ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number }
+    opts?: {
+      ttlSeconds?: number; expiresAt?: number; jti?: string; now?: number;
+      subjectWallet?: string; subjectWalletChain?: string; subjectWalletPath?: string;
+    }
   ): Promise<Attestation> {
     if (typeof (signer as Signer | undefined)?.sign !== 'function') {
       throw new TypeError(
@@ -382,6 +517,12 @@ export class Attestation {
       }
     }
 
+    // Validate the v1 optional wallet extensions (§5.1): pairing first
+    // (precedes any adapter lookup), then structural checks, CAIP-2
+    // grammar and the fail-closed adapter check. Runs only when at
+    // least one wallet field is present.
+    const walletFields = validateWalletOpts(opts);
+
     const now = opts?.now ?? Math.floor(Date.now() / 1000);
     const exp = opts?.expiresAt ?? (now + (opts?.ttlSeconds ?? 31536000));
     const jti = opts?.jti ?? randomUUID();
@@ -402,6 +543,17 @@ export class Attestation {
       exp,
       jti,
     };
+
+    // Canonical tail order (§5.1 rule 1): wallet fields follow jti in
+    // exactly this order; absent fields are omitted entirely — tokens
+    // without them stay byte-identical to the pre-extension format.
+    if (walletFields.subjectWallet !== undefined) {
+      payload.subjectWallet = walletFields.subjectWallet;
+      payload.subjectWalletChain = walletFields.subjectWalletChain;
+      if (walletFields.subjectWalletPath !== undefined) {
+        payload.subjectWalletPath = walletFields.subjectWalletPath;
+      }
+    }
 
     const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
     const signature = await signer.sign(payloadBytes);

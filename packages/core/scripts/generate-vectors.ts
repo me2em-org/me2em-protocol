@@ -25,7 +25,8 @@
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { Identity, get64ByteSeedFromMnemonic } from '../dist/index.js';
+import { base58 } from '@scure/base';
+import { Attestation, Identity, get64ByteSeedFromMnemonic } from '../dist/index.js';
 import { base64urlEncode } from '../dist/util.js';
 
 // Fixed BIP39 vectors (cross-verified against an independent PBKDF2
@@ -81,6 +82,23 @@ const B = await work.attestSubHandle('connector-1', grantB, {
   ttlSeconds: 1800,
   jti: 'vector-b-subhandle-0001',
   now: NOW,
+});
+
+// v1 optional extensions (specs/v1.0.md §5.1): wallet fields in canonical
+// order. The address is an ILLUSTRATIVE valid-format address — base58 of
+// the subject Handle's public key (32-byte ed25519 → base58), NOT a
+// wallet actually derived from subjectWalletPath (the Handle key comes
+// from HKDF, not the SLIP tree); real path→address derivation is pinned
+// by @me2em/solano tests (Phantom cross-check). No adapter is registered
+// in the generator context, so only the structural checks apply — the
+// description states this honestly.
+const W = await Attestation.issue(identity, work.getPublicKey(), 'work', grantA, {
+  ttlSeconds: 31536000,
+  jti: 'vector-a-handle-wallet-0001',
+  now: NOW,
+  subjectWallet: base58.encode(work.getPublicKey()),
+  subjectWalletChain: 'solana:mainnet-beta',
+  subjectWalletPath: "m/44'/501'/0'/0'",
 });
 
 // ---------------------------------------------------------------------------
@@ -265,6 +283,22 @@ const vectors = {
       expected_token: B.token,
     },
   ],
+  attestation_wallet: [
+    {
+      description: "v1 optional extensions (§5.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath — real path→address derivation is pinned by @me2em/solano tests (Phantom cross-check)",
+      seed_hex: seed12Hex,
+      subject_handle_name: 'work',
+      grant: grantA,
+      ttl_seconds: 31536000,
+      now: NOW,
+      jti: 'vector-a-handle-wallet-0001',
+      subject_wallet: base58.encode(work.getPublicKey()),
+      subject_wallet_chain: 'solana:mainnet-beta',
+      subject_wallet_path: "m/44'/501'/0'/0'",
+      expected_payload_json: JSON.stringify(W.payload),
+      expected_token: W.token,
+    },
+  ],
   session_handle: [
     {
       description: 'Handle session token; payload pinned (Session.create stamps iat from the wall clock). Ed25519 over the exact payload bytes',
@@ -299,7 +333,7 @@ const vectors = {
 const output = {
   spec: 'Me2eM core protocol',
   spec_version: '1.0',
-  vector_file_version: 1,
+  vector_file_version: 2,
   algorithm: 'BIP39 (seed) + HKDF-SHA256 (RFC 5869, derivation) + Ed25519 (RFC 8032, signatures) + X25519 (RFC 7748, ECDH)',
   notes: [
     'All derived keys are 32 bytes and used directly as Ed25519 seeds (RFC 8032).',
