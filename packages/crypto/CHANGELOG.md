@@ -48,10 +48,12 @@ its own.
 - Tests: the official SLIP-0010 ed25519 Test Vectors 1 and 2
   **verbatim** (every chain, private key + chain code, byte-exact;
   TV2 through the public 64-byte contract, TV1 through the
-  algorithm-level `masterKeyFromSeedRaw` over the spec-legal
-  16–64-byte range) plus negatives (non-hardened indices and path
-  components, seed ≠ 64 bytes, malformed paths, malformed nodes) and
-  a sign/verify roundtrip pinning `publicKey` against `signRaw`.
+  algorithm-level `masterKeyFromSeedRaw` — module-internal, not
+  re-exported; the public 64-byte contract delegates to it — over the
+  spec-legal 16–64-byte range) plus negatives (non-hardened indices
+  and path components, seed ≠ 64 bytes, malformed paths, malformed
+  nodes) and a sign/verify roundtrip pinning `publicKey` against
+  `signRaw`.
 
 ## [1.0.0-rc.1] — 2026-11-01
 

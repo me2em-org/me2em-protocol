@@ -230,6 +230,9 @@ describe('slip10 — hardened-only rule (non-hardened → TypeError)', () => {
     const brokenChain = { key: new Uint8Array(32), chainCode: new Uint8Array(16) };
     expect(() => slip10.deriveHardened(brokenKey, 0x80000000)).toThrow(TypeError);
     expect(() => slip10.derivePath(brokenChain, "m/0'")).toThrow(TypeError);
+    // The bare path "m" never reaches the component loop — the guard
+    // in deriveChildPath must still reject a malformed node.
+    expect(() => slip10.derivePath(brokenChain, 'm')).toThrow(TypeError);
     expect(() => slip10.publicKey(brokenKey)).toThrow(TypeError);
   });
 });

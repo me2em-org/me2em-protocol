@@ -151,8 +151,9 @@ function deriveHardenedChild(node: Slip10Node, index: number): Slip10Node {
  * @param node - Starting node (usually the master node).
  * @param path - Hardened derivation path, e.g. `m/44'/501'/0'/0'`.
  * @returns The derived node (fresh buffers).
- * @throws {TypeError} on any grammar violation — in particular a
- *   component without a hardening marker (ed25519 is hardened-only).
+ * @throws {TypeError} on a malformed node or any grammar violation —
+ *   in particular a component without a hardening marker (ed25519 is
+ *   hardened-only).
  *
  * @example
  * ```ts
@@ -162,6 +163,14 @@ function deriveHardenedChild(node: Slip10Node, index: number): Slip10Node {
  * ```
  */
 function deriveChildPath(node: Slip10Node, path: string): Slip10Node {
+  // Fail-closed node guard — kept at THIS level, not in the public
+  // derivePath wrapper: the bare path "m" returns before the component
+  // loop ever reaches deriveHardenedChild, so a wrapper-only guard
+  // would let a malformed node through as a "detached copy". The
+  // guard inside deriveHardenedChild covers the component loop and
+  // the direct slip10.deriveHardened entry; this one covers the
+  // caller's node exactly once per call.
+  assertNode(node, 'derivePath');
   if (typeof path !== 'string') {
     throw new TypeError('SLIP-0010 path must be a string');
   }
@@ -278,10 +287,9 @@ export const slip10 = {
   /**
    * Hardened-only path derivation — see the module grammar:
    * `m/44'/501'/0'/0'`; every component hardened, no leading zeros.
-   * @throws {TypeError} on any grammar violation.
+   * @throws {TypeError} on a malformed node or any grammar violation.
    */
   derivePath(node: Slip10Node, path: string): Slip10Node {
-    assertNode(node, 'derivePath');
     return deriveChildPath(node, path);
   },
 
