@@ -27,7 +27,7 @@
     "vectors": "tsc -p tsconfig.json && node --experimental-strip-types scripts/generate-vectors.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "build-docs": "typedoc"
+    "build-docs": "pnpm --filter \"@me2em/core^...\" run build && typedoc"
   },
   "license": "Apache-2.0",
   "engines": {
