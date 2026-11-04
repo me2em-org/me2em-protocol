@@ -5,6 +5,20 @@ previously had no changelog (flagged in the PR-4 review); this file is
 created as part of the PR-12 docs consolidation, retroactively covering
 the shipped alpha line.
 
+## [1.1.0-rc.2] — 2026-11-04
+
+Republish with a fresh build — **no source changes**. The git tree is
+identical to [1.1.0-rc.1]; the published rc.1 tarball, however, carried
+a stale pre-Ф-crypto `dist/` without the `slip10` namespace at all,
+because the release flow had no build hook and packed whatever was on
+disk. rc.2 exists solely to put the correct artifacts on npm; the new
+`prepublishOnly` hook guarantees every future publish builds from the
+current tree.
+
+### Fixed
+- Release hygiene: `prepublishOnly` runs the build, so a publish can
+  no longer ship a stale `dist/`.
+
 ## [1.1.0-rc.1] — 2026-11-04
 
 First minor of the frozen 1.x line: SLIP-0010 ed25519 hierarchical

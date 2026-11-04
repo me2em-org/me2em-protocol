@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] — 2026-11-04
+
+Republish with a fresh build — **no source changes**. The git tree is
+identical to [1.0.0-rc.3]; the published rc.3 tarball, however, carried
+a stale pre-Ф1 `dist/` (no `payment.js`, no `wallet-binding.js`, none
+of the wallet-extension API), because the release flow had no build
+hook and packed whatever was on disk. rc.4 exists solely to put the
+correct artifacts on npm; the new `prepublishOnly` hook guarantees
+every future publish builds from the current tree.
+
+### Fixed
+- Release hygiene: `prepublishOnly` runs the build, so a publish can
+  no longer ship a stale `dist/`.
+
 ## [1.0.0-rc.3] — 2026-11-04
 
 Payment-layer primitives (Ф1 of the payment-layer plan, Документ 2 v1.2)

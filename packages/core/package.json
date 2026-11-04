@@ -1,6 +1,6 @@
 {
   "name": "@me2em/core",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "description": "Core primitives for the Me2eM authorization protocol: Identity, Handle, and Session",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,6 +19,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "pnpm run build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "bench": "vitest bench --run",
