@@ -12,6 +12,17 @@ changes; tokens without the new fields are byte-identical to the rc.2
 format (`vector_file_version` 1 → 2, `attestation_handle` /
 `attestation_subhandle` rows unchanged and re-pinned byte-exact).
 
+### BREAKING
+- **`REFERENCE_MISMATCH` added to `PaymentFailureReason` (v1.2 §5.4).**
+  Additive for the enum, breaking for exhaustive-switch consumers
+  (TypeScript compile error). Semantics: the transaction exists but
+  `request.reference` is not contained in its account keys (static or
+  LUT) — "this transaction is not an execution of THIS request".
+  Consumers MUST treat unknown runtime reason values as `REJECTED`
+  (never as success). Note: `PaymentFailureReason` itself first ships
+  in this release (payment.ts is new), so no published consumer exists;
+  the entry records the design-level break for the payment layer.
+
 ### Added
 - **`payment.ts` — payment-layer surface.** `WalletDescriptor`,
   `WalletEntityRef`, `WalletAdapter` (with optional `nextIndex?` —
@@ -56,17 +67,6 @@ format (`vector_file_version` 1 → 2, `attestation_handle` /
   `attestation_wallet` block (byte-exact re-issue, canonical tail
   order, and the walletless byte-identity regression against the
   `attestation_handle` row).
-
-### BREAKING
-- **`REFERENCE_MISMATCH` added to `PaymentFailureReason` (v1.2 §5.4).**
-  Additive for the enum, breaking for exhaustive-switch consumers
-  (TypeScript compile error). Semantics: the transaction exists but
-  `request.reference` is not contained in its account keys (static or
-  LUT) — "this transaction is not an execution of THIS request".
-  Consumers MUST treat unknown runtime reason values as `REJECTED`
-  (never as success). Note: `PaymentFailureReason` itself first ships
-  in this release (payment.ts is new), so no published consumer exists;
-  the entry records the design-level break for the payment layer.
 
 ## [1.0.0-rc.2] — 2026-11-03
 

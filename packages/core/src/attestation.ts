@@ -150,38 +150,41 @@ function validateWalletOpts(
   opts?: { subjectWallet?: string; subjectWalletChain?: string; subjectWalletPath?: string }
 ): { subjectWallet?: string; subjectWalletChain?: string; subjectWalletPath?: string } {
   const { subjectWallet, subjectWalletChain, subjectWalletPath } = opts ?? {};
-  if (
-    subjectWallet === undefined &&
-    subjectWalletChain === undefined &&
-    subjectWalletPath === undefined
-  ) {
+
+  // 1. Pairing — before any adapter lookup: the wallet fields are issued
+  // in pairs (both or none), and a derivation path requires an address.
+  // The nested guards keep every failure message distinct and let the
+  // compiler narrow `subjectWallet` / `subjectWalletChain` to `string`
+  // for steps 2–4 (no casts).
+  if (subjectWallet === undefined) {
+    if (subjectWalletChain !== undefined) {
+      throwFormat(
+        'MALFORMED',
+        'subjectWalletChain without subjectWallet — the wallet fields are issued in pairs (both or none)'
+      );
+    }
+    if (subjectWalletPath !== undefined) {
+      throwFormat(
+        'MALFORMED',
+        'subjectWalletPath without subjectWallet — a derivation path requires an address'
+      );
+    }
     return {};
   }
-
-  // 1. Pairing — before any adapter lookup.
-  if (subjectWalletChain !== undefined && subjectWallet === undefined) {
-    throwFormat(
-      'MALFORMED',
-      'subjectWalletChain without subjectWallet — the wallet fields are issued in pairs (both or none)'
-    );
-  }
-  if (subjectWallet !== undefined && subjectWalletChain === undefined) {
+  if (subjectWalletChain === undefined) {
     throwFormat(
       'MALFORMED',
       'subjectWallet without subjectWalletChain — the wallet fields are issued in pairs (both or none)'
     );
   }
-  if (subjectWalletPath !== undefined && subjectWallet === undefined) {
-    throwFormat(
-      'MALFORMED',
-      'subjectWalletPath without subjectWallet — a derivation path requires an address'
-    );
-  }
 
   // 2. Structural: string type, non-empty, no whitespace (full \s class).
-  const present: Array<[string, string]> = [];
-  if (subjectWallet !== undefined) present.push(['subjectWallet', subjectWallet]);
-  if (subjectWalletChain !== undefined) present.push(['subjectWalletChain', subjectWalletChain]);
+  // The wallet and chain are both present here (pairing above); the typeof
+  // checks stay as a fail-closed runtime defense for untyped JS callers.
+  const present: Array<[string, string]> = [
+    ['subjectWallet', subjectWallet],
+    ['subjectWalletChain', subjectWalletChain],
+  ];
   if (subjectWalletPath !== undefined) present.push(['subjectWalletPath', subjectWalletPath]);
   for (const [field, value] of present) {
     if (typeof value !== 'string') {
@@ -199,7 +202,7 @@ function validateWalletOpts(
   }
 
   // 3. CAIP-2 grammar for the chain (grammar lives in core — v1.2 §0.3).
-  if (!isValidChain(subjectWalletChain as string)) {
+  if (!isValidChain(subjectWalletChain)) {
     throwFormat(
       'MALFORMED',
       `subjectWalletChain is not a valid CAIP-2 chain id: ${JSON.stringify(subjectWalletChain)}`
@@ -208,8 +211,8 @@ function validateWalletOpts(
 
   // 4. Adapter-aware validation, fail-closed (§5.1 rule 5). Exact-CAIP-2
   // registry lookup; without a registered adapter only rules 1–3 apply.
-  const adapter = getWalletAdapter(subjectWalletChain as string);
-  if (adapter !== null && !adapter.isValidAddress(subjectWallet as string)) {
+  const adapter = getWalletAdapter(subjectWalletChain);
+  if (adapter !== null && !adapter.isValidAddress(subjectWallet)) {
     throwFormat(
       'MALFORMED',
       `subjectWallet failed adapter address validation for ${adapter.chain}`
