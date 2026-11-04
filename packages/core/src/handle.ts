@@ -26,6 +26,7 @@ import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 import { DisposedError } from './disposed-error.js';
 import { AttestationError } from './errors.js';
+import { bindEntityWallet, getEntityWallet, type WalletDescriptor } from './payment.js';
 import type { Signer } from './types.js';
 import { base64urlEncode, INSPECT_SYMBOL } from './util.js';
 
@@ -271,6 +272,32 @@ export class Handle implements Signer {
   /** @returns The derivation path, or undefined for Handle (only SubHandle has a path). */
   getPath(): string[] | undefined {
     return undefined;
+  }
+
+  /**
+   * Binds a wallet to this Handle (payment layer, Документ 2 v1.2 §3).
+   *
+   * The descriptor is copied — later caller-side mutation does not
+   * change what was bound. Storage is in-memory (WeakMap keyed by the
+   * instance) and non-persistent: after a restart the binding is gone
+   * and the application re-binds. SubHandles inherit this method.
+   * Entities hold no seed and cannot derive — they only read back what
+   * was bound via {@link getWallet}.
+   *
+   * @throws {TypeError} If `descriptor` lacks a non-empty string
+   *   `chain`/`address`.
+   */
+  bindWallet(descriptor: WalletDescriptor): void {
+    bindEntityWallet(this, descriptor);
+  }
+
+  /**
+   * Returns the wallet bound to this Handle for the exact CAIP-2
+   * `chain`, or `null`. The adapter registry is not consulted — this
+   * reads the binding only. SubHandles inherit this method.
+   */
+  getWallet(chain: string): WalletDescriptor | null {
+    return getEntityWallet(this, chain);
   }
 
   /**

@@ -2,6 +2,72 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] — 2026-11-04
+
+Payment-layer primitives (Ф1 of the payment-layer plan, Документ 2 v1.2)
+and the v1 optional wallet extensions to the attestation payload
+([specs/v1.0.md §5.1](../../specs/v1.0.md)). Additive to the frozen API
+(§12 rule 1): no existing field, key order, limit or derivation formula
+changes; tokens without the new fields are byte-identical to the rc.2
+format (`vector_file_version` 1 → 2, `attestation_handle` /
+`attestation_subhandle` rows unchanged and re-pinned byte-exact).
+
+### Added
+- **`payment.ts` — payment-layer surface.** `WalletDescriptor`,
+  `WalletEntityRef`, `WalletAdapter` (with optional `nextIndex?` —
+  chain-scoped index allocation; empty-or-filtered-empty input → `0`,
+  `max+1` otherwise, unparseable paths ignored; core performs no
+  fallback when absent), `PaymentAdapter` (`pay`/`verifyPayment`/
+  optional `verifyWalletBinding`), `PaymentFailureReason`,
+  `PaymentRequest`, `PaymentResult`, the CAIP-2 grammar helpers
+  `isValidChain` / `parseChain` (namespace `[-a-z0-9]{3,8}`, reference
+  `[-a-zA-Z0-9]{1,64}` — grammar only; chain values live in the chain
+  packages), the process-wide adapter registry
+  (`registerWalletAdapter` returns a disposer; `getWalletAdapter`;
+  `globalThis[Symbol.for('me2em.paymentAdapters')]` so duplicate module
+  copies share one registry; last-wins; registering is a privilege of
+  trusted application code) and the internal WeakMap wallet-binding
+  storage.
+- **`verifyWalletBinding` — core default** (`wallet-binding.ts`):
+  attestation signature vs the issuer key + subject agreement
+  (`subjectId === entity.id`) + `subjectWallet === wallet.address`.
+  Chain adapters may override with stronger checks (on-curve, Mode 1
+  re-derivation); transport layers never invoke it implicitly (v1.2 §6).
+- **`bindWallet(descriptor)` / `getWallet(chain)`** on `Identity`,
+  `Handle` and (inherited) `SubHandle` (v1.2 §3): thin delegates to
+  WeakMap storage; the descriptor is copied on bind; in-memory and
+  non-persistent — after a restart the application re-binds; entities
+  hold no seed and cannot derive.
+- **Attestation payload — v1 optional extensions (§5.1).** Three
+  optional fields `subjectWallet` / `subjectWalletChain` /
+  `subjectWalletPath`, passed in `Attestation.issue` opts (not via the
+  grant), emitted in the canonical tail order after `jti`,
+  omit-if-undefined. Issue-time validation: pairing (address ⇔ chain,
+  path ⇒ address — before any adapter lookup), structural checks
+  (non-empty, no `\s` whitespace), CAIP-2 grammar for the chain, and a
+  fail-closed adapter check (`adapter.isValidAddress`) when an adapter
+  is registered for the exact chain — structural-only otherwise.
+  `decode()` accepts the fields when present with string-type checking
+  only (no pairing/grammar/on-curve at decode); verifiers not
+  implementing the extension MUST NOT reject tokens carrying it.
+- **`specs/v1.0.md` §5.1** "v1 optional extensions — wallet binding
+  fields" (nine normative rules) and a §10 paragraph pinning the
+  `attestation_wallet` vector category; the golden test gains one
+  `attestation_wallet` block (byte-exact re-issue, canonical tail
+  order, and the walletless byte-identity regression against the
+  `attestation_handle` row).
+
+### BREAKING
+- **`REFERENCE_MISMATCH` added to `PaymentFailureReason` (v1.2 §5.4).**
+  Additive for the enum, breaking for exhaustive-switch consumers
+  (TypeScript compile error). Semantics: the transaction exists but
+  `request.reference` is not contained in its account keys (static or
+  LUT) — "this transaction is not an execution of THIS request".
+  Consumers MUST treat unknown runtime reason values as `REJECTED`
+  (never as success). Note: `PaymentFailureReason` itself first ships
+  in this release (payment.ts is new), so no published consumer exists;
+  the entry records the design-level break for the payment layer.
+
 ## [1.0.0-rc.2] — 2026-11-03
 
 ### Added
