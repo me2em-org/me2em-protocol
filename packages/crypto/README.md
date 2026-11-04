@@ -61,6 +61,7 @@ Low-level cryptographic primitives built on WebCrypto (`crypto.subtle`).
 - **ecdh** — X25519 keypair generation, shared secret derivation, Ed25519↔X25519 conversion. Full 32B keys, UKS-safe.
 - **aead** — AES-256-GCM encrypt/decrypt. Random 12-byte IV per call. Ciphertext includes the 16-byte GCM tag.
 - **signatures** — Raw Ed25519 signing (`signRaw`, `verifyRaw`) for transient key material.
+- **slip10** — SLIP-0010 ed25519 hierarchical derivation, **hardened-only** (`slip10` namespace): `masterKeyFromSeed` (exactly 64-byte seed — same contract as `Identity.fromSeed`), `deriveHardened` / `derivePath` (`m/44'/501'/0'/0'` grammar; a non-hardened index is a `TypeError`), `publicKey`. Verified against the official SLIP-0010 ed25519 test vectors verbatim. The foundation for chain-package wallet trees (e.g. `@me2em/solano`), which carry no SLIP implementation of their own.
 - **wipe** — Secure zeroing of secret byte arrays (two-pass: random then zeros).
 
 ```ts

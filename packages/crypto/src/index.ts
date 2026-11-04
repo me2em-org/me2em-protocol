@@ -1,6 +1,8 @@
 // packages/crypto/src/index.ts
 
 export { hkdf, hkdfWithInfo } from './core/hkdf.js';
+export { slip10 } from './core/slip10.js';
+export type { Slip10Node } from './core/slip10.js';
 export {
   generateX25519KeyPair,
   x25519SharedSecret,
