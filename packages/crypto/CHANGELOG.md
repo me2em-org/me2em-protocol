@@ -5,6 +5,54 @@ previously had no changelog (flagged in the PR-4 review); this file is
 created as part of the PR-12 docs consolidation, retroactively covering
 the shipped alpha line.
 
+## [1.1.0-rc.1] — 2026-11-04
+
+First minor of the frozen 1.x line: SLIP-0010 ed25519 hierarchical
+key derivation, shipped as the **Ф-crypto** phase of the payment-layer
+plan (Документ 2 v1.2). Purely additive — the frozen API of
+1.0.0-rc.1 is unchanged, and every prior test vector still passes.
+This is the crypto foundation for `@me2em/solano` (Ф3), which consumes
+the `crypto.slip10` namespace and carries no SLIP implementation of
+its own.
+
+### Added
+- **`slip10` namespace — SLIP-0010 ed25519, hardened-only**
+  (`src/core/slip10.ts`):
+  - `slip10.masterKeyFromSeed(seed)` → `{ key, chainCode }`:
+    `I = HMAC-SHA512(Key = "ed25519 seed", Data = seed)`; IL is the
+    master key, IR the chain code. For ed25519 any IL is valid — no
+    retry loop. **Seed contract: exactly 64 bytes** — the same seed
+    contract as `@me2em/core`'s `Identity.fromSeed` (64 bytes, also
+    the SLIP-0010 upper bound of 512 bits); otherwise `TypeError`.
+  - `slip10.deriveHardened(node, index)` — hardened-only CKDpriv:
+    `I = HMAC-SHA512(Key = c_par, Data = 0x00 ‖ ser256(k_par) ‖ ser32(i))`;
+    `ki = IL`, `ci = IR`; `ser32` big-endian. The index MUST carry the
+    hardening bit (2³¹ ≤ i ≤ 2³² − 1) — a non-hardened index throws
+    `TypeError`, because normal derivation is not defined for ed25519.
+  - `slip10.derivePath(node, path)` — strict hardened grammar
+    `m(/(0|[1-9][0-9]*)('│h│H))*` (no leading zeros; the bare `m` is a
+    detached copy), e.g. the canonical Solana payment path
+    `m/44'/501'/0'/0'`.
+  - `slip10.publicKey(node)` — the 32-byte Ed25519 public key via
+    `@noble/curves`; chain packages derive payment addresses from it
+    (Solana: `base58(publicKey)`, no checksum) without importing
+    `@noble/*` themselves.
+  - All contract violations throw a bare `TypeError` (programmer
+    errors), distinct from the `CryptoError` operational model.
+    Returned buffers are fresh copies; inputs are never mutated.
+- `@noble/hashes` is now a **direct** dependency (`^1.8.0`) —
+  HMAC-SHA512 for SLIP-0010. Previously present only transitively
+  (via `@noble/curves` / `@scure/bip39`); pinning the same 1.8.0 line
+  keeps a single instance in the package graph. No other dependency
+  changes.
+- Tests: the official SLIP-0010 ed25519 Test Vectors 1 and 2
+  **verbatim** (every chain, private key + chain code, byte-exact;
+  TV2 through the public 64-byte contract, TV1 through the
+  algorithm-level `masterKeyFromSeedRaw` over the spec-legal
+  16–64-byte range) plus negatives (non-hardened indices and path
+  components, seed ≠ 64 bytes, malformed paths, malformed nodes) and
+  a sign/verify roundtrip pinning `publicKey` against `signRaw`.
+
 ## [1.0.0-rc.1] — 2026-11-01
 
 Release-candidate alignment with `@me2em/core` 1.0.0-rc.1 (the
