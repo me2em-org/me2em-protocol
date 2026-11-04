@@ -1,6 +1,6 @@
 # Me2eM Protocol — LTS v1.0 Program Plan
 
-**Version:** 3.1 — amended per architect review (2026-10-30): no-compatibility mandate (A9), `subjectWallet`/D8 → `@me2em/solano` track (A4), engines ≥22 (A2). Supersedes internal plan draft v2.0 after a full code audit at `0b73599`.
+**Version:** 3.1 — amended per architect review (2026-10-30): no-compatibility mandate (A9), `subjectWallet`/D8 → `@me2em/solana` track (A4), engines ≥22 (A2). Supersedes internal plan draft v2.0 after a full code audit at `0b73599`.
 **Goal:** ship `@me2em/core` v1.0.0 as an LTS release: 24-month security-support window, 7-day SLA for critical CVEs, frozen public API, gated on external audit or bug bounty (D7).
 **Roles:** Zed Wizard — implementation, branches, PRs, gates; architect — review, merge, CI workflow patches, Cloudflare config, audit, npm publishing.
 
@@ -38,7 +38,7 @@
 | D5 | Auto-init `@noble/ed25519` stays in `crypto/init.ts` | ✅ accepted | Documented as the single justified side effect; explicit `initEd25519()` optional for subpath imports |
 | D6 | `Session.fromVerified` → `@internal`, not exported from `index.ts` | ✅ accepted | Tests access it via test-utils, not the public surface |
 | D7 | External audit or bug bounty mandatory | ✅ accepted | LTS without it is marketing; see §9 (vendor search starts at the developer's discretion) |
-| D8 | `subjectWallet?: string` in attestation payload (not in grant) | ⏸ deferred — out of LTS core scope | Per architect review 2026-10-30: wallet binding is designed in a separate TZ and shipped in `@me2em/solano`; plan tasks 2.3.* excluded from this program |
+| D8 | `subjectWallet?: string` in attestation payload (not in grant) | ⏸ deferred — out of LTS core scope | Per architect review 2026-10-30: wallet binding is designed in a separate TZ and shipped in `@me2em/solana`; plan tasks 2.3.* excluded from this program |
 | D9 | Spec is `specs/v1.0.md`; `specs/draft/core.md` archived | ✅ accepted | Draft vectors placeholder replaced by generated real vectors |
 
 ---
@@ -49,8 +49,8 @@
 |---|---|---|---|
 | A1 | 2.1.2 | **Drop `derivePasswordLegacy`** — confirmed. | After D1 the master key material changes (seed 32→64 bytes), so no v0.7 derived value survives; a legacy path preserves nothing. With A9 there is no migration guide either — the breaking change is stated in the package CHANGELOG. |
 | A2 | 0.3.1 | `engines.node: ">=22"` (root + core) — raised per architect review. | Node 18/20 are EOL; CI already pins Node 22 (LTS maintenance to 2027-04); zero installed base makes the floor a free choice, and one supported Node line keeps CI simple. |
-| A3 | 1.5 | Add `@scure/base` dependency for base64url. | Audited, tiny, same family as the already-depended-on `@scure/bip39`. No hand-rolled codecs in a crypto library. (The base58 use moved to the `@me2em/solano` track together with 2.3.) |
-| A4 | 2.3.* | **Excluded from the LTS program** (architect review 2026-10-30): `subjectWallet`, on-curve/base58 validation and everything Solana-bound moves to a separate TZ and the separate package `@me2em/solano`. The PDA note (off-curve addresses are valid) carries over into that TZ. | Freezes the core attestation format earlier and shrinks the LTS audit surface. PR-9 is retired (tombstone in §5). |
+| A3 | 1.5 | Add `@scure/base` dependency for base64url. | Audited, tiny, same family as the already-depended-on `@scure/bip39`. No hand-rolled codecs in a crypto library. (The base58 use moved to the `@me2em/solana` track together with 2.3.) |
+| A4 | 2.3.* | **Excluded from the LTS program** (architect review 2026-10-30): `subjectWallet`, on-curve/base58 validation and everything Solana-bound moves to a separate TZ and the separate package `@me2em/solana`. The PDA note (off-curve addresses are valid) carries over into that TZ. | Freezes the core attestation format earlier and shrinks the LTS audit surface. PR-9 is retired (tombstone in §5). |
 | A5 | 3.3.2/3.3.3 | `crypto/ed25519.ts` is **not** deleted: it is re-exported by `crypto/index.ts` into the public `crypto` namespace. Keep the documented wrappers; unify only *internal* imports (3.3.1 unchanged). | Plan v2.0 called it dead code; the audit shows it is public API surface with owned TypeDoc documentation. Removing it would be a separate breaking decision, out of LTS scope. |
 | A6 | flow rule | **Same-PR consumer rule:** every breaking `core` PR carries the `@me2em/react` (and crypto where applicable) migration in the same PR. `main` must be green after every merge. | Verified: PR-2's rename breaks `useImportSeed.ts`, `useCreateIdentity.ts` and 4 react test files. A red `main` would also feed broken state to the docs sites on redeploy. |
 | A7 | 0.3.2 | CI already exists (`ci-security.yml`). Remaining work: enforce coverage ≥90% (lines+branches) via vitest thresholds in-repo (PR-4); CI wiring patch supplied to the architect. | Workflow edits require the Workflows token scope, which `me2em-sandbox-agent` deliberately does not have. |
@@ -79,12 +79,12 @@ Base unit of work = **one PR** (not one stage; not one subtask). Stage 5 (tests)
 | PR-6 | `core/signer` | 1.2 | `interface Signer` in `types.ts`, `Attestation.issue(signer, subjectPublicKey, subjectName, grant, opts)`, `Identity`/`Handle` implement `Signer`, `attestHandle`/`attestSubHandle` pass `this`; tests 5.13 | **yes** |
 | PR-7 | `core/hardening` | 1.5, 1.6, 1.7, 1.8.2–1.8.7 | base64url via `@scure/base` (A3) + no-`btoa` test, `randomUUID` fallback, all errors → `AttestationError` with `code`/`level`, `MAX_DEPTH_EXCEEDED`, `DISPOSED`, error table test (5.8), `expectAttestationError` migration (5.9), signature-length pre-check, `jti` validation, `__proto__` protection, `getSubMetadata` deep copy, shared-secret mutation tests (5.12), fuzz on `parseToken`/`parseSessionToken` (5.15), no-`randomUUID` test (5.18) | **yes** (error types) |
 | PR-8 | `core/revisions` | 2.1, 2.2, 2.4, 5.6, 5.16 | `derivePassword(context, { revision?, byteLength? })`, `deriveChannelKey(context, { revision? })`, NFKC on context+revision, `DERIVATION_PATHS.password(revision?)`/`.channel(revision?)`; `derivePasswordLegacy` **dropped** (A1); README/USE_CASES revision model + JSDoc `@since`; CHANGELOG breaking note (A1, A9) | **yes** |
-| PR-9 | *(retired)* | 2.3, 5.17 | **Retired pre-implementation** — `subjectWallet` moved to the `@me2em/solano` TZ (A4). Number kept for traceability, not re-used. | — |
+| PR-9 | *(retired)* | 2.3, 5.17 | **Retired pre-implementation** — `subjectWallet` moved to the `@me2em/solana` TZ (A4). Number kept for traceability, not re-used. | — |
 | PR-10 | `core/arch-cycle` | 3.1, 3.2, 3.3.1, 3.3.4 | Static `SubHandle` import in `handle.ts` (D4), `deriveSubHandleKey()` in `crypto/derivation.ts` shared by both entry points + parity test (5.3.3), all internal `hkdf`/`sha256`/`ed` imports via `crypto/`, auto-init documented (D5); wrappers kept (A5) | no |
 | PR-11 | `core/session-split` | 3.4, 3.5, 3.6.1–3.6.3 | `#verifyChainStructure`/`#verifyRootAttestation`/`#verifyHandleAttestation`/`#verifySessionAgainstGrant`/`#verifySessionSignature` with order+levels preserved (all 20+ attested-session tests green untouched), private `Session` constructor + `@internal` `Session.fromVerified`, `MAX_DEPTH_EXCEEDED` override, no double normalization in `attestSubHandle` | **yes** (constructor) |
 | PR-12 | `docs-lts-rc` | 4.1–4.2, 4.4–4.6, 6.4, 6.5 | `THREAT_MODEL.md` (incl. attestation/session replay, clock-skew exploitation, BL-07 limits), `SECURITY.md` update (SLA 7 days), README limits/runtime section, API freeze, `v1.0.0-rc.1` prep (no `MIGRATION.md` — A9) | docs + freeze |
 
-Excluded from LTS: variant-A factory (3.1 long-term), `FinalizationRegistry` guarantees (1.4.3), `subjectWallet`/D8 → `@me2em/solano` TZ (A4), `MIGRATION.md` (A9).
+Excluded from LTS: variant-A factory (3.1 long-term), `FinalizationRegistry` guarantees (1.4.3), `subjectWallet`/D8 → `@me2em/solana` TZ (A4), `MIGRATION.md` (A9).
 
 ---
 
@@ -183,6 +183,6 @@ Cadence assumes one PR in review at a time with same-day review turnaround; the 
 | 1.8.5–1.8.7 | PR-7 | 5.7 | PR-7 (property-based), distributed |
 | 2.1.1–2.1.5 | PR-8 (2.1.2 dropped, A1) | 5.8–5.10 | PR-4/PR-7 |
 | 2.2.1–2.2.3 | PR-8 | 5.11 | PR-3 |
-| 2.3.1–2.3.6 | excluded → solano TZ (A4) | 5.12–5.14 | PR-7 (5.14 → PR-3/PR-7) |
-| — | — | 5.15, 5.18–5.19 | PR-7 (5.17 → solano TZ) |
+| 2.3.1–2.3.6 | excluded → solana TZ (A4) | 5.12–5.14 | PR-7 (5.14 → PR-3/PR-7) |
+| — | — | 5.15, 5.18–5.19 | PR-7 (5.17 → solana TZ) |
 | 6.1–6.6, 7.1–7.5 | architect track (§9) + PR-12 | | |

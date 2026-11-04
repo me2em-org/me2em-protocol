@@ -1,4 +1,4 @@
-// packages/solano/src/networks.ts
+// packages/solana/src/networks.ts
 //
 // Chain identity constants for the Solana adapter (Документ 2 v1.2
 // §0.3): the CAIP-2 GRAMMAR lives in @me2em/core, the concrete Solana
@@ -9,7 +9,7 @@
 import { parseChain } from '@me2em/core';
 
 /**
- * The Solana networks @me2em/solano names. `'mainnet-beta'` is the
+ * The Solana networks @me2em/solana names. `'mainnet-beta'` is the
  * canonical Solana mainnet cluster name (not `'mainnet'`).
  */
 export type SolanaNetwork = 'mainnet-beta' | 'devnet' | 'testnet' | 'localnet';

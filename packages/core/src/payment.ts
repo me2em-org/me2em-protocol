@@ -4,7 +4,7 @@
 // adapter interfaces, CAIP-2 grammar helpers, the process-wide adapter
 // registry and the in-memory wallet-binding storage. Pure interfaces and
 // stateless helpers — no network, no chain code. Chain-specific values
-// (e.g. `solana:mainnet-beta`) live in the chain packages (solano,
+// (e.g. `solana:mainnet-beta`) live in the chain packages (solana,
 // monero); core pins only the grammar.
 //
 // Module-graph note: this module imports NOTHING from the rest of src/

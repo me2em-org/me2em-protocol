@@ -38,10 +38,10 @@ describe('CAIP-2 grammar (isValidChain / parseChain)', () => {
 
   it('reference boundaries: 1 and 64 chars ok, 65 fail; dashes and case allowed', () => {
     expect(isValidChain('solana:a')).toBe(true);
-    expect(isValidChain(`solano:${'a'.repeat(64)}`)).toBe(true);
-    expect(isValidChain(`solano:${'a'.repeat(65)}`)).toBe(false);
+    expect(isValidChain(`acme:${'a'.repeat(64)}`)).toBe(true);
+    expect(isValidChain(`acme:${'a'.repeat(65)}`)).toBe(false);
     expect(isValidChain('eip155:1')).toBe(true);
-    expect(isValidChain('solano:Mainnet-Beta')).toBe(true);
+    expect(isValidChain('acme:Mainnet-Beta')).toBe(true);
   });
 
   it('malformed forms → null/false', () => {
@@ -81,7 +81,7 @@ describe('adapter registry', () => {
 
   it('unknown chain → null (no aliasing, no prefix match)', () => {
     expect(getWalletAdapter('solana:testnet')).toBeNull();
-    expect(getWalletAdapter('solano:devnet')).toBeNull();
+    expect(getWalletAdapter('acme:devnet')).toBeNull();
     expect(getWalletAdapter('')).toBeNull();
   });
 
@@ -100,19 +100,19 @@ describe('adapter registry', () => {
   });
 
   it('disposer is idempotent', () => {
-    const dispose = registerWalletAdapter(makeAdapter('solano:test'));
+    const dispose = registerWalletAdapter(makeAdapter('acme:test'));
     dispose();
     dispose();
-    expect(getWalletAdapter('solano:test')).toBeNull();
+    expect(getWalletAdapter('acme:test')).toBeNull();
   });
 
   it('registry is shared across module copies via globalThis Symbol.for', async () => {
     // A second import of the module (fresh module record in a separate
     // vitest module registry) must see the SAME registry map.
-    const dispose = registerWalletAdapter(makeAdapter('solano:shared'));
+    const dispose = registerWalletAdapter(makeAdapter('acme:shared'));
     const fresh = await import('../src/payment.js');
-    expect(fresh.getWalletAdapter('solano:shared')?.chain).toBe('solano:shared');
-    expect(fresh.getWalletAdapter('solano:shared')).toBe(getWalletAdapter('solano:shared'));
+    expect(fresh.getWalletAdapter('acme:shared')?.chain).toBe('acme:shared');
+    expect(fresh.getWalletAdapter('acme:shared')).toBe(getWalletAdapter('acme:shared'));
     dispose();
   });
 

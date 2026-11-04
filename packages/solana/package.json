@@ -1,5 +1,5 @@
 {
-  "name": "@me2em/solano",
+  "name": "@me2em/solana",
   "version": "1.0.0-rc.1",
   "description": "Solana adapter for the Me2eM payment layer: deterministic wallet trees, chain adapters, payment references and request URLs",
   "type": "module",

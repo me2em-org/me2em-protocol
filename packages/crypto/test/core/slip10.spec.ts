@@ -1,7 +1,7 @@
 // packages/crypto/test/core/slip10.spec.ts
 //
 // Ф-crypto (payment-layer plan, Документ 2 v1.2): SLIP-0010 ed25519
-// in @me2em/crypto, consumed by @me2em/solano as `crypto.slip10`.
+// in @me2em/crypto, consumed by @me2em/solana as `crypto.slip10`.
 //
 // The positive vectors are the official SLIP-0010 ed25519 Test
 // Vectors 1 and 2, VERBATIM from slip-0010.md (Appendix A of the

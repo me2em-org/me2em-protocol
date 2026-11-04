@@ -1,4 +1,4 @@
-// packages/solano/src/wallet-tree.ts
+// packages/solana/src/wallet-tree.ts
 //
 // SolanaWalletTree (Документ 2 v1.2 §4.1) — the deterministic wallet
 // derivation context that replaces the impossible-in-core
@@ -7,7 +7,7 @@
 // `dispose()`.
 //
 // Derivation is delegated entirely to `crypto.slip10` (Ф-crypto):
-// @me2em/solano carries NO SLIP-0010 implementation of its own and
+// @me2em/solana carries NO SLIP-0010 implementation of its own and
 // imports no curve library — it composes the canonical Solana payment
 // path, base58-encodes the derived public key and manages key
 // lifetime (wipe on dispose, fresh buffers per derivation).
@@ -118,7 +118,7 @@ export interface SolanaDerivedWallet {
  *
  * @example
  * ```ts
- * import { SolanaWalletTree } from '@me2em/solano';
+ * import { SolanaWalletTree } from '@me2em/solana';
  * import { secureWipe } from '@me2em/crypto';
  *
  * const tree = SolanaWalletTree.fromSeed(seed64);

@@ -1,4 +1,4 @@
-// packages/solano/test/reference.spec.ts
+// packages/solana/test/reference.spec.ts
 //
 // Ф3: createPaymentReference — 32 random bytes, base58-encoded;
 // uniqueness across calls.

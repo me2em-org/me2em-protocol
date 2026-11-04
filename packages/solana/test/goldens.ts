@@ -1,7 +1,7 @@
-// packages/solano/test/goldens.ts
+// packages/solana/test/goldens.ts
 //
 // Golden pins for the Ф3 wallet path, computed INDEPENDENTLY of the
-// solano sources (scripts run against the published-shape
+// solana sources (scripts run against the published-shape
 // @me2em/crypto build + @scure/base only):
 //
 //   seed  = SLIP-0010 Test Vector 2 (official, slip-0010.md) — the
@@ -10,7 +10,7 @@
 //   path  = m/44'/501'/{index}'/0'   (canonical Solana payment path)
 //   addr  = base58(slip10.publicKey(slip10.derivePath(master, path)))
 //
-// If solano's path template, public-key handling or base58 encoding
+// If solana's path template, public-key handling or base58 encoding
 // drifts, these pins fail.
 import { fromHex } from '@me2em/crypto';
 

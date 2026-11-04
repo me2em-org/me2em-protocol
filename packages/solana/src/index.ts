@@ -1,6 +1,6 @@
-// packages/solano/src/index.ts
+// packages/solana/src/index.ts
 //
-// @me2em/solano — the Solana track of the Me2eM payment layer
+// @me2em/solana — the Solana track of the Me2eM payment layer
 // (Документ 2 v1.2 §9, Ф3 "wallet-only"): deterministic wallet
 // trees over `crypto.slip10`, chain-bound wallet adapters, payment
 // references and Solana Pay request URLs.

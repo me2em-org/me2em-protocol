@@ -1,8 +1,15 @@
 # Changelog
 
-All notable changes to `@me2em/solano` are documented here. This is the
+All notable changes to `@me2em/solana` are documented here. This is the
 first release of the package — the Solana track of the Me2eM payment
 layer.
+
+> **Note on naming.** The package was renamed from `@me2em/solano` to
+> `@me2em/solana` before the first stable track was established: the
+> network is Solana, and the codename in early planning documents
+> (`solano`) is not the product name. `@me2em/solano@0.0.0-stage` and
+> `@me2em/solano@1.0.0-rc.1` on npm are deprecated placeholders —
+> install `@me2em/solana` instead.
 
 ## [1.0.0-rc.1] — 2026-11-04
 

@@ -1,4 +1,4 @@
-// packages/solano/test/setup.ts
+// packages/solana/test/setup.ts
 import { webcrypto } from 'node:crypto';
 
 if (!globalThis.crypto?.subtle) {

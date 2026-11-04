@@ -25,7 +25,7 @@ First minor of the frozen 1.x line: SLIP-0010 ed25519 hierarchical
 key derivation, shipped as the **Ф-crypto** phase of the payment-layer
 plan (Документ 2 v1.2). Purely additive — the frozen API of
 1.0.0-rc.1 is unchanged, and every prior test vector still passes.
-This is the crypto foundation for `@me2em/solano` (Ф3), which consumes
+This is the crypto foundation for `@me2em/solana` (Ф3), which consumes
 the `crypto.slip10` namespace and carries no SLIP implementation of
 its own.
 

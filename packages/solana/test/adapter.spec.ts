@@ -1,4 +1,4 @@
-// packages/solano/test/adapter.spec.ts
+// packages/solana/test/adapter.spec.ts
 //
 // Ф3: SolanaWalletAdapter — the core WalletAdapter contract
 // (resolveWallet with per-call seed, structural isValidAddress with

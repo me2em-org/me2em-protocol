@@ -481,7 +481,7 @@ quotes in this entry are intentional).
   [PLAN-LTS-v1.md](./PLAN-LTS-v1.md) (supersedes the internal plan
   draft v2.0 after a code audit at `0b73599`; v3.1 per architect
   review: no-compat mandate — no migration guides, `subjectWallet`/
-  D8 → separate `@me2em/solano` TZ, engines >=22). Decisions D1–D9
+  D8 → separate `@me2em/solana` TZ, engines >=22). Decisions D1–D9
   accepted (D8 deferred out of core scope); amendments A1–A9 are
   part of the plan; baseline verified: 438 tests green (core 186 /
   crypto 151 / react 101). Work proceeds as ~11 coherent PRs

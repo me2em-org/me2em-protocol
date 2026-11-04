@@ -1,4 +1,4 @@
-// packages/solano/src/register.ts
+// packages/solana/src/register.ts
 //
 // Adapter registration (Документ 2 v1.2 §2.1): one stateless adapter
 // instance per exact CAIP-2 chain key — chain-bound views. Keys are

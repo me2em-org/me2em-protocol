@@ -1,4 +1,4 @@
-// packages/solano/src/adapter.ts
+// packages/solana/src/adapter.ts
 //
 // SolanaWalletAdapter (Документ 2 v1.2 §2/§8) — the @me2em/core
 // `WalletAdapter` implementation for one exact CAIP-2 chain id.

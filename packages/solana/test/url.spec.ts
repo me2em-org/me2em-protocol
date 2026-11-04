@@ -1,4 +1,4 @@
-// packages/solano/test/url.spec.ts
+// packages/solana/test/url.spec.ts
 //
 // Ф3: createPaymentRequestURL — the Solana Pay URI hand-off for
 // external wallets (Phantom acceptance format): parameter set,

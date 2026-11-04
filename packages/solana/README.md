@@ -1,8 +1,8 @@
-[![npm version](https://img.shields.io/npm/v/@me2em/solano.svg)](https://www.npmjs.com/package/@me2em/solano)
-[![License](https://img.shields.io/npm/l/@me2em/solano.svg)](./LICENSE)
-[![Docs](https://img.shields.io/badge/docs-solano.me2em.com-blue)](https://solano.me2em.com)
+[![npm version](https://img.shields.io/npm/v/@me2em/solana.svg)](https://www.npmjs.com/package/@me2em/solana)
+[![License](https://img.shields.io/npm/l/@me2em/solana.svg)](./LICENSE)
+[![Docs](https://img.shields.io/badge/docs-solana.me2em.com-blue)](https://solana.me2em.com)
 
-# @me2em/solano
+# @me2em/solana
 
 Solana adapter for the Me2eM payment layer: deterministic wallet trees over SLIP-0010, chain-bound wallet adapters, payment references and Solana Pay request URLs — offline by design (no RPC in this release).
 
@@ -13,7 +13,7 @@ Solana adapter for the Me2eM payment layer: deterministic wallet trees over SLIP
 ## Install
 
 ```sh
-pnpm add @me2em/solano @me2em/core
+pnpm add @me2em/solana @me2em/core
 ```
 
 > 💡 `@me2em/core` is a **peer** dependency (`>=1.0.0-rc.3 <2.0.0-0`) —
@@ -38,7 +38,7 @@ pnpm add @me2em/solano @me2em/core
 - **`tree.dispose()`** — zeroizes the master material; further key-requiring calls throw `DisposedError`. Idempotent.
 
 ```ts
-import { SolanaWalletTree } from '@me2em/solano';
+import { SolanaWalletTree } from '@me2em/solana';
 import { secureWipe } from '@me2em/crypto';
 
 const tree = SolanaWalletTree.fromSeed(seed64); // 64-byte BIP39 seed
@@ -72,7 +72,7 @@ try {
   `spl-token` is present exactly when `asset` is an SPL mint; the native SOL sentinel is **`'sol'`** (`SOLANA_NATIVE_ASSET`, exact lowercase match). `expiresAt` is deliberately **not** encoded — the verifier enforces expiry from the SIGNED `PaymentRequest` (v1.2 §0.1: all verification parameters live in signed artifacts; the URL is a transport, not the verification artifact).
 
 ```ts
-import { createPaymentRequestURL } from '@me2em/solano';
+import { createPaymentRequestURL } from '@me2em/solana';
 
 const url = createPaymentRequestURL({
   chain: 'solana:mainnet-beta',
@@ -90,7 +90,7 @@ const url = createPaymentRequestURL({
 - **`registerSolanaAdapters({ networks? })`** — registers one stateless `SolanaWalletAdapter` per network under its exact CAIP-2 key; defaults to `['mainnet-beta']` (dev/test clusters are an explicit opt-in). Returns an idempotent combined disposer. Network names are validated **before** any registration.
 
 ```ts
-import { registerSolanaAdapters } from '@me2em/solano';
+import { registerSolanaAdapters } from '@me2em/solana';
 
 const dispose = registerSolanaAdapters(); // solana:mainnet-beta
 // … the payment layer resolves the adapter by exact chain id …

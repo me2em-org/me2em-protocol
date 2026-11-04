@@ -4,7 +4,7 @@
 //
 // This is the Ф-crypto phase of the payment-layer plan (Документ 2
 // v1.2): SLIP-0010 lives in @me2em/crypto and is consumed as
-// `crypto.slip10`. Chain packages (e.g. @me2em/solano) carry no SLIP
+// `crypto.slip10`. Chain packages (e.g. @me2em/solana) carry no SLIP
 // implementation of their own — they build paths on top of this
 // namespace and derive payment addresses from the resulting public
 // keys.
@@ -145,7 +145,7 @@ function deriveHardenedChild(node: Slip10Node, index: number): Slip10Node {
  * and MUST carry a hardening marker; `0 ≤ component ≤ 2^31 − 1`.
  * The bare path `m` is valid and returns a detached copy of the node.
  *
- * The canonical Solana payment path consumed by @me2em/solano is
+ * The canonical Solana payment path consumed by @me2em/solana is
  * `m/44'/501'/{index}'/0'`.
  *
  * @param node - Starting node (usually the master node).
