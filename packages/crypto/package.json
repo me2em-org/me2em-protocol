@@ -23,7 +23,7 @@
     "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "build-docs": "typedoc",
+    "build-docs": "pnpm --filter \"@me2em/crypto^...\" run build && typedoc",
     "test:coverage": "vitest run --coverage"
   },
   "license": "Apache-2.0",
@@ -44,7 +44,6 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.11",
     "tsup": "^8.0.0",
-    "typedoc": "^0.26.11",
     "typescript": "^5.6.0",
     "vitest": "^4.1.7"
   }

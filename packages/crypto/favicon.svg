@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- Фон: Скругленный квадрат (как у me2em/core, чтобы показать, что это базовый SDK) -->
+  <rect width="16" height="16" rx="3" fill="#2563EB"/>
+
+  <!-- Левая скобка - output < -->
+  <path d="M6 4 L3 8 L6 12" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Правая скобка - input > -->
+  <path d="M10 4 L13 8 L10 12" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Центральное ядро (шифр) -->
+  <circle cx="8" cy="8" r="1.5" fill="white"/>
+</svg>

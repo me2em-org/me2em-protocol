@@ -23,7 +23,7 @@
     "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "build-docs": "typedoc",
+    "build-docs": "pnpm --filter \"@me2em/solana^...\" run build && typedoc",
     "test:coverage": "vitest run --coverage"
   },
   "license": "Apache-2.0",
