@@ -6,7 +6,7 @@ signed sessions, and parent-signed **attestation chains** for delegatable,
 externally verifiable authorization — all on Ed25519.
 
 [![npm version](https://img.shields.io/npm/v/@me2em/core.svg)](https://www.npmjs.com/package/@me2em/core)
-[![License](https://img.shields.io/npm/l/@me2em/core.svg)](./LICENSE)
+[![License](https://img.shields.io/npm/l/@me2em/core.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-core.me2em.com-blue)](https://core.me2em.com)
 
 ## 🎯 Overview
@@ -57,7 +57,7 @@ different lenses:
 | **E2EE Messaging** (UC-6) | The user's messaging identity | An optional device identity |
 
 Full glossary (including Channel and material-class terms):
-see the root [GLOSSARY.md](../../GLOSSARY.md).
+see `GLOSSARY.md` in the repository.
 
 ---
 
@@ -73,11 +73,11 @@ pnpm add @me2em/core
 `@noble/hashes` (HKDF, SHA-256), `@scure/bip39` (mnemonic handling).
 
 > 💡 This package is self-contained. For E2EE channels, X3DH key
->  agreement, and Argon2id use [`@me2em/crypto`](../crypto/README.md).
+>  agreement, and Argon2id use [`@me2em/crypto`](https://www.npmjs.com/package/@me2em/crypto).
 >  For React hooks and seed phrase UX components use
->  [`@me2em/react`](../react/README.md). The three packages are
->  designed to work together — see the root
->  [README](../../README.md) for the full package map.
+>  [`@me2em/react`](https://www.npmjs.com/package/@me2em/react). The three packages are
+>  designed to work together — see the
+>  [repository README](https://github.com/me2em-org/me2em-protocol) for the full package map.
 
 ## 🚀 Quick Start
 
@@ -540,8 +540,7 @@ Redis `RevocationChecker`.
 **Key lifecycle:** `dispose()` zeroizes the private key (`fill(0)`) and
 permanently revokes all capability methods (`DisposedError`); it is
 idempotent. Hard zeroization cannot be guaranteed in a JS runtime —
-GC/JIT may retain copies ([BACKLOG](../../BACKLOG.md) BL-07,
-[THREAT_MODEL.md](../../THREAT_MODEL.md) §5.2).
+GC/JIT may retain copies (see `THREAT_MODEL.md` §5.2 in the repository).
 
 ## 🛡️ Security Best Practices
 
@@ -561,7 +560,7 @@ GC/JIT may retain copies ([BACKLOG](../../BACKLOG.md) BL-07,
 - Don't reuse Handles across unrelated contexts.
 - Don't log private keys or seed phrases.
 - Don't rely on zeroing buffers as a hard guarantee — GC/JIT may retain
-  copies (tracked in [BACKLOG](../../BACKLOG.md) BL-07).
+  copies; zeroization hardening is tracked in the repository backlog.
 
 ## 🧪 Testing
 
@@ -569,7 +568,7 @@ GC/JIT may retain copies ([BACKLOG](../../BACKLOG.md) BL-07,
 cd packages/core && pnpm test
 ```
 
-350 tests cover: deterministic derivation and cross-entry-point key
+The test suite covers: deterministic derivation and cross-entry-point key
 consistency, name canonicalization, derivation revisions (r1 byte-parity,
 r2 independence, NFKC contexts), session lifecycle (create, verify,
 tamper, expiry, iat), revocation, SubHandle constraint enforcement,
@@ -583,17 +582,17 @@ validation), module-structure and crypto-boundary pins, and parser fuzz
 ## 🗺️ Roadmap
 
 Passphrase support and `dispose()` zeroization have shipped. Remaining
-recommendations — session lineage (`sid`), zeroization hardening
-(BL-07), attestation reference compression,
+recommendations — session lineage (`sid`), zeroization hardening,
+attestation reference compression,
 and the full package strategy (`@me2em/crypto`, `@me2em/messenger`,
-`@me2em/iot`) — live in [BACKLOG.md](../../BACKLOG.md). The backlog is
+`@me2em/iot`) — are tracked in the repository backlog, which is
 advisory and not part of the shipped API contract.
 
 The public API is **frozen** as of `1.0.0-rc.1` — see
-[specs/v1.0.md §12](../../specs/v1.0.md) for the evolution rules.
+`specs/v1.0.md` §12 in the repository for the evolution rules.
 
 ## 📜 License
 
-Apache License 2.0 — see [LICENSE](../../LICENSE).
+Apache License 2.0.
 
 © 2026 Me2eM Organization. Built for privacy, openness, and user sovereignty.

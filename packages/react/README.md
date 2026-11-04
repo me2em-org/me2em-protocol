@@ -1,5 +1,5 @@
 [![npm version](https://img.shields.io/npm/v/@me2em/react.svg)](https://www.npmjs.com/package/@me2em/react)
-[![License](https://img.shields.io/npm/l/@me2em/react.svg)](./LICENSE)
+[![License](https://img.shields.io/npm/l/@me2em/react.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-react.me2em.com-blue)](https://react.me2em.com)
 
 ## 📦 @me2em/react — React bindings
@@ -14,12 +14,12 @@ pnpm add @me2em/react react
 
 Requires React >= 18.0.0 as a peer dependency.
 
-> 💡 This package requires [`@me2em/core`](../core/README.md) (peer
->  dependency via workspace) and React ≥ 18. It is self-contained —
+> 💡 This package requires [`@me2em/core`](https://www.npmjs.com/package/@me2em/core) (peer
+>  dependency) and React ≥ 18. It is self-contained —
 >  for E2EE channels, X3DH, and Argon2id see
->  [`@me2em/crypto`](../crypto/README.md). All three packages are
->  designed to work together — see the root
->  [README](../../README.md) for the full package map.
+>  [`@me2em/crypto`](https://www.npmjs.com/package/@me2em/crypto). All three packages are
+>  designed to work together — see the
+>  [repository README](https://github.com/me2em-org/me2em-protocol) for the full package map.
 
 ## Quick Start
 
@@ -90,7 +90,7 @@ this package:
 | **Context cache** | Per-identity encrypted storage of derived Handle context. |
 
 Full glossary (including Attestation, SubHandle, Ephemeral material):
-see the root [GLOSSARY.md](../../GLOSSARY.md).
+see `GLOSSARY.md` in the repository.
 
 **This package never persists your seed.** The seed phrase exists in
 two places only — your paper and transient memory during login. What
@@ -228,6 +228,7 @@ Each identity gets a separate IndexedDB database (name = SHA-256 hash of identit
 
 ## Status
 
-Alpha. API may change between 0.1.x releases. See [packages/core/README.md](../../packages/core/README.md) for the underlying protocol.
+Release candidate. The public API is aligned with the frozen protocol
+v1.0 — see the [@me2em/core README](https://www.npmjs.com/package/@me2em/core) for the underlying protocol.
 
-Roadmap: `@me2em/crypto` shipped (0.1.0-alpha.1); `@me2em/messenger` planned (BACKLOG BL-29).
+Roadmap: `@me2em/messenger` is planned next.
