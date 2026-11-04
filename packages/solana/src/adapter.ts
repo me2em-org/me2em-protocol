@@ -84,7 +84,7 @@ export class SolanaWalletAdapter implements WalletAdapter {
    *
    * The seed is consumed per call (a throwaway tree is built, derived
    * from and disposed in `finally`); the returned
-   * {@link WalletDescriptor} carries NO key material — the derived
+   * `WalletDescriptor` carries NO key material — the derived
    * private key is wiped before returning. Use {@link SolanaWalletTree}
    * directly when you need the raw signing key.
    *
