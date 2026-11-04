@@ -1,5 +1,5 @@
 [![npm version](https://img.shields.io/npm/v/@me2em/crypto.svg)](https://www.npmjs.com/package/@me2em/crypto)
-[![License](https://img.shields.io/npm/l/@me2em/crypto.svg)](./LICENSE)
+[![License](https://img.shields.io/npm/l/@me2em/crypto.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-crypto.me2em.com-blue)](https://crypto.me2em.com)
 
 # @me2em/crypto
@@ -8,7 +8,8 @@ Cryptographic mechanisms for the Me2eM protocol: E2EE channels, X3DH key exchang
 
 ## Status
 
-**v0.1.0-alpha.1** — envelopes (key-wrapping, media chunks) + full documentation.
+Release candidate. E2EE channels, X3DH, SLIP-0010 derivation, password
+KDF and envelopes (key-wrapping, media chunks) are shipped.
 
 ## Security Philosophy
 
@@ -33,7 +34,7 @@ this package:
 | **Epoch** | Rotation counter for channel root keys. Messages from previous epochs are undecryptable. |
 
 Full glossary (including Identity, Handle, Attestation, Session):
-see the [root README](../../README.md).
+see the [repository README](https://github.com/me2em-org/me2em-protocol).
 
 ---
 
@@ -43,13 +44,13 @@ see the [root README](../../README.md).
 pnpm add @me2em/crypto
 ```
 
-> 💡 This package depends on [`@me2em/core`](../core/README.md)
-> (workspace) and `hash-wasm` (Argon2id). It is headless-only —
+> 💡 This package depends on [`@me2em/core`](https://www.npmjs.com/package/@me2em/core)
+> and `hash-wasm` (Argon2id). It is headless-only —
 > no React imports, works in both browser and Node.js ≥ 20.
 > For React hooks and seed phrase UX use
-> [`@me2em/react`](../react/README.md). All three packages are
-> designed to work together — see the root
-> [README](../../README.md) for the full package map.
+> [`@me2em/react`](https://www.npmjs.com/package/@me2em/react). All three packages are
+> designed to work together — see the
+> [repository README](https://github.com/me2em-org/me2em-protocol) for the full package map.
 
 ## Modules
 
@@ -203,7 +204,7 @@ try {
 
 ## Roadmap
 
-- **BL-14** — Double Ratchet (message-key evolution per message; window-based replay protection shipped in 1.0.0-rc.1)
+- **Double Ratchet** — message-key evolution per message (window-based replay protection already shipped)
 - **PreKeyStorage** — IndexedDB implementation for messenger-layer persistence
 - **attRef** — Attestation reference for envelope origin verification
 
@@ -211,12 +212,12 @@ try {
 
 - **headless-only**: zero React imports, zero DOM specifics.
 - WebCrypto (`crypto.subtle`) is the only allowed crypto API.
-- Dependencies: `@me2em/core` (workspace), `hash-wasm` (Argon2id).
+- Dependencies: `@me2em/core`, `hash-wasm` (Argon2id), `@noble/*` and `@scure/*` primitives.
 
-See [packages/core README](../../packages/core/README.md) for the core package.
+See the [@me2em/core README](https://www.npmjs.com/package/@me2em/core) for the core package.
 
 ## License
 
-Apache License 2.0 — see [LICENSE](../../LICENSE).
+Apache License 2.0.
 
 © 2026 Me2eM Organization. Built for privacy, openness, and user sovereignty.
