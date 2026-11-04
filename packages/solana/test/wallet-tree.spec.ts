@@ -1,4 +1,4 @@
-// packages/solano/test/wallet-tree.spec.ts
+// packages/solana/test/wallet-tree.spec.ts
 //
 // Ф3: SolanaWalletTree — seed contract, deterministic derivation
 // (golden-pinned against independently computed TV2 addresses),
@@ -77,7 +77,7 @@ describe('SolanaWalletTree.deriveWallet — golden addresses (TV2, m/44\'/501\'/
       // The returned private key is a real Ed25519 signing seed whose
       // public key IS the address preimage — a signature made with it
       // verifies against the key decoded from the ADDRESS string:
-      const message = new TextEncoder().encode('me2em solano Ф3');
+      const message = new TextEncoder().encode('me2em solana Ф3');
       const sig = signRaw(wallet.privateKey, message);
       expect(verifyRaw(base58.decode(wallet.address), message, sig)).toBe(true);
       expect(verifyRaw(slip10.publicKey(node), message, sig)).toBe(true);

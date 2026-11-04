@@ -1,4 +1,4 @@
-// packages/solano/test/register.spec.ts
+// packages/solana/test/register.spec.ts
 //
 // Ф3: registerSolanaAdapters — exact-CAIP-2 keys, production-safe
 // default network set, combined idempotent disposer, last-wins

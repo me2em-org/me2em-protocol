@@ -277,7 +277,7 @@ Me2eM does **not** claim protection against:
    backups, cloud-synced notes (README best practices address the
    process; the protocol cannot).
 7. **Wallet binding** — `subjectWallet` / Solana attribution is a
-   separate design track (`@me2em/solano`), deliberately excluded from
+   separate design track (`@me2em/solana`), deliberately excluded from
    the core attestation format (A4).
 8. **`@me2em/crypto` E2EE internals** — X3DH, pre-key and channel-layer
    threats are documented in that package's README; this document covers

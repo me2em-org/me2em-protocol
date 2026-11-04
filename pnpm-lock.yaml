@@ -151,7 +151,7 @@ importers:
         specifier: ^4.1.7
         version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.28.2)(yaml@2.9.0))
 
-  packages/solano:
+  packages/solana:
     dependencies:
       '@me2em/crypto':
         specifier: workspace:^

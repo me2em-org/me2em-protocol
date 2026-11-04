@@ -1,4 +1,4 @@
-// packages/solano/src/reference.ts
+// packages/solana/src/reference.ts
 //
 // Payment references (Документ 2 v1.2 §5.4): the correlation key a
 // `PaymentRequest` carries for chain-level REPLAYED detection.

@@ -1,4 +1,4 @@
-// packages/solano/src/url.ts
+// packages/solana/src/url.ts
 //
 // Solana Pay request URLs (Документ 2 v1.2 §5.1): the hand-off format
 // for EXTERNAL wallets (Phantom, Solflare — browser extensions do not
