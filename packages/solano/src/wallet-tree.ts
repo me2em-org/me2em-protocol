@@ -38,10 +38,20 @@ function paymentPath(index: number): string {
 }
 
 /**
- * Matches exactly the paths this tree issues — `m/44'/501'/N'/0'` —
- * with the plain index captured. Anything else (foreign coin types,
- * missing levels, non-numeric junk) is not ours and is ignored by
- * {@link nextPaymentIndex}, never thrown on (v1.2 §2.2 tolerance).
+ * Recognizes the paths this tree issues — `m/44'/501'/N'/0'` — with
+ * the plain index captured. Deliberately a SUPerset of what the tree
+ * emits: the index alternative is `(\d+)`, not the canonical
+ * `(0|[1-9][0-9]*)`, so a padded rendering persisted by external
+ * tooling (`m/44'/501'/00'/0'`) still counts as used — rejecting it
+ * could reallocate an existing index (address reuse), the exact
+ * failure v1.2 §2.2 forbids. `Number()` canonicalizes the capture
+ * (`'007'` → 7) and the range check drops overflows; the capture is
+ * never fed to `derivePath` as a string (issuance goes through
+ * {@link paymentPath} with a validated number), so liberal matching
+ * here has no derivation surface. Everything else (foreign coin
+ * types, missing levels, non-numeric junk) is not ours and is
+ * ignored by {@link nextPaymentIndex}, never thrown on (v1.2 §2.2
+ * tolerance).
  */
 const PAYMENT_PATH_RE = /^m\/44'\/501'\/(\d+)'\/0'$/;
 

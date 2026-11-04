@@ -147,6 +147,21 @@ describe('SolanaWalletTree.nextIndex — v1.2 §2.2 allocation semantics', () =>
     expect(() => nextPaymentIndex(undefined as unknown as string[])).toThrow(TypeError);
   });
 
+  // Deliberate tolerance (v1.2 §2.2): the scanner accepts padded index
+  // renderings (`00`, `007`) and canonicalizes via Number() — a strict
+  // `(0|[1-9][0-9]*)` grammar would silently ignore such persisted
+  // paths and could reallocate an existing index (address reuse).
+  // Overflowing captures (2^31 and beyond) stay filtered by the range
+  // check.
+  it('padded index renderings count as used; overflows stay filtered', () => {
+    expect(nextPaymentIndex(["m/44'/501'/00'/0'"])).toBe(1);
+    expect(nextPaymentIndex(["m/44'/501'/007'/0'"])).toBe(8);
+    expect(
+      nextPaymentIndex(["m/44'/501'/3'/0'", "m/44'/501'/002'/0'"])
+    ).toBe(4);
+    expect(nextPaymentIndex(["m/44'/501'/2147483648'/0'"])).toBe(0);
+  });
+
   it('works after dispose (no key material involved)', async () => {
     const tree = SolanaWalletTree.fromSeed(TV2_SEED);
     tree.dispose();
