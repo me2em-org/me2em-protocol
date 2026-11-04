@@ -100,7 +100,7 @@ importers:
         version: 5.6.3
       vitest:
         specifier: ^4.1.7
-        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.27.7)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.28.2)(yaml@2.9.0))
 
   packages/react:
     dependencies:
@@ -150,6 +150,34 @@ importers:
       vitest:
         specifier: ^4.1.7
         version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.28.2)(yaml@2.9.0))
+
+  packages/solano:
+    dependencies:
+      '@me2em/crypto':
+        specifier: workspace:^
+        version: link:../crypto
+      '@scure/base':
+        specifier: ^2.4.0
+        version: 2.4.0
+    devDependencies:
+      '@me2em/core':
+        specifier: workspace:^
+        version: link:../core
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.5
+      '@vitest/coverage-v8':
+        specifier: ^4.1.11
+        version: 4.1.11(vitest@4.1.11)
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.32)(typescript@5.6.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.6.3
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.27.7)(yaml@2.9.0))
 
 packages:
 
@@ -3108,7 +3136,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.27.7)(yaml@2.9.0))
+      vitest: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@25.0.1)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.28.2)(yaml@2.9.0))
 
   '@vitest/expect@4.1.11':
     dependencies:

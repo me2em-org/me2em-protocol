@@ -22,6 +22,9 @@ paths = [
   '''packages/crypto/test/.*''',
   '''packages/core/test/.*''',
   '''packages/react/test/.*''',
+  # Ф3: structural address tests use deterministic byte fills
+  # ("new Uint8Array(32).fill(0xff)") — synthetic material, same as above.
+  '''packages/solano/test/.*''',
   # Published BIP39 test vectors ("abandon … about" / "abandon … art")
   # are standard, synthetic test material — see specs/v1.0.md §10.
   '''specs/test-vectors.json''',
