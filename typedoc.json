@@ -13,5 +13,10 @@
     "includeGroups": true
   },
   "categorizeByGroup": true,
-  "sort": ["source-order", "alphabetical"]
+  "sort": ["source-order", "alphabetical"],
+  // "structure" router keeps every page at the output root (or in namespace
+  // folders like crypto/). The default "kind" router emits a top-level
+  // functions/ directory, which Cloudflare Pages reserves for Pages
+  // Functions — static files inside it are never served.
+  "router": "structure"
 }
