@@ -361,6 +361,13 @@ class SolanaPaymentVerifier {
       return null;
     }
 
+    // Owner check: must be the AddressLookupTable program
+    const LUT_PROGRAM_ID = 'AddressLookupTab1e1111111111111111111111111';
+    if (account.owner !== LUT_PROGRAM_ID) {
+      this.#lutCache.set(lookupKey, []); // not a LUT → fail-closed
+      return null;
+    }
+
     const [base64Data] = account.data;
     const addresses = parseLutAddresses(base64Data);
     // Cache the result (null if parse failed — fail-closed at call site)

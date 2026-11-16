@@ -7,14 +7,17 @@
 // bincode parser — only the `AddressLookupTable` wire format is
 // supported:
 //
-//   version (u8) | discriminator (u32 LE) |
-//   deactivationSlot (u64 LE) | lastExtendedSlot (u64 LE) |
-//   lastExtendedSlotStartIndex (u8) | authority (Option<Pubkey>) |
-//   addresses (Vec<Pubkey>)
+//   discriminator: u32 LE (4 bytes, = 1 for initialized LUT)
+//   deactivationSlot: u64 LE (8 bytes)
+//   lastExtendedSlot: u64 LE (8 bytes)
+//   lastExtendedSlotStartIndex: u8 (1 byte)
+//   authority: Option<Pubkey> (1 + 0/32 bytes)
+//   addresses: Vec<Pubkey> — u32 LE count + N × 32 bytes
 //
 // The parser is best-effort: any corruption (short buffer, invalid
-// base64, wrong lengths) causes the function to return `null`, and
-// the caller treats this as `REFERENCE_MISMATCH` (fail-closed).
+// base64, wrong lengths, wrong discriminator) causes the function to
+// return `null`, and the caller treats this as `REFERENCE_MISMATCH`
+// (fail-closed).
 //
 // No dependencies beyond `@scure/base` (base64 decoding) and
 // standard TypedArrays.
@@ -69,12 +72,11 @@ function readOptionPubkey(buf: Uint8Array, offset: number): {
  * 32-byte pubkey buffers.
  *
  * Returns `null` on any parse failure (corrupted data, wrong length,
- * invalid base64) — the caller must treat this as `REFERENCE_MISMATCH`
- * (fail-closed).
+ * invalid base64, wrong discriminator) — the caller must treat this
+ * as `REFERENCE_MISMATCH` (fail-closed).
  *
  * Wire format (AddressLookupTable):
- *   - version: u8 (1 byte)
- *   - discriminator: u32 LE (4 bytes)
+ *   - discriminator: u32 LE (4 bytes, = 1 for initialized LUT)
  *   - deactivationSlot: u64 LE (8 bytes)
  *   - lastExtendedSlot: u64 LE (8 bytes)
  *   - lastExtendedSlotStartIndex: u8 (1 byte)
@@ -91,18 +93,19 @@ export function parseLutAddresses(base64Data: string): readonly Uint8Array[] | n
 
   let offset = 0;
 
-  // version: u8 — skip
-  offset += 1;
-
-  // discriminator: u32 LE (4 bytes) — skip
-  offset += 4;
-
-  // deactivationSlot: u64 LE (8 bytes) — we skip it, but must advance
   try {
+    // discriminator: u32 LE — must be 1 (initialized LUT)
+    const discriminator = readU32LE(raw, offset);
+    offset += 4;
+    if (discriminator !== 1) {
+      return null; // not a LUT account → fail-closed
+    }
+
+    // deactivationSlot: u64 LE — skip
     offset += 8;
-    // lastExtendedSlot: u64 LE (8 bytes) — skip
+    // lastExtendedSlot: u64 LE — skip
     offset += 8;
-    // lastExtendedSlotStartIndex: u8 (1 byte) — skip
+    // lastExtendedSlotStartIndex: u8 — skip
     offset += 1;
     // authority: Option<Pubkey>
     const { nextOffset } = readOptionPubkey(raw, offset);
