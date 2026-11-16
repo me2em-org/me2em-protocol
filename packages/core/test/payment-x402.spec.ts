@@ -21,7 +21,7 @@ import {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeRequirements(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function makeRequirements(overrides: Partial<X402PaymentRequirements> = {}): X402PaymentRequirements {
   return {
     scheme: 'exact',
     network: 'solana:mainnet-beta',
@@ -447,7 +447,3 @@ describe('REGULATORY_PROFILES', () => {
     expect(REGULATORY_PROFILES.SANCTIONS).toBe('sanctions');
   });
 });
-
-// Keep the type import used at runtime level as well.
-const _typeRef: X402PaymentRequirements = makeRequirements() as X402PaymentRequirements;
-void _typeRef;

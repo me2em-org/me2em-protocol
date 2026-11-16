@@ -137,12 +137,6 @@ export type PaymentFailureReason =
   | 'PACT_INVALID' | 'BUYER_NOT_ATTESTED' | 'SELLER_NOT_ATTESTED';
 
 /**
- * A signed-off payment demand (v1.2 §0.1): every parameter a verifier
- * needs comes from this artifact — nothing is negotiated out-of-band.
- * All payment parameters live in signed data; the wire shape is pinned
- * here and unchanged from Документ 2 v1.0 (v1.2 §12).
- */
-/**
  * Me2eM metadata for the direct payment flow (ТЗ x402 v1.1 §2.4).
  * In the x402 wire format these fields travel as `extra.me2em`
  * (`X402Me2emExtra`, base64 — lives in `@me2em/x402`, M1).
@@ -162,6 +156,12 @@ export interface Me2emExtra {
   readonly [key: string]: unknown;
 }
 
+/**
+ * A signed-off payment demand (v1.2 §0.1): every parameter a verifier
+ * needs comes from this artifact — nothing is negotiated out-of-band.
+ * All payment parameters live in signed data; the wire shape is pinned
+ * here and unchanged from Документ 2 v1.0 (v1.2 §12).
+ */
 export interface PaymentRequest {
   /** Exact CAIP-2 chain the request is payable on. */
   readonly chain: string;
