@@ -128,7 +128,7 @@ describe('SolanaWalletTree.nextIndex — v1.2 §2.2 allocation semantics', () =>
     expect(
       nextPaymentIndex([
         "m/44'/60'/0'/0'", // foreign coin type
-        "m/44'/501'/5'", // missing level
+        "m/44'/501'/5'", // 3-level phantom — recognized as used (Б-1)
         "m/0'/1'/2'", // not ours
         'garbage',
         '',
@@ -136,7 +136,7 @@ describe('SolanaWalletTree.nextIndex — v1.2 §2.2 allocation semantics', () =>
         'm/44\'/501\'/4294967296\'/0\'', // beyond the plain-index range
         null as unknown as string, // tolerated mixed input
       ])
-    ).toBe(0);
+    ).toBe(6);
     expect(
       nextPaymentIndex(["m/44'/501'/9'/0'", 'garbage', "m/44'/501'/3'/0'"])
     ).toBe(10);
@@ -147,19 +147,39 @@ describe('SolanaWalletTree.nextIndex — v1.2 §2.2 allocation semantics', () =>
     expect(() => nextPaymentIndex(undefined as unknown as string[])).toThrow(TypeError);
   });
 
-  // Deliberate tolerance (v1.2 §2.2): the scanner accepts padded index
-  // renderings (`00`, `007`) and canonicalizes via Number() — a strict
-  // `(0|[1-9][0-9]*)` grammar would silently ignore such persisted
-  // paths and could reallocate an existing index (address reuse).
-  // Overflowing captures (2^31 and beyond) stay filtered by the range
-  // check.
-  it('padded index renderings count as used; overflows stay filtered', () => {
-    expect(nextPaymentIndex(["m/44'/501'/00'/0'"])).toBe(1);
-    expect(nextPaymentIndex(["m/44'/501'/007'/0'"])).toBe(8);
-    expect(
-      nextPaymentIndex(["m/44'/501'/3'/0'", "m/44'/501'/002'/0'"])
-    ).toBe(4);
-    expect(nextPaymentIndex(["m/44'/501'/2147483648'/0'"])).toBe(0);
+  describe('padded renderings ignored (В-1) + phantom 3-level recognized (Б-1)', () => {
+    it('padded index renderings are NOT used (cannot be produced by crypto.slip10.derivePath)', () => {
+      expect(nextPaymentIndex(["m/44'/501'/00'/0'"])).toBe(0);
+      expect(nextPaymentIndex(["m/44'/501'/007'/0'"])).toBe(0);
+      expect(
+        nextPaymentIndex(["m/44'/501'/3'/0'", "m/44'/501'/002'/0'"])
+      ).toBe(4); // only the canonical 3 counts
+    });
+
+    it('3-level phantom shape m/44\'/501\'/{N}\' is recognized as used', () => {
+      expect(nextPaymentIndex(["m/44'/501'/5'"])).toBe(6);
+      expect(nextPaymentIndex(["m/44'/501'/5'/0'"])).toBe(6); // our shape, same index
+      expect(nextPaymentIndex(["m/44'/501'/5'", "m/44'/501'/3'/0'"])).toBe(6);
+      expect(nextPaymentIndex(["m/44'/501'/5'", "m/44'/501'/5'/0'"])).toBe(6); // both forms of 5
+    });
+
+    it('overflows stay filtered in both shapes', () => {
+      expect(nextPaymentIndex(["m/44'/501'/2147483648'"])).toBe(0);
+      expect(nextPaymentIndex(["m/44'/501'/2147483648'/0'"])).toBe(0);
+      expect(nextPaymentIndex(["m/44'/501'/2147483647'"])).toBe(2147483648); // max legal + 1
+    });
+
+    it('mixed foreign / padded / phantom / canonical input', () => {
+      expect(
+        nextPaymentIndex([
+          "m/44'/60'/0'/0'",     // foreign coin type — ignored
+          "m/44'/501'/00'/0'",   // padded — ignored (В-1)
+          "m/44'/501'/5'",       // phantom — used (Б-1)
+          "m/44'/501'/3'/0'",    // canonical — used
+          'garbage',             // ignored
+        ])
+      ).toBe(6);
+    });
   });
 
   it('works after dispose (no key material involved)', async () => {
