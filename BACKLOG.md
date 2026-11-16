@@ -282,6 +282,29 @@ development, not part of the shipped API contract.
   semantic change, no sleeps. Optional same-file extension: the older
   timer-path tests sleep 2–3 s (`useSession.spec.tsx:151/191`) and can
   move to bounded `waitFor` too.
+- **BL-55 · open · `deriveStateKey` + structuredClone-safe `Channel`
+  brand (`@me2em/react` persistence).** `Channel` (D1 in
+  `@me2em/crypto`) carries a symbol-keyed runtime brand
+  (`Symbol('Channel')`, non-enumerable via `Object.defineProperty`) —
+  the structured clone algorithm does **not** transfer symbol-keyed
+  properties, so `structuredClone(channel)` produces an object that
+  fails `isChannel()` and is rejected by every channel API with
+  `INVALID_ARGUMENT`. This matters when `@me2em/react` begins cloning
+  `Channel` across boundaries that use `structuredClone` — IndexedDB
+  persistence, Web Worker message passing, or a warm-restart pattern
+  (see BL-27: "Isolation and warm-restart patterns live in
+  `@me2em/react`"). The fix has two halves: (1) a new `deriveStateKey`
+  function in `@me2em/core` (session-bound state key, companion to the
+  existing `derivePassword`/`deriveChannelKey` rotation model), and
+  (2) `Channel`'s brand switched from symbol-keyed to a non-enumerable
+  string-keyed property (e.g. `_me2emChannel`) so the structured clone
+  algorithm preserves it. Both halves ship together in a single PR
+  after `@me2em/solana` Ф3. **Not related to the crypto security
+  batch or solana** — tracked here so the React persistence path does
+  not regress. Reviewer note until the fix lands: `@me2em/react` MUST
+  NOT clone `Channel` via `structuredClone`; it MUST hold the channel
+  as an opaque reference (object identity) or re-derive from the
+  shared secret at the consumer boundary.
 
 ## P3 — Protocol Extensions (0.8+)
 
