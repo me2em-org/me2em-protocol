@@ -2,8 +2,8 @@
 
 Baseline: core · react · crypto all at **1.0.0-rc.1** (648 tests =
 core 364 · crypto 182 · react 102). tsc/build-docs clean per package.
-The API-freeze release candidate of the LTS program (PR-12); the
-original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
+The release-candidate line of the LTS program (PR-12); the API stabilizes
+through the `rc.N` line and freezes at `v1.0.0` stable. The original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —
 tag `v1.0.0-rc.1` on the publish source `9bcf0f3`; verified by
 dist-tags and a clean-install consumer smoke (all four core exports).
@@ -45,10 +45,10 @@ development, not part of the shipped API contract.
   `treatWarningsAsErrors: true` — every exported symbol needs complete
   TSDoc (description, params/returns, `@example` for non-trivial API).
 - `crypto` namespace includes documented raw Ed25519 wrappers
-  (`crypto/ed25519.ts`): they are frozen public API surface
-  (specs/v1.0.md §12), kept for TSDoc documentation ownership and
-  `@noble` typing isolation under `treatWarningsAsErrors`; removal is a
-  breaking 2.0.0 decision — do not propose (PLAN amendment A5).
+  (`crypto/ed25519.ts`): they are part of the frozen-at-`v1.0.0` public API
+  (specs/v1.0.md §12.2), kept for TSDoc documentation ownership and
+  `@noble` typing isolation under `treatWarningsAsErrors`; removal after
+  `v1.0.0` is a breaking 2.0.0 decision — do not propose (PLAN amendment A5).
 - Versioning: independent per-package semver. Cross-package
   dependencies inside the monorepo use `workspace:^` — `pnpm publish`
   substitutes `workspace:*` with an EXACT version, which breaks
@@ -503,6 +503,20 @@ quotes in this entry are intentional).
   the drafts (retrievable at `e0f4dc5`). This supersedes the
   archive disposition of D9/PLAN-LTS as the final one; those
   records remain untouched as history.
+
+- **DR-8 (2026-11-16)** — Freeze policy revision. The `1.0.0-rc.N` freeze
+  is a recommendation, not an absolute: the rc line is a release candidate,
+  and breaking changes that improve clarity,
+  correctness or security may land in `rc.N+1`, each documented in the
+  CHANGELOG with an explicit `**Breaking:**` marker and a rationale. The
+  derivation freeze (info strings, salts, formulas; wire formats and
+  limits) remains in force throughout the rc line — derivation-affecting
+  changes still require a new versioned path and a new vector-file
+  revision. The API freeze takes effect at `v1.0.0` stable; from that
+  point, additive changes land in 1.x minors and breaking changes
+  require 2.0.0 plus a new spec revision. Normative text:
+  `specs/v1.0.md` §12.1. Supersedes the "API frozen as of rc.1" language
+  in DR-6, README, THREAT_MODEL §8 and the spec's status paragraphs.
 
 ## Package Roadmap (strategy)
 

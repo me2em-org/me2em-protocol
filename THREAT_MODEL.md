@@ -1,7 +1,7 @@
 # Me2eM Protocol — Threat Model
 
 **Status:** normative companion to [`specs/v1.0.md`](./specs/v1.0.md),
-applies to `@me2em/core` **1.0.0-rc.1** (the API-freeze release candidate).
+applies to `@me2em/core` **1.0.0-rc.1** (the release-candidate of the LTS program).
 Last updated: 2026-11-01 (PR-12). Reporting a vulnerability:
 [`SECURITY.md`](./SECURITY.md). Practical hardening guidance:
 [`packages/core/README.md` → Security Best Practices](./packages/core/README.md#%EF%B8%8F-security-best-practices).
@@ -300,9 +300,13 @@ Me2eM does **not** claim protection against:
   [`specs/test-vectors.json`](./specs/test-vectors.json); any change to
   an info string, payload schema or limit is a BREAKING protocol change
   requiring a new version and a vector-file revision.
-- **The public API is frozen** as of `1.0.0-rc.1` (specs/v1.0.md §12):
-  additive changes land in 1.x minors, breaking changes require 2.0.0
-  and a new spec revision.
+- **The public API is stabilizing** through the `1.0.0-rc.N` line and
+  freezes at `v1.0.0` stable (specs/v1.0.md §12.1). During the rc line,
+  breaking changes that improve clarity, correctness or security may land
+  in `rc.N+1`, each documented in the CHANGELOG with an explicit
+  `**Breaking:**` marker and a rationale. After the `v1.0.0` freeze,
+  additive changes land in 1.x minors, and breaking changes require
+  `2.0.0` and a new spec revision.
 - **Security fixes** follow the [`SECURITY.md`](./SECURITY.md) SLA:
   critical vulnerabilities are fixed within 7 days inside the 24-month
   support window that opens at v1.0.0 GA.

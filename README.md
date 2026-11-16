@@ -264,7 +264,7 @@ function CreateIdentityScreen() {
 
 | Package | Status | Description |
 |---------|--------|-------------|
-| [`@me2em/core`](./packages/core) | 🔐 **rc (v1.0.0-rc.1, API frozen)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
+| [`@me2em/core`](./packages/core) | 🔐 **rc (v1.0.0-rc.1, API stabilizing)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` |
 | [`@me2em/crypto`](./packages/crypto) | 🔐 **rc (v1.0.0-rc.1)** | Protocol crypto: canonical X3DH, pre-keys, E2EE channels with epoch rotation, envelopes, Argon2id |
 | [`@me2em/react`](./packages/react) | 🔐 **rc (v1.0.0-rc.1)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
 | `@me2em/messenger` | 🚧 Planned (0.9) | Vertical: E2EE chats, groups with epoch key rotation |
@@ -447,7 +447,7 @@ We welcome contributions! Please read:
 | **Shipped** | `@me2em/react` 0.1 alpha — identity hooks, seed UX, session management, context cache |
 | **Shipped** | `@me2em/crypto` 0.1 alpha — X3DH, E2EE channels, envelopes, Argon2id guard rails |
 | **Shipped** | [me2em.com](https://me2em.com) — protocol blog: guides, tutorials, deep dives (RU) |
-| **Shipped** | `1.0.0-rc.1` — public API freeze (specs/v1.0.md §12), threat model, LTS security policy |
+| **Shipped** | `1.0.0-rc.1` — release-candidate line adopted (specs/v1.0.md §12), threat model, LTS security policy |
 | **Next** | DevSecOps hardening — branch protection, coverage thresholds (CI pipeline live) |
 | **Next** | `@me2em/messenger` (0.9) — first vertical; `@me2em/server` reference backend |
 | **Next** | `@me2em/core` v1.0.0 GA — opens the 24-month LTS support window (7-day critical SLA) |
