@@ -3,8 +3,15 @@ import { describe, it, expect } from 'vitest';
 // Imports the BUILT artifact, not src. CI runs `build` before tests,
 // so dist always exists in CI; locally run `pnpm --filter @me2em/solana
 // build` first.
-import { SolanaWalletTree, isValidSolanaAddress } from '../dist/index.js';
+import {
+  SolanaWalletTree,
+  isValidSolanaAddress,
+  SolanaPaymentAdapter,
+  verifyWalletBindingSolana,
+} from '../dist/index.js';
 import { GOLDEN_ADDRESSES, TV2_SEED } from './goldens.js';
+
+// Import deriveForVerification as a static method (no named import needed)
 
 /**
  * Smoke pin for the PUBLISHED module graph (the crypto BL-45 class of
@@ -23,5 +30,19 @@ describe('dist artifact (published shape)', () => {
     } finally {
       tree.dispose();
     }
+  });
+
+  it('SolanaPaymentAdapter constructs from dist', () => {
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet' });
+    expect(adapter.chain).toBe('solana:devnet');
+  });
+
+  it('verifyWalletBindingSolana works from dist', () => {
+    expect(verifyWalletBindingSolana({ chain: 'solana:devnet', address: GOLDEN_ADDRESSES[0] })).toBe(true);
+  });
+
+  it('deriveForVerification works from dist', async () => {
+    const addr = await SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/0'/0'");
+    expect(addr).toBe(GOLDEN_ADDRESSES[0]);
   });
 });

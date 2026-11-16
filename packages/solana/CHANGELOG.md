@@ -11,6 +11,107 @@ layer.
 > `@me2em/solano@1.0.0-rc.1` on npm are deprecated placeholders —
 > install `@me2em/solana` instead.
 
+## [1.0.0-rc.3] — 2026-11-16
+
+Ф4: payment verification (`verifyPayment` — 7-step normative order),
+LUT address resolution, on-curve wallet binding (`verifyWalletBindingSolana`),
+`deriveForVerification` (non-consuming seed), JSON-RPC client, and
+`blockTime` fallback. SOL-only (SPL → `WRONG_ASSET`). No API surface
+change — all additions are new functions/types.
+
+### Added
+- **`SolanaPaymentVerifier` — 7-step `verifyPayment` (normative Ф4).**
+  Steps: NOT_FOUND → REFERENCE_MISMATCH → EXPIRED/containment-before-time
+  → REPLAYED → WRONG_RECIPIENT → UNDERPAID → WRONG_ASSET → success.
+  LUT fallback for reference resolution when reference is not in
+  static keys. Idempotent: repeated calls with same `txRef` return
+  success. `blockTime` falls back to `tx.meta.blockTime` (RPC returns
+  only this). Chain check: `request.chain` must match adapter chain.
+- **`SolanaPaymentAdapter` — Ф4 adapter.** Wraps `SolanaPaymentVerifier`
+  + `SolanaWalletAdapter` + `RpcClient`. Exposes `verifyPayment`,
+  `resolveWallet`, `isValidAddress`, `nextIndex`, `chain`, `network`.
+- **`verifyWalletBindingSolana` — on-curve wallet binding (Ф4).**
+  Takes `WalletDescriptor`, checks `@noble/curves/ed25519` on-curve.
+  Core-default `verifyWalletBinding` (signature + subject + address)
+  is separate — applications call BOTH.
+- **`SolanaWalletTree.deriveForVerification` — non-consuming seed.**
+  Creates a temporary tree, derives wallet at index, disposes tree.
+  Seed is NOT consumed (unlike `deriveWallet` which advances internal
+  state). Path: `m/44'/501'/{N}'/0'` (canonical 4-level).
+- **`RpcClient` — JSON-RPC 2.0 client for Solana.** Methods:
+  `getTransaction`, `getSignaturesForAddress`, `getAccountInfo`.
+  Supports custom `fetch` for testing. Throws `Error` on JSON-RPC
+  errors, HTTP errors, or null results (except `getTransaction`
+  returning `null` for NOT_FOUND).
+- **`parseLutAddresses` — LUT account data parser.** Decodes base64,
+  parses Solana Extension format (deactivationSlot, lastExtendedSlot,
+  authority, addresses). Returns `readonly Uint8Array[] | null`
+  (fail-closed on corruption).
+- **`SOLANA_RPC_ENDPOINTS` — well-known RPC endpoints.** Default
+  endpoints for mainnet-beta, devnet, testnet, localnet.
+- **`networks.ts` — chain namespace utilities.** `solanaChain()`,
+  `isSolanaReference()`, `isSolanaAddress()`.
+
+### Fixed
+- **`blockTime` fallback — only `tx.meta?.blockTime` (Б-4).** The
+  previous code checked `tx.meta?.blockTime ?? tx.blockTime` but
+  the Solana RPC returns only `meta.blockTime` (no top-level
+  `blockTime`). The top-level field was removed from the RPC type.
+- **WRONG_ASSET ordering — step 6a (BEFORE UNDERPAID).** SPL tokens
+  must fail at step 6a (WRONG_ASSET) before step 6 (UNDERPAID).
+  This is because Ф4 is SOL-only.
+- **`#verifyAmount` — removed `asset` parameter.** Asset check is
+  done at step 6a (before `#verifyAmount`). The `asset` parameter
+  and `asset !== 'sol'` check inside `#verifyAmount` were removed.
+- **`deriveForVerification` — `exec()` instead of `test()` +
+  `match()` (Б-3).** The previous `test()` + regex `match()` was
+  fragile (padded indices matched `test()` but not `match()`).
+  Now uses `exec()` to capture the index directly.
+- **`readU64LE` — deleted dead code (Ф4).** The LUT parser no
+  longer reads `deactivationSlot`/`lastExtendedSlot` (u64 LE) —
+  they are skipped with `offset += 8`. `readU64LE` was removed.
+  `readU32LE` is kept for `count` (Vec<Pubkey> length).
+- **`parseLutAddresses` — discriminator check (u32 LE = 1).**
+  The wire format starts with discriminator (not version byte).
+  Discriminator must equal 1 (initialized LUT); any other value
+  causes `null` return (fail-closed).
+- **`#resolveLutLookup` — owner check.** Account owner must be
+  `AddressLookupTab1e1111111111111111111111111`; non-LUT accounts
+  are rejected (fail-closed).
+- **`register.ts` — SolanaPaymentAdapter instead of SolanaWalletAdapter.**
+  `registerSolanaAdapters` now registers `SolanaPaymentAdapter` (Ф4
+  verifyPayment support) instead of `SolanaWalletAdapter`.
+- **`dist-artifact.spec.ts` — constructor calls instead of typeof.**
+  Tests now instantiate `SolanaPaymentAdapter` and call
+  `deriveForVerification` to verify the dist artifact is functional.
+
+### Changed
+- **`@noble/curves` — added as direct dependency (Ф4, Н-1).**
+  Previously not a dependency (derivation went through
+  `crypto.slip10`). Ф4's `verifyWalletBindingSolana` imports
+  `@noble/curves/ed25519` directly for on-curve checks.
+- **`@me2em/crypto` dependency: `workspace:^` (— `^1.1.0-rc.2`
+  at publish; Н-3).** No change from rc.2.
+
+### Notes
+- `createPaymentRequestURL`'s optional `label`/`message`/`memo`
+  parameters (P0.3 §5.5) remain **not part of rc.3** — deferred
+  to x402 (Б-3, open).
+- `verifyWalletBindingSolana` is on-curve only (Ф4). Core-default
+  `verifyWalletBinding` (signature + subject + address equality)
+  is separate. Applications MUST call BOTH for full binding
+  verification.
+- LUT resolution: `parseLutAddresses` reads base64-encoded LUT
+  account data from RPC (`getAccountInfo`). The `loadedAddresses`
+  fallback in `verifyPayment` handles transactions that include
+  address table lookups in their message (v0 transactions).
+- `deriveForVerification` does NOT consume seed: it creates a
+  temporary `SolanaWalletTree`, derives the wallet, and disposes
+  the tree in a `finally` block. This is safe for repeated calls.
+- `@scure/base` / `@noble/curves` in dist: `pnpm pack` confirms
+  no inline `slip10`/`secureWipe`/`@noble/curves` — all external
+  dependencies.
+
 ## [1.0.0-rc.2] — 2026-11-16
 
 Ф3 correctness fixes after the rc.1 review: `nextIndex` semantics

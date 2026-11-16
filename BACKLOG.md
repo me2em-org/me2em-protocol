@@ -305,6 +305,54 @@ development, not part of the shipped API contract.
   NOT clone `Channel` via `structuredClone`; it MUST hold the channel
   as an opaque reference (object identity) or re-derive from the
   shared secret at the consumer boundary.
+- **BL-54 · open · `parseLutAddresses` — explicit minimal-length
+  check.**
+  `packages/solana/src/lut.ts` currently fails closed on a short
+  buffer only *indirectly*: `readOptionPubkey` reads `undefined` past
+  the end of the array and throws, which the outer `try/catch`
+  converts to `null`. This works, but a short buffer is a
+  distinguishable failure that deserves an explicit guard before any
+  reads: `if (raw.length < 22) return null;` (minimum = discriminator
+  4 + deactivationSlot 8 + lastExtendedSlot 8 + lastExtendedSlot
+  StartIndex 1 + authority tag 1). Add the guard + a test that
+  constructs a 21-byte buffer. Non-blocking for rc.3 (current
+  behaviour is fail-closed); robustness only.
+- **BL-56 · open · `#verifyAmount` — string-based SOL→lamports
+  parsing.**
+  `SolanaPaymentVerifier.#verifyAmount`
+  (`packages/solana/src/verify.ts`) converts `request.amount` to
+  lamports via `BigInt(Math.round(parseFloat(amount) * 1e9))`. For the
+  current whole-unit SOL contract (≤ 9 decimals, seller-controlled)
+  this is exact — but `parseFloat` for money is a latent precision
+  hazard if the amount ever carries more than 9 decimal digits.
+  Replace with string-based parsing:
+  ```ts
+  function solToLamports(amount: string): bigint {
+    const parts = amount.split('.');
+    const whole = parts[0] || '0';
+    const frac = (parts[1] || '').padEnd(9, '0');
+    if (frac.length > 9) {
+      throw new TypeError(`verifyPayment: amount has more than 9 decimals: ${JSON.stringify(amount)}`);
+    }
+    return BigInt(whole) * 1_000_000_000n + BigInt(frac);
+  }
+  ```
+  Add tests: `'0'`, `'1'`, `'1.0'`, `'1.23456789'` (exact lamports),
+  `'0.000000001'` (1 lamport), `'1.2345678901'` (throws — >9 decimals).
+  Non-blocking for rc.3 (amount is seller-controlled ≤ 9 decimals);
+  robustness only.
+- **BL-57 · open · `verify.spec.ts` fixtures — realistic base58
+  addresses.**
+  `packages/solana/test/verify.spec.ts` uses string literals
+  `'refPubkey123'`, `'payTo123'`, `'otherRef123'` as `reference` /
+  `payTo` values. `#containsReference` compares strings
+  (`staticKeys.includes(reference)`), so mocks work — but the values
+  are not realistic base58 32-byte pubkeys, and a future change that
+  adds an address-format check (e.g. `isValidSolanaAddress`) would
+  silently break the tests. Replace the literals with
+  `base58.encode(crypto.getRandomValues(new Uint8Array(32)))` (a
+  fixed seed per test for determinism). Non-blocking for rc.3 (mocks
+  work); test realism only.
 
 ## P3 — Protocol Extensions (0.8+)
 

@@ -11,7 +11,7 @@
 // code; import no untrusted dependencies before registering.
 
 import { registerWalletAdapter } from '@me2em/core';
-import { SolanaWalletAdapter } from './adapter.js';
+import { SolanaPaymentAdapter } from './verify.js';
 import { isSolanaNetwork, type SolanaNetwork } from './networks.js';
 
 /**
@@ -32,7 +32,7 @@ export interface RegisterSolanaAdaptersOptions {
 
 /**
  * Registers Solana wallet adapters into the process-wide core
- * registry (v1.2 §2.1) — one {@link SolanaWalletAdapter} per network,
+ * registry (v1.2 §2.1) — one {@link SolanaPaymentAdapter} per network,
  * keyed by its exact CAIP-2 chain id.
  *
  * @param options - `{ networks?: SolanaNetwork[] }`; defaults to
@@ -54,7 +54,9 @@ export function registerSolanaAdapters(options: RegisterSolanaAdaptersOptions = 
       );
     }
   }
-  const disposers = networks.map((network) => registerWalletAdapter(new SolanaWalletAdapter(network)));
+  const disposers = networks.map((network) =>
+    registerWalletAdapter(new SolanaPaymentAdapter({ network }))
+  );
   let disposed = false;
   return () => {
     if (disposed) return;
