@@ -271,14 +271,14 @@ class SolanaPaymentVerifier {
       return { status: 'failure', reason: 'WRONG_RECIPIENT', observedAt: now };
     }
 
-    // Step 6: UNDERPAID
-    if (!this.#verifyAmount(tx, request.amount, request.payTo)) {
-      return { status: 'failure', reason: 'UNDERPAID', observedAt: now };
-    }
-
     // Step 6a: WRONG_ASSET (Ф4 SOL-only)
     if (request.asset !== 'sol') {
       return { status: 'failure', reason: 'WRONG_ASSET', observedAt: now };
+    }
+
+    // Step 6: UNDERPAID
+    if (!this.#verifyAmount(tx, request.amount, request.payTo)) {
+      return { status: 'failure', reason: 'UNDERPAID', observedAt: now };
     }
 
     // Step 7: success

@@ -57,9 +57,9 @@ change — all additions are new functions/types.
   previous code checked `tx.meta?.blockTime ?? tx.blockTime` but
   the Solana RPC returns only `meta.blockTime` (no top-level
   `blockTime`). The top-level field was removed from the RPC type.
-- **WRONG_ASSET ordering — step 6a (AFTER UNDERPAID).** SPL tokens
-  that pass the amount check must fail at step 6a (WRONG_ASSET),
-  not step 6 (UNDERPAID). This is because Ф4 is SOL-only.
+- **WRONG_ASSET ordering — step 6a (BEFORE UNDERPAID).** SPL tokens
+  must fail at step 6a (WRONG_ASSET) before step 6 (UNDERPAID).
+  This is because Ф4 is SOL-only.
 - **`#verifyAmount` — removed `asset` parameter.** Asset check is
   done at step 6a (before `#verifyAmount`). The `asset` parameter
   and `asset !== 'sol'` check inside `#verifyAmount` were removed.
