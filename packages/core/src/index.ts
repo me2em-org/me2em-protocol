@@ -17,7 +17,29 @@ export {
   type PaymentFailureReason,
   type PaymentRequest,
   type PaymentResult,
+  type Me2emExtra,
 } from './payment.js';
+export {
+  X402_VERSION,
+  BUYER_ATTESTATION_POLICY,
+  REGULATORY_PROFILES,
+  isX402PaymentRequired,
+  isX402PaymentRequirements,
+  isX402PaymentPayload,
+  isX402SettleResponse,
+  isX402VerifyResponse,
+  isX402Supported,
+  type X402ResourceInfo,
+  type X402PaymentRequirements,
+  type X402PaymentRequired,
+  type X402PaymentPayload,
+  type X402SettleResponse,
+  type X402VerifyResponse,
+  type X402Supported,
+  type Me2emErrorCode,
+  type BuyerAttestationPolicy,
+  type RegulatoryProfile,
+} from './payment-x402.js';
 export { verifyWalletBinding, type WalletBindingOptions } from './wallet-binding.js';
 export * as crypto from './crypto/index.js';
 
