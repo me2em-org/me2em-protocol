@@ -504,8 +504,7 @@ quotes in this entry are intentional).
   archive disposition of D9/PLAN-LTS as the final one; those
   records remain untouched as history.
 
-- **DR-8 (2026-11-16)** — Freeze policy revision. v1.2 §0.2 redefines the
-  `1.0.0-rc.N` freeze as a recommendation, not an absolute: the rc line
+- **DR-8 (2026-11-16)** — Freeze policy revision. The `1.0.0-rc.N` freeze as a recommendation, not an absolute: the rc line
   is a release candidate, and breaking changes that improve clarity,
   correctness or security may land in `rc.N+1`, each documented in the
   CHANGELOG with an explicit `**Breaking:**` marker and a rationale. The
