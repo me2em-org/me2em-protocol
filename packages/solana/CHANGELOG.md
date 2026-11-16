@@ -71,6 +71,19 @@ change — all additions are new functions/types.
   longer reads `deactivationSlot`/`lastExtendedSlot` (u64 LE) —
   they are skipped with `offset += 8`. `readU64LE` was removed.
   `readU32LE` is kept for `count` (Vec<Pubkey> length).
+- **`parseLutAddresses` — discriminator check (u32 LE = 1).**
+  The wire format starts with discriminator (not version byte).
+  Discriminator must equal 1 (initialized LUT); any other value
+  causes `null` return (fail-closed).
+- **`#resolveLutLookup` — owner check.** Account owner must be
+  `AddressLookupTab1e1111111111111111111111111`; non-LUT accounts
+  are rejected (fail-closed).
+- **`register.ts` — SolanaPaymentAdapter instead of SolanaWalletAdapter.**
+  `registerSolanaAdapters` now registers `SolanaPaymentAdapter` (Ф4
+  verifyPayment support) instead of `SolanaWalletAdapter`.
+- **`dist-artifact.spec.ts` — constructor calls instead of typeof.**
+  Tests now instantiate `SolanaPaymentAdapter` and call
+  `deriveForVerification` to verify the dist artifact is functional.
 
 ### Changed
 - **`@noble/curves` — added as direct dependency (Ф4, Н-1).**
