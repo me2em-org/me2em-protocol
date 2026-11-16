@@ -250,7 +250,7 @@ class SolanaPaymentVerifier {
     // Step 3: EXPIRED (blockTime → observedAt fallback)
     // Containment (step 2) runs BEFORE time — otherwise a foreign txRef
     // with an expired blockTime would falsely return EXPIRED.
-    const paymentTime = tx.meta?.blockTime ?? tx.blockTime ?? now;
+    const paymentTime = tx.meta?.blockTime ?? now;
     if (paymentTime > request.expiresAt) {
       return { status: 'failure', reason: 'EXPIRED', observedAt: now };
     }
@@ -272,10 +272,13 @@ class SolanaPaymentVerifier {
     }
 
     // Step 6: UNDERPAID
-    if (
-      !this.#verifyAmount(tx, request.amount, request.asset, request.payTo)
-    ) {
+    if (!this.#verifyAmount(tx, request.amount, request.payTo)) {
       return { status: 'failure', reason: 'UNDERPAID', observedAt: now };
+    }
+
+    // Step 6a: WRONG_ASSET (Ф4 SOL-only)
+    if (request.asset !== 'sol') {
+      return { status: 'failure', reason: 'WRONG_ASSET', observedAt: now };
     }
 
     // Step 7: success
@@ -374,7 +377,8 @@ class SolanaPaymentVerifier {
    * transaction sends to `payTo`.
    *
    * SPL (`spl-token` / `spl-token-2022`) is NOT supported in Ф4 —
-   * `asset !== 'sol'` → `WRONG_ASSET` (checked in #verifyAmount).
+   * `asset !== 'sol'` → `WRONG_ASSET` (checked as step 6a before
+   * #verifyAmount).
    */
   #verifyRecipient(tx: ParsedTransactionWithInstructions, payTo: string): boolean {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -402,19 +406,13 @@ class SolanaPaymentVerifier {
    * `payTo` meets or exceeds `amount` (whole units → lamports).
    *
    * Ф4 is SOL-only: `amount * 1e9` = lamports.
-   * SPL (asset !== 'sol') → `WRONG_ASSET` (fail-closed).
+   * SPL check is done as step 6a (WRONG_ASSET) before this method.
    */
   #verifyAmount(
     tx: ParsedTransactionWithInstructions,
     amount: string,
-    asset: string,
     payTo: string
   ): boolean {
-    // Ф4: SOL-only — SPL is WRONG_ASSET (fail-closed)
-    if (asset !== 'sol') {
-      return false; // will be caught as WRONG_ASSET by caller
-    }
-
     const amountLamports = BigInt(Math.round(parseFloat(amount) * 1e9));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

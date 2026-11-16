@@ -256,17 +256,16 @@ export class SolanaWalletTree {
     seed: Uint8Array,
     path: string
   ): Promise<string> {
-    // Validate path is canonical m/44'/501'/{N}'/0'
-    if (!/^m\/44'\/501'\/(0|[1-9][0-9]*)'\/0'$/.test(path)) {
+    // Validate path is canonical m/44'/501'/{N}'/0' and extract index
+    const match = /^m\/44'\/501'\/(0|[1-9][0-9]*)'\/0'$/.exec(path);
+    if (!match) {
       throw new TypeError(
         `deriveForVerification: path must be m/44'/501'/{N}'/0', got ${JSON.stringify(path)}`
       );
     }
+    const index = Number(match[1]);
     const tree = SolanaWalletTree.fromSeed(seed);
     try {
-      // Extract index from path
-      const match = path.match(/\/(0|[1-9][0-9]*)'\/0'$/);
-      const index = Number(match![1]);
       const wallet = await tree.deriveWallet(index);
       return wallet.address;
     } finally {

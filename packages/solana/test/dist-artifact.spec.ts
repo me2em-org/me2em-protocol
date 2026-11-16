@@ -3,7 +3,12 @@ import { describe, it, expect } from 'vitest';
 // Imports the BUILT artifact, not src. CI runs `build` before tests,
 // so dist always exists in CI; locally run `pnpm --filter @me2em/solana
 // build` first.
-import { SolanaWalletTree, isValidSolanaAddress } from '../dist/index.js';
+import {
+  SolanaWalletTree,
+  isValidSolanaAddress,
+  SolanaPaymentAdapter,
+  verifyWalletBindingSolana,
+} from '../dist/index.js';
 import { GOLDEN_ADDRESSES, TV2_SEED } from './goldens.js';
 
 /**
@@ -23,5 +28,17 @@ describe('dist artifact (published shape)', () => {
     } finally {
       tree.dispose();
     }
+  });
+
+  it('exports SolanaPaymentAdapter', () => {
+    expect(typeof SolanaPaymentAdapter).toBe('function');
+  });
+
+  it('exports verifyWalletBindingSolana', () => {
+    expect(typeof verifyWalletBindingSolana).toBe('function');
+  });
+
+  it('SolanaWalletTree exports deriveForVerification', () => {
+    expect(typeof SolanaWalletTree.deriveForVerification).toBe('function');
   });
 });

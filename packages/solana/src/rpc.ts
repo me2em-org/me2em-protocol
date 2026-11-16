@@ -63,8 +63,6 @@ export interface ParsedTransactionResponse {
     };
     readonly blockTime?: number | null;
   };
-  /** Unix seconds when the transaction was included in a block (`null` for very new/old). */
-  readonly blockTime?: number | null;
   /** The transaction version (0 = legacy/v0, 1 = v1). */
   readonly version?: number | string;
 }

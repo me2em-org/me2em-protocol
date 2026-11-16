@@ -24,15 +24,6 @@ import { base64 } from '@scure/base';
 // Bincode helpers (little-endian, in-place)
 // ---------------------------------------------------------------------------
 
-/** Read a u64 LE from `buf` at `offset`; advances offset by 8. */
-function readU64LE(buf: Uint8Array, offset: number): number {
-  let value = 0;
-  for (let i = 0; i < 8; i++) {
-    value |= buf[offset + i] << (i * 8);
-  }
-  return value;
-}
-
 /** Read a u8 from `buf` at `offset`; advances offset by 1. */
 function readU8(buf: Uint8Array, offset: number): number {
   return buf[offset];
@@ -96,6 +87,9 @@ export function parseLutAddresses(base64Data: string): readonly Uint8Array[] | n
   }
 
   let offset = 0;
+
+  // version: u8 — skip
+  offset += 1;
 
   // deactivationSlot: u64 LE (8 bytes) — we skip it, but must advance
   try {
