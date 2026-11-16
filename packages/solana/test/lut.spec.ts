@@ -2,26 +2,29 @@
 //
 // Ф4: parseLutAddresses — valid input, corrupted data, short buffer.
 import { describe, it, expect } from 'vitest';
+import { base58 } from '@scure/base';
 import { parseLutAddresses } from '../src/lut.js';
 
 // Helper: build a minimal LUT account data
-// version(1) + deactivationSlot(8) + lastExtendedSlot(8) + lastExtendedSlotStartIndex(1) +
-// authority: Option<Pubkey>(1 byte = no authority, or 33 bytes = Some(pubkey)) +
-// addresses: Vec<Pubkey>(u32 LE count + 32*count bytes)
+// version(1) + discriminator(4) + deactivationSlot(8) + lastExtendedSlot(8) +
+// lastExtendedSlotStartIndex(1) + authority: Option<Pubkey>(1 byte = no authority,
+// or 33 bytes = Some(pubkey)) + addresses: Vec<Pubkey>(u32 LE count + 32*count bytes)
 function buildLutData(pubkeys: string[]): Uint8Array {
-  const { base58 } = require('@scure/base');
   const pubkeyBytes = pubkeys.map((pk) => base58.decode(pk));
 
   // Calculate total size
   const authoritySize = 1; // NoOption
   const addressesSize = 4 + pubkeyBytes.length * 32;
-  const totalSize = 1 + 8 + 8 + 1 + authoritySize + addressesSize;
+  const totalSize = 1 + 4 + 8 + 8 + 1 + authoritySize + addressesSize;
 
   const buf = new Uint8Array(totalSize);
   let offset = 0;
 
   // version = 1
   buf[offset++] = 1;
+
+  // discriminator = 0 (4 bytes, already zero)
+  offset += 4;
 
   // deactivationSlot = 0 (8 bytes, already zero)
   offset += 8;
@@ -58,7 +61,6 @@ describe('parseLutAddresses — valid input', () => {
       'DeXb83pRNqBf3owXLST8qUNPvCAB9JaA41TcBfYn1bKm',
       'VoSTx7BZFzLEjJYM8eWjLKF7R3QYZFoK5Wq8R8PxqBk',
     ];
-    const { base58 } = require('@scure/base');
     const data = buildLutData(pubkeys);
     const base64Data = Buffer.from(data).toString('base64');
     const result = parseLutAddresses(base64Data);
@@ -89,13 +91,13 @@ describe('parseLutAddresses — valid input', () => {
 
   it('parses a LUT with authority', () => {
     const pubkeys = ['DeXb83pRNqBf3owXLST8qUNPvCAB9JaA41TcBfYn1bKm'];
-    const { base58 } = require('@scure/base');
     const authorityPk = base58.decode('11111111111111111111111111111111');
     const addressesSize = 4 + pubkeys.length * 32;
-    const totalSize = 1 + 8 + 8 + 1 + 33 + addressesSize;
+    const totalSize = 1 + 4 + 8 + 8 + 1 + 33 + addressesSize;
     const buf = new Uint8Array(totalSize);
     let offset = 0;
     buf[offset++] = 1; // version
+    offset += 4; // discriminator
     offset += 8; // deactivationSlot
     offset += 8; // lastExtendedSlot
     offset += 1; // lastExtendedSlotStartIndex
@@ -139,7 +141,7 @@ describe('parseLutAddresses — corrupted data', () => {
 
 describe('parseLutAddresses — short buffer', () => {
   it('returns null when buffer is shorter than header', () => {
-    // Header is at least 1 + 8 + 8 + 1 + 1 = 19 bytes minimum
+    // Header is at least 1 + 4 + 8 + 8 + 1 + 1 = 23 bytes minimum
     const short = new Uint8Array(10);
     const base64Data = Buffer.from(short).toString('base64');
     expect(parseLutAddresses(base64Data)).toBeNull();

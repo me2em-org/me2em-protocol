@@ -105,7 +105,6 @@ function makeMockFetch(
 
 function makeRequest(overrides?: Partial<PaymentRequest>): PaymentRequest {
   return {
-    txRef: 'sig123',
     reference: 'refPubkey123',
     payTo: 'payTo123',
     amount: '1.0',
@@ -309,6 +308,45 @@ describe('SolanaPaymentVerifier — 7 steps', () => {
       });
       const result = await adapter.verifyPayment('sig123', makeRequest({ amount: '1.0', asset: 'sol' }));
       expect(result.status).toBe('success');
+    });
+
+    it('SPL without system.transfer → WRONG_ASSET (not UNDERPAID)', async () => {
+      // Transaction with system.transfer (passes step 5 WRONG_RECIPIENT and step 6 UNDERPAID)
+      // but asset is 'usdc' → must fail at step 6a WRONG_ASSET, not step 6 UNDERPAID
+      const tx = {
+        transaction: {
+          message: {
+            accountKeys: [
+              { pubkey: 'refPubkey123', signer: true, writable: true, source: 'static' as const },
+              { pubkey: 'payTo123', signer: false, writable: true, source: 'static' as const },
+            ],
+            instructions: [
+              {
+                program: 'system',
+                parsed: {
+                  type: 'transfer',
+                  info: {
+                    destination: 'payTo123',
+                    lamports: 1e9,
+                  },
+                },
+              },
+            ],
+          },
+        },
+        meta: { blockTime: 1700000000 },
+      } as const;
+      const mockFetch = makeMockFetch({
+        getTransaction: () => Promise.resolve({ result: tx }),
+        getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      });
+      const adapter = new SolanaPaymentAdapter({
+        network: 'devnet',
+        endpoint: 'http://localhost:8899',
+        fetch: mockFetch,
+      });
+      const result = await adapter.verifyPayment('sig123', makeRequest({ asset: 'usdc' }));
+      expect(result.reason).toBe('WRONG_ASSET');
     });
   });
 

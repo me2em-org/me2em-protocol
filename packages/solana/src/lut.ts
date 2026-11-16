@@ -7,6 +7,7 @@
 // bincode parser — only the `AddressLookupTable` wire format is
 // supported:
 //
+//   version (u8) | discriminator (u32 LE) |
 //   deactivationSlot (u64 LE) | lastExtendedSlot (u64 LE) |
 //   lastExtendedSlotStartIndex (u8) | authority (Option<Pubkey>) |
 //   addresses (Vec<Pubkey>)
@@ -72,6 +73,8 @@ function readOptionPubkey(buf: Uint8Array, offset: number): {
  * (fail-closed).
  *
  * Wire format (AddressLookupTable):
+ *   - version: u8 (1 byte)
+ *   - discriminator: u32 LE (4 bytes)
  *   - deactivationSlot: u64 LE (8 bytes)
  *   - lastExtendedSlot: u64 LE (8 bytes)
  *   - lastExtendedSlotStartIndex: u8 (1 byte)
@@ -90,6 +93,9 @@ export function parseLutAddresses(base64Data: string): readonly Uint8Array[] | n
 
   // version: u8 — skip
   offset += 1;
+
+  // discriminator: u32 LE (4 bytes) — skip
+  offset += 4;
 
   // deactivationSlot: u64 LE (8 bytes) — we skip it, but must advance
   try {

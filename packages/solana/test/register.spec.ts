@@ -72,7 +72,14 @@ describe('registerSolanaAdapters — disposer hygiene', () => {
     expect(getWalletAdapter('solana:mainnet-beta')).toBeNull();
   });
 
-  it('registered adapters are functional SolanaWalletAdapters', async () => {
+  it('registered adapters expose verifyPayment (Ф4)', () => {
+    track(registerSolanaAdapters({ networks: ['devnet'] }));
+    const adapter = getWalletAdapter('solana:devnet');
+    expect(adapter).not.toBeNull();
+    expect(typeof (adapter as unknown as { verifyPayment?: unknown }).verifyPayment).toBe('function');
+  });
+
+  it('registered adapters are functional (isValidAddress + resolveWallet)', async () => {
     track(registerSolanaAdapters({ networks: ['devnet'] }));
     const adapter = getWalletAdapter('solana:devnet');
     expect(adapter!.isValidAddress('QVQwskmGkDfxQfRkbFJeY2YFm7go3ciiLvuANp1AsCi')).toBe(true);

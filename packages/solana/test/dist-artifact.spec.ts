@@ -11,6 +11,8 @@ import {
 } from '../dist/index.js';
 import { GOLDEN_ADDRESSES, TV2_SEED } from './goldens.js';
 
+// Import deriveForVerification as a static method (no named import needed)
+
 /**
  * Smoke pin for the PUBLISHED module graph (the crypto BL-45 class of
  * failure): tsup bundles every import that is not a declared
@@ -30,15 +32,17 @@ describe('dist artifact (published shape)', () => {
     }
   });
 
-  it('exports SolanaPaymentAdapter', () => {
-    expect(typeof SolanaPaymentAdapter).toBe('function');
+  it('SolanaPaymentAdapter constructs from dist', () => {
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet' });
+    expect(adapter.chain).toBe('solana:devnet');
   });
 
-  it('exports verifyWalletBindingSolana', () => {
-    expect(typeof verifyWalletBindingSolana).toBe('function');
+  it('verifyWalletBindingSolana works from dist', () => {
+    expect(verifyWalletBindingSolana({ chain: 'solana:devnet', address: GOLDEN_ADDRESSES[0] })).toBe(true);
   });
 
-  it('SolanaWalletTree exports deriveForVerification', () => {
-    expect(typeof SolanaWalletTree.deriveForVerification).toBe('function');
+  it('deriveForVerification works from dist', async () => {
+    const addr = await SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/0'/0'");
+    expect(addr).toBe(GOLDEN_ADDRESSES[0]);
   });
 });
