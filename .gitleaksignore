@@ -6,3 +6,9 @@
 # fixture pattern (referenced in the gitleaks troubleshooting guide,
 # not an actual secret)
 d906f51:.github/workflows/README.md:52:allow-test-fixtures
+
+# Solana golden fixtures (packages/solana/test/goldens.ts) contain
+# PUBLIC data only: SLIP-0010 test-vector seed hex (already public in
+# @me2em/crypto specs) and base58 wallet addresses (public Solana
+# addresses, never private keys).
+packages/solana/test/goldens.ts:allow-test-fixtures

@@ -11,6 +11,67 @@ layer.
 > `@me2em/solano@1.0.0-rc.1` on npm are deprecated placeholders —
 > install `@me2em/solana` instead.
 
+## [1.0.0-rc.2] — 2026-11-16
+
+Ф3 correctness fixes after the rc.1 review: `nextIndex` semantics
+(phantom-path recognition + padded-index rejection) and a real-wallet
+acceptance cross-check. No API surface change — all fixes are in the
+behavior of existing functions.
+
+### Fixed
+- **`nextIndex` / `nextPaymentIndex` — padded index renderings are no
+  longer treated as used (В-1).** `m/44'/501'/00'/0'` can never be
+  produced by `crypto.slip10.derivePath` (canonical
+  `(0|[1-9][0-9]*)` grammar); the previous `(\d+)` alternative was a
+  defect — it could block a legitimate allocation for an index that
+  was never actually derived. The index grammar is now canonical.
+
+### Changed
+- **`nextIndex` / `nextPaymentIndex` — the 3-level "phantom" shape
+  `m/44'/501'/{N}'` is now recognized as used (Б-1).** One seed, one
+  wallet family: Phantom and other SLIP-0010 wallets derive
+  `m/44'/501'/{N}'` from the same seed, and index allocation must not
+  hand out an index that an external wallet already claims — that
+  would create a semantic collision (same index, different address)
+  for users who import the same mnemonic across wallets. Both the
+  3-level phantom shape and the canonical 4-level shape now count as
+  used; index allocation is `max(seen) + 1` over the union.
+
+### Added
+- **Phantom / `solana-keygen` acceptance cross-check (Б-2, deferred).**
+  The fixed test mnemonic (BIP39 official 12-word vector) derives a
+  wallet at `m/44'/501'/0'/0'`; the resulting public address is pinned
+  against a REAL Phantom import and the `solana-keygen recover`
+  reference CLI. This is the only test that proves interop with the
+  Solana ecosystem, independent of the me2em stack. The test is
+  skipped until the fixture is filled at acceptance (`PHANTOM_GOLDEN_ADDRESS`
+  placeholder); CI stays green. Provenance is documented in
+  `test/goldens.ts` (Phantom version, OS, date) — never the private
+  key. Phantom cross-check — deferred, `test.skip` до заполнения,
+  не блокирует rc.2.
+- **gitleaks allowlist for public golden fixtures.** `packages/solana/test/goldens.ts`
+  carries only PUBLIC data (test-vector seed hex + base58 addresses);
+  allowlisted via `.gitleaksignore`, `.gitleaks.toml`, and inline
+  `// gitleaks:allow` comments so the `allow-test-fixtures` rule
+  does not flag it (the same class of false positive that blocked
+  the pre-rename `@me2em/solano` CI run).
+
+### Notes
+- `createPaymentRequestURL`'s optional `label`/`message`/`memo`
+  parameters (P0.3 §5.5) are **not** part of rc.2 — the decision
+  (implement now vs. scope-reduce) is deferred to the x402 analysis
+  (Б-3, open). The current URL shape (`amount`, `[spl-token]`,
+  `reference`) is unchanged. Deliberately absent; x402 memo goes
+  through extra.me2em.memo; add later if needed for direct flow.
+- No change to `@scure/base` / `@noble/curves` dependency policy
+  (Н-1): `@scure/base` stays a direct dependency (imported directly
+  by `adapter.ts`, `reference.ts`, `wallet-tree.ts`); `@noble/curves`
+  is not added in Ф3 (derivation goes through `crypto.slip10`);
+  Ф4 will add it directly when `verifyWalletBinding` (on-curve)
+  lands.
+- `@me2em/crypto` dependency stays `workspace:^` (— `^1.1.0-rc.2`
+  at publish; Н-3).
+
 ## [1.0.0-rc.1] — 2026-11-04
 
 Initial release: the **Ф3 "wallet-only"** phase of the payment-layer
