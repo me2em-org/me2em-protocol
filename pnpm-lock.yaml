@@ -153,6 +153,9 @@ importers:
       '@me2em/crypto':
         specifier: workspace:^
         version: link:../crypto
+      '@noble/curves':
+        specifier: ^1.8.1
+        version: 1.9.7
       '@scure/base':
         specifier: ^2.4.0
         version: 2.4.0

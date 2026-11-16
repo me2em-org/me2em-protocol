@@ -48,6 +48,17 @@ export function isSolanaChain(chain: string): boolean {
   return parsed !== null && parsed.namespace === SOLANA_NAMESPACE;
 }
 
+/**
+ * Default public RPC endpoints per network (v1.2 §4). Production
+ * callers MUST override via `SolanaPaymentAdapterOptions.endpoint`.
+ */
+export const SOLANA_RPC_ENDPOINTS: Readonly<Record<SolanaNetwork, string>> = {
+  'mainnet-beta': 'https://api.mainnet-beta.solana.com',
+  devnet: 'https://api.devnet.solana.com',
+  testnet: 'https://api.testnet.solana.com',
+  localnet: 'http://localhost:8899',
+};
+
 /** Runtime type guard for {@link SolanaNetwork} (exact string match). */
 export function isSolanaNetwork(value: string): value is SolanaNetwork {
   return (NETWORKS as readonly string[]).includes(value);
