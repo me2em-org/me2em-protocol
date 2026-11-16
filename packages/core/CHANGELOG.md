@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** none (documentation-only). Docs: freeze policy revised — rc
+  line is not frozen, API freezes at v1.0.0 (spec §12.1, DR-8).
+
 ## [1.0.0-rc.4] — 2026-11-04
 
 Republish with a fresh build — **no source changes**. The git tree is
