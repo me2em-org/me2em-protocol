@@ -67,6 +67,27 @@ Record in [BACKLOG.md](./BACKLOG.md).
 
 ---
 
+## Payment-layer terms
+
+| Term | Definition |
+|------|------------|
+| **PaymentRequired** | x402 v2: 402-ответ с `resource` и `accepts[]` (варианты оплаты). |
+| **PaymentRequirements** | x402 v2: один вариант оплаты в `accepts[]` (`scheme`, `network`, `amount`, `asset`, `payTo`, `maxTimeoutSeconds`). |
+| **PaymentPayload** | x402 v2: подписанный покупателем `PAYMENT-SIGNATURE` (эхо `accepted` + `payload`). |
+| **SettleResponse** | x402 v2: `PAYMENT-RESPONSE` — результат `settle` (success/failure + `transaction`). |
+| **facilitator** | Внешний сервис за `FacilitatorClient` (verify/settle/supported). |
+| **scheme** | x402: способ исполнения (`exact`, `eip3009`, `permit2-exact`, …). |
+| **extra.me2em** | Me2eM-расширение в `PaymentRequirements.extra` (sellerId, memo, reference, agreementProof, buyerId). |
+| **Me2emErrorCode** | Подмножество `PaymentFailureReason` для x402 (REFERENCE_MISMATCH, PACT_INVALID, BUYER_NOT_ATTESTED, SELLER_NOT_ATTESTED). |
+| **BuyerAttestationPolicy** | Декларация приложения: `none` / `optional` / `required` (x402 не enforce'ит). |
+| **RegulatoryProfile** | Декларация compliance-режима: `none` / `kyc` / `aml` / `age-gated` / `sanctions` (x402 не enforce'ит). |
+| **PaymentSigner** | Контракт `@me2em/x402` (M1): `capabilities` + `signPayment(requirements, resource)`. |
+| **FacilitatorClient** | Интерфейс `@me2em/x402` (M1): `supported()` / `verify()` / `settle()`. |
+| **atomic units** | Наименьшая неделимая единица актива (`X402PaymentRequirements.amount`, строка `/^[0-9]+$/`). |
+| **whole units** | Целые токен-единицы (`PaymentRequest.amount`, десятичная строка; конверсия в atomic — на приложении). |
+
+---
+
 ## @me2em/crypto terms
 
 | Term | Definition |

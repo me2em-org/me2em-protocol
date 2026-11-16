@@ -1,5 +1,51 @@
 # Changelog
 
+## [1.0.0-rc.5] — 2026-11-17
+
+x402 payment-layer base: wire types and structural guards for the
+x402 v2 protocol, Me2eM error codes, declaration constants, and the
+`PaymentRequest.extra` metadata slot. No network, no runtime — types
+and pure guards only.
+
+### Added
+- **`payment-x402.ts`** — new dependency-leaf module with x402 v2 wire
+  types (`X402PaymentRequired`, `X402PaymentRequirements`,
+  `X402PaymentPayload`, `X402SettleResponse`, `X402VerifyResponse`,
+  `X402Supported`, `X402ResourceInfo`) and structural guards
+  (`isX402*`) that never throw. `X402_VERSION = 2`.
+- **`Me2emErrorCode`** — subset of `PaymentFailureReason`:
+  `REFERENCE_MISMATCH`, `PACT_INVALID`, `BUYER_NOT_ATTESTED`,
+  `SELLER_NOT_ATTESTED`.
+- **`BUYER_ATTESTATION_POLICY` / `REGULATORY_PROFILES`** — declaration
+  constants (`BuyerAttestationPolicy`, `RegulatoryProfile`); x402 does
+  not enforce, only fails fast on contradictory configuration (in
+  `@me2em/x402`).
+- **`PaymentRequest.extra?`** — optional `Me2emExtra` slot for
+  Me2eM metadata on the direct flow (`sellerId`, `buyerId`, `memo`,
+  `reference`, `agreementProof: Uint8Array`). x402 wire shape
+  (`X402Me2emExtra`, base64) lives in `@me2em/x402` (M1).
+
+### Changed
+- **`PaymentFailureReason` — three new failure values (Breaking).**
+  `PACT_INVALID`, `BUYER_NOT_ATTESTED`, `SELLER_NOT_ATTESTED` added.
+  Exhaustive `switch` consumers will get a TypeScript compile error;
+  the fail-safe runtime rule stands: unknown values MUST be treated
+  as `REJECTED`, never as success.
+
+### Notes
+- No change to `PaymentResult` (still `{ status: 'success';
+  observedAt } | { status: 'failure'; reason; observedAt }`).
+- No change to `subjectWallet` validation (already implemented in
+  rc.4; M0 adds JSDoc only).
+- `GLOSSARY.md` — payment-layer terms (PaymentRequired,
+  PaymentRequirements, PaymentPayload, SettleResponse, facilitator,
+  scheme, extra.me2em, Me2emErrorCode, BuyerAttestationPolicy,
+  RegulatoryProfile, PaymentSigner, FacilitatorClient, atomic units,
+  whole units).
+- `PaymentSigner` / `FacilitatorClient` — **not** in M0; they live in
+  `@me2em/x402` (M1, §3.3/§3.5 of the x402 spec). M0 exposes only the
+  wire types those contracts reference.
+
 ## [Unreleased]
 
 ### Changed
