@@ -100,23 +100,34 @@ describe('parseLutAddresses — valid input', () => {
     const pubkeys = ['DeXb83pRNqBf3owXLST8qUNPvCAB9JaA41TcBfYn1bKm'];
     const authorityPk = base58.decode('11111111111111111111111111111111');
     const addressesSize = 4 + pubkeys.length * 32;
-    const totalSize = 1 + 4 + 8 + 8 + 1 + 33 + addressesSize;
+    const totalSize = 4 + 8 + 8 + 1 + 33 + addressesSize; // no version
     const buf = new Uint8Array(totalSize);
     let offset = 0;
-    buf[offset++] = 1; // version
-    offset += 4; // discriminator
+    // discriminator = 1 (u32 LE)
+    buf[offset++] = 1;
+    buf[offset++] = 0;
+    buf[offset++] = 0;
+    buf[offset++] = 0;
     offset += 8; // deactivationSlot
     offset += 8; // lastExtendedSlot
     offset += 1; // lastExtendedSlotStartIndex
     buf[offset++] = 1; // authority: Some
     buf.set(authorityPk, offset);
     offset += 32;
-    buf[offset++] = 1; // count
-    buf.set(pubkeys.map((pk) => base58.decode(pk)).flat(), offset);
+    // count = 1 (u32 LE)
+    buf[offset++] = 1;
+    buf[offset++] = 0;
+    buf[offset++] = 0;
+    buf[offset++] = 0;
+    // addresses
+    const pkBytes = base58.decode(pubkeys[0]);
+    buf.set(pkBytes, offset);
     const base64Data = base64.encode(buf);
     const result = parseLutAddresses(base64Data);
     expect(result).not.toBeNull();
     expect(result!.length).toBe(1);
+    // Content assertion: the parsed address must equal the fixture pubkey.
+    expect(result![0]).toEqual(pkBytes);
   });
 });
 
