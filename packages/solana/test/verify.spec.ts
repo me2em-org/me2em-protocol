@@ -5,8 +5,10 @@
 // idempotency, v0/v1 fixtures.
 import { describe, it, expect, vi } from 'vitest';
 import type { PaymentRequest } from '@me2em/core';
-import { SolanaPaymentAdapter } from '../src/verify.js';
+import { ed25519 } from '@noble/curves/ed25519.js';
 import { base58 } from '@scure/base';
+import { SolanaPaymentAdapter } from '../src/verify.js';
+import { GOLDEN_ADDRESSES } from './goldens.js';
 
 // ---------------------------------------------------------------------------
 // Helpers — build minimal ParsedTransactionWithInstructions fixtures
@@ -66,17 +68,6 @@ function makeTransferTx({
       blockTime,
     },
     version,
-  };
-}
-
-function makeJsonRpcResponse(result?: unknown, error?: unknown) {
-  return {
-    json: () =>
-      Promise.resolve(
-        error
-          ? { jsonrpc: '2.0', error, id: 1 }
-          : { jsonrpc: '2.0', result, id: 1 }
-      ),
   };
 }
 
@@ -431,5 +422,44 @@ describe('SolanaPaymentVerifier — 7 steps', () => {
       const result = await adapter.verifyPayment('sig123', makeRequest({ amount: '1.0', asset: 'sol' }));
       expect(result).toEqual({ status: 'success', observedAt: expect.any(Number) });
     });
+  });
+});
+
+describe('SolanaPaymentAdapter — wallet-surface delegation', () => {
+  const adapter = new SolanaPaymentAdapter({ network: 'devnet' });
+
+  it('network getter exposes the bound network', () => {
+    expect(adapter.network).toBe('devnet');
+    expect(adapter.chain).toBe('solana:devnet');
+  });
+
+  it('nextIndex delegates to the wallet adapter', () => {
+    expect(adapter.nextIndex(["m/44'/501'/3'/0'", "m/44'/501'/7'/0'"])).toBe(8);
+    expect(adapter.nextIndex([])).toBe(0);
+  });
+
+  it('verifyWalletBinding delegates to the on-curve override (Ф4)', async () => {
+    // A guaranteed off-curve address, found deterministically: ~half of
+    // arbitrary 32-byte strings are not valid ed25519 points.
+    const offCurveAddress = (() => {
+      for (let i = 1; i < 100; i++) {
+        const bytes = new Uint8Array(32);
+        bytes[0] = i;
+        if (!ed25519.utils.isValidPublicKey(bytes)) return base58.encode(bytes);
+      }
+      throw new Error('no off-curve fixture found');
+    })();
+    const ok = await adapter.verifyWalletBinding(
+      { chain: 'solana:devnet', address: GOLDEN_ADDRESSES[0] },
+      { id: 'x', kind: 'identity', name: 'n' },
+      {}
+    );
+    expect(ok).toBe(true);
+    const offCurve = await adapter.verifyWalletBinding(
+      { chain: 'solana:devnet', address: offCurveAddress },
+      { id: 'x', kind: 'identity', name: 'n' },
+      {}
+    );
+    expect(offCurve).toBe(false);
   });
 });

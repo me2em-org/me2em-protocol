@@ -1,6 +1,6 @@
 {
   "name": "@me2em/solana",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "description": "Solana adapter for the Me2eM payment layer: deterministic wallet trees, chain adapters, payment references and request URLs",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,10 +36,14 @@
   "dependencies": {
     "@me2em/crypto": "workspace:^",
     "@noble/curves": "^1.8.1",
-    "@scure/base": "^2.4.0"
+    "@scure/base": "^2.4.0",
+    "@solana-program/memo": "^0.16.0",
+    "@solana-program/system": "^0.16.0",
+    "@solana/keys": "^2.3.0",
+    "@solana/kit": "^8.6.0"
   },
   "peerDependencies": {
-    "@me2em/core": ">=1.0.0-rc.3 <2.0.0-0"
+    "@me2em/core": ">=1.0.0-rc.6 <2.0.0-0"
   },
   "devDependencies": {
     "@me2em/core": "workspace:^",

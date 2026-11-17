@@ -222,4 +222,44 @@ export class RpcClient {
     >('getAccountInfo', [address, { encoding: 'base64' as const }]);
     return result;
   }
+
+  /**
+   * Fetch the latest blockhash and the last block height it remains
+   * valid for (`pay` builds the transaction lifetime from it — a fresh
+   * blockhash per call, no injection, В-7/A). Commitment: `confirmed`.
+   */
+  async getLatestBlockhash(): Promise<{
+    blockhash: string;
+    lastValidBlockHeight: number;
+  }> {
+    const result = await this.#request<{
+      value: { blockhash: string; lastValidBlockHeight: number } | null;
+    }>('getLatestBlockhash', [{ commitment: 'confirmed' as const }]);
+    if (result === null || result.value === null) {
+      throw new Error('RPC getLatestBlockhash: empty result');
+    }
+    return result.value;
+  }
+
+  /**
+   * Submit a base64-encoded signed transaction. Returns the
+   * transaction signature. `skipPreflight: false` — the preflight
+   * simulation rejects (and therefore throws on) transactions that
+   * would obviously fail (e.g. insufficient funds). No confirmation
+   * wait — checking execution is `verifyPayment`'s job.
+   */
+  async sendTransaction(wireBase64: string): Promise<string> {
+    const result = await this.#request<string>('sendTransaction', [
+      wireBase64,
+      {
+        encoding: 'base64' as const,
+        skipPreflight: false,
+        preflightCommitment: 'confirmed' as const,
+      },
+    ]);
+    if (typeof result !== 'string' || result.length === 0) {
+      throw new Error('RPC sendTransaction: empty signature');
+    }
+    return result;
+  }
 }

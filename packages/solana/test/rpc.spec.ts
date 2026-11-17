@@ -10,7 +10,7 @@ function makeMockFetch(response: {
   json?: () => Promise<unknown>;
   text?: () => Promise<string>;
 }): typeof globalThis.fetch {
-  return vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+  return vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
     const res: Response = {
       status: response.status ?? 200,
       ok: response.ok ?? true,
@@ -144,5 +144,64 @@ describe('RpcClient — null result', () => {
     const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
     const result = await rpc.getAccountInfo('emptyAccount');
     expect(result).toBeNull();
+  });
+});
+
+describe('RpcClient — Ф5 methods (pay)', () => {
+  it('getLatestBlockhash returns blockhash and lastValidBlockHeight', async () => {
+    const mockFetch = makeMockFetch({
+      ...makeJsonRpcResponse({ value: { blockhash: 'BLOCKHASHx', lastValidBlockHeight: 12345 } }),
+    });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    const bh = await rpc.getLatestBlockhash();
+    expect(bh).toEqual({ blockhash: 'BLOCKHASHx', lastValidBlockHeight: 12345 });
+  });
+
+  it('getLatestBlockhash throws on JSON-RPC error', async () => {
+    const mockFetch = makeMockFetch({
+      ...makeJsonRpcResponse(undefined, { code: -32000, message: 'node is behind' }),
+    });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    await expect(rpc.getLatestBlockhash()).rejects.toThrow(/node is behind/);
+  });
+
+  it('getLatestBlockhash throws on null value', async () => {
+    const mockFetch = makeMockFetch({
+      ...makeJsonRpcResponse({ value: null }),
+    });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    await expect(rpc.getLatestBlockhash()).rejects.toThrow(/empty result/);
+  });
+
+  it('sendTransaction returns the signature and sends preflight-on base64 params', async () => {
+    const mockFetch = makeMockFetch({
+      ...makeJsonRpcResponse('sig456'),
+    });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    const sig = await rpc.sendTransaction('QUJD');
+    expect(sig).toBe('sig456');
+    const body = JSON.parse(String((mockFetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body));
+    expect(body.method).toBe('sendTransaction');
+    expect(body.params[1]).toEqual({
+      encoding: 'base64',
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+  });
+
+  it('sendTransaction throws on JSON-RPC error (e.g. failed preflight)', async () => {
+    const mockFetch = makeMockFetch({
+      ...makeJsonRpcResponse(undefined, { code: -32002, message: 'Transaction simulation failed' }),
+    });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    await expect(rpc.sendTransaction('QUJD')).rejects.toThrow(/simulation failed/);
+  });
+
+  it('sendTransaction throws on an empty signature (txRef is non-empty by contract)', async () => {
+    const mockFetch = makeMockFetch({
+      ...makeJsonRpcResponse(''),
+    });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    await expect(rpc.sendTransaction('QUJD')).rejects.toThrow(/empty signature/);
   });
 });
