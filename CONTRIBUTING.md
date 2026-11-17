@@ -46,9 +46,9 @@ pnpm run build-docs
 
 ## 📦 Publishing to npm
 
-Publishing is manual and performed by the maintainer only. **Always use `pnpm`, never `npm`**, to maintain lockfile consistency. Never publish with `--no-git-checks`: the git checks are the gate that proves you are publishing the merged state of `main`, not a local branch.
+Publishing is manual and performed by the maintainer only. **Always use `pnpm`, never `npm`**, to maintain lockfile consistency. Never publish with `--no-git-checks`: the git checks are the gate that proves you are publishing the tagged release state, not a local branch.
 
-1. **Prepare the release in a PR.** Bump the `"version"` field in `packages/<pkg>/package.json`, update `packages/<pkg>/CHANGELOG.md`, and carry any required consumer migration in the same PR (the `workspace:^` ranges publish as `^X.Y.Z`). Publishing happens only from the merge commit on `main` with a clean working tree — if `pnpm publish` fails a git check, fix the git state, do not bypass it.
+1. **Prepare the release in a PR.** Bump the `"version"` field in `packages/<pkg>/package.json`, update `packages/<pkg>/CHANGELOG.md`, and carry any required consumer migration in the same PR (the `workspace:^` ranges publish as `^X.Y.Z`). Publishing happens only from the tagged release commit on the integration branch (`develop` before the GA merge, `main` merge commits afterwards) with a clean working tree — if `pnpm publish` fails a git check, fix the git state, do not bypass it.
 2. **Smoke-test the packed artifact in a clean directory** (the packages are ESM-only, so verify via dynamic `import()`):
    ```bash
    pnpm --filter @me2em/<pkg> pack
@@ -56,12 +56,17 @@ Publishing is manual and performed by the maintainer only. **Always use `pnpm`, 
    #   pnpm init && pnpm add <path-to-the-tarball>
    #   node -e "import('@me2em/<pkg>').then(m => console.log(Object.keys(m)))"
    ```
-3. **Publish with an explicit `--tag` on every publish** (`pnpm publish` defaults to `latest`, and a prerelease must never take `latest` over):
+3. **Publish with an explicit `--tag` on every publish** (`pnpm publish` defaults to `latest`):
    ```bash
    # stable releases (including GA):
    pnpm publish --filter @me2em/<pkg> --access public --tag latest
 
-   # prereleases published after the first stable:
+   # prereleases of a package with no stable version yet —
+   # the rc line IS the release line, publish it as `latest`
+   # (recorded practice: core 1.0.0-rc.1, crypto 1.0.0-rc.1):
+   pnpm publish --filter @me2em/<pkg> --access public --tag latest
+
+   # prereleases published after the first stable — never take `latest`:
    pnpm publish --filter @me2em/<pkg> --access public --tag next
    ```
 4. **Tag the release:** create the `<pkg>-v<version>` tag (e.g. `react-v1.0.0`) on the merge commit and push it.
