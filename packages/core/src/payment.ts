@@ -97,8 +97,17 @@ export interface PaymentAdapter extends WalletAdapter {
    * (browser extensions) do not go through `pay` — they follow the
    * chain-specific request-URL flow. On success `txRef` is non-empty;
    * on failure `pay` throws (v1.2 §5.1).
+   *
+   * `opts` are chain-specific call options (rc.6 — additive, optional).
+   * Deterministic adapters require `opts.seed` (the same seed contract
+   * as `resolveWallet`) — without it they throw `TypeError`; the
+   * adapter never retains seed or derived key material.
    */
-  pay(from: WalletDescriptor, request: PaymentRequest): Promise<string>;
+  pay(
+    from: WalletDescriptor,
+    request: PaymentRequest,
+    opts?: { seed?: Uint8Array; memo?: string }
+  ): Promise<string>;
   /**
    * Idempotent pure read of the chain state for a confirmed transaction
    * (v1.2 §5.3): repeating the call with the same `txRef` yields the
