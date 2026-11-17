@@ -327,9 +327,15 @@ describe('PaymentAdapter.pay opts (rc.6 — additive third parameter)', () => {
     }
   }
 
-  it('2-arg implementer stays assignable; interface call site may pass opts', async () => {
+  it('2-arg implementer stays assignable; opts are silently ignored at runtime', async () => {
     const adapter: PaymentAdapter = new TwoArgAdapter();
     const from: WalletDescriptor = { chain: 'solana:devnet', address: 'A' };
+    // Compile-time pin: a 2-arg implementer stays assignable to
+    // PaymentAdapter (fewer-parameters rule).
+    // Runtime: JS drops the extra argument for a 2-arg function — the
+    // implementer does NOT receive opts. Implementations that need
+    // opts.seed MUST accept the third parameter (documented in the
+    // interface JSDoc and CHANGELOG rc.6).
     const txRef = await adapter.pay(from, request, { seed: new Uint8Array(64) });
     expect(txRef).toBe('two-arg-ref');
   });
