@@ -6,7 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { PaymentRequest } from '@me2em/core';
 import { ed25519 } from '@noble/curves/ed25519.js';
-import { base58 } from '@scure/base';
+import { base58, base64 } from '@scure/base';
 import { SolanaPaymentAdapter } from '../src/verify.js';
 import { GOLDEN_ADDRESSES } from './goldens.js';
 
@@ -22,6 +22,7 @@ function makeTransferTx({
   version = '0',
   addressTableLookups = undefined,
   loadedAddresses = undefined,
+  referenceInStaticKeys = true,
 }: {
   reference: string;
   payTo: string;
@@ -30,13 +31,17 @@ function makeTransferTx({
   version?: number | string;
   addressTableLookups?: unknown;
   loadedAddresses?: { writable: string[]; readonly: string[] };
+  referenceInStaticKeys?: boolean;
 }) {
   return {
     transaction: {
       message: {
         accountKeys: [
           {
-            pubkey: reference,
+            // When the reference lives only in a LUT, the static keys
+            // must NOT contain it — otherwise containment passes before
+            // the LUT path is ever reached.
+            pubkey: referenceInStaticKeys ? reference : 'staticPayer123',
             signer: true,
             writable: true,
             source: 'static',
@@ -104,6 +109,52 @@ function makeRequest(overrides?: Partial<PaymentRequest>): PaymentRequest {
     chain: 'solana:devnet',
     ...overrides,
   };
+}
+
+// ---------------------------------------------------------------------------
+// LUT fixtures — build AddressLookupTable account data (lut.ts wire format)
+// ---------------------------------------------------------------------------
+
+/** Mirrored from verify.ts (module-private constant there). */
+const LUT_PROGRAM_ID = 'AddressLookupTab1e1111111111111111111111111';
+const LUT_ACCOUNT_KEY = base58.encode(new Uint8Array(32).fill(4));
+// A deterministic off-static-keys reference pubkey (need not be on-curve).
+const REFERENCE_BYTES = new Uint8Array(32).map((_, i) => (i * 7 + 3) & 0xff);
+const REFERENCE_B58 = base58.encode(REFERENCE_BYTES);
+
+function u32le(v: number): number[] {
+  return [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff];
+}
+
+function u64le(v: bigint): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < 8; i++) out.push(Number((v >> BigInt(i * 8)) & 0xffn));
+  return out;
+}
+
+function makeLutAccountData(
+  addresses: Uint8Array[],
+  opts: { authorityTag?: number; discriminator?: number } = {}
+): string {
+  const bytes: number[] = [
+    ...u32le(opts.discriminator ?? 1),
+    ...u64le(0n),
+    ...u64le(0n),
+    0,
+    opts.authorityTag ?? 0,
+  ];
+  if ((opts.authorityTag ?? 0) === 1) bytes.push(...new Array<number>(32).fill(9));
+  bytes.push(...u32le(addresses.length), ...addresses.flatMap((a) => Array.from(a)));
+  return base64.encode(new Uint8Array(bytes));
+}
+
+/** Count `getAccountInfo` calls a mock fetch has served so far. */
+function countRpcMethod(mockFetch: unknown, method: string): number {
+  const calls = (mockFetch as { mock?: { calls: [RequestInfo | URL, RequestInit?][] } })
+    .mock?.calls ?? [];
+  return calls.filter(
+    ([, init]) => init?.body && JSON.parse(String(init.body)).method === method
+  ).length;
 }
 
 // ---------------------------------------------------------------------------
@@ -461,5 +512,204 @@ describe('SolanaPaymentAdapter — wallet-surface delegation', () => {
       {}
     );
     expect(offCurve).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LUT containment — RPC-resolved loadedAddresses and the manual fallback
+// (the legacy path: addressTableLookups present, loadedAddresses absent)
+// ---------------------------------------------------------------------------
+
+describe('verifyPayment — LUT containment (loadedAddresses + manual fallback)', () => {
+  it('accepts a reference present only in meta.loadedAddresses (not in static keys)', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      loadedAddresses: { writable: [REFERENCE_B58], readonly: [] },
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result).toEqual({ status: 'success', observedAt: expect.any(Number) });
+    expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(0);
+  });
+
+  it('returns REFERENCE_MISMATCH when loadedAddresses exist but lack the reference', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      loadedAddresses: { writable: ['unrelatedLutAddr'], readonly: ['anotherOne'] },
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result).toEqual({ status: 'failure', reason: 'REFERENCE_MISMATCH', observedAt: expect.any(Number) });
+    expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(0);
+  });
+
+  it('skips the manual fallback when the RPC already resolved loadedAddresses', async () => {
+    // addressTableLookups present AND loadedAddresses present: the manual
+    // bincode path must not run (no getAccountInfo), result is mismatch.
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      addressTableLookups: [{ accountKey: LUT_ACCOUNT_KEY, writableIndexes: [0], readonlyIndexes: [] }],
+      loadedAddresses: { writable: ['resolvedElsewhere'], readonly: [] },
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result.reason).toBe('REFERENCE_MISMATCH');
+    expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(0);
+  });
+
+  it('manual fallback: resolves the reference from an on-chain LUT account → success', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      addressTableLookups: [{ accountKey: LUT_ACCOUNT_KEY, writableIndexes: [0], readonlyIndexes: [] }],
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      getAccountInfo: () =>
+        Promise.resolve({
+          result: { data: [makeLutAccountData([REFERENCE_BYTES]), 'base64'], owner: LUT_PROGRAM_ID },
+        }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result).toEqual({ status: 'success', observedAt: expect.any(Number) });
+    expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(1);
+  });
+
+  it('manual fallback: reference not among resolved LUT addresses → REFERENCE_MISMATCH', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      addressTableLookups: [{ accountKey: LUT_ACCOUNT_KEY, writableIndexes: [0], readonlyIndexes: [] }],
+      referenceInStaticKeys: false,
+    });
+    const other = REFERENCE_BYTES.map((b, i) => (i === 0 ? b ^ 0xff : b));
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      getAccountInfo: () =>
+        Promise.resolve({
+          result: { data: [makeLutAccountData([other]), 'base64'], owner: LUT_PROGRAM_ID },
+        }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result).toEqual({ status: 'failure', reason: 'REFERENCE_MISMATCH', observedAt: expect.any(Number) });
+  });
+
+  it('manual fallback: LUT account missing (getAccountInfo null) → fail-closed mismatch', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      addressTableLookups: [{ accountKey: LUT_ACCOUNT_KEY, writableIndexes: [0], readonlyIndexes: [] }],
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      getAccountInfo: () => Promise.resolve({ result: null }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result.reason).toBe('REFERENCE_MISMATCH');
+    expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(1);
+  });
+
+  it('manual fallback: account owner is not the LUT program → fail-closed mismatch', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      addressTableLookups: [{ accountKey: LUT_ACCOUNT_KEY, writableIndexes: [0], readonlyIndexes: [] }],
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      getAccountInfo: () =>
+        Promise.resolve({
+          result: {
+            data: [makeLutAccountData([REFERENCE_BYTES]), 'base64'],
+            owner: 'SystemProgram1111111111111111111111111111111',
+          },
+        }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result.reason).toBe('REFERENCE_MISMATCH');
+  });
+
+  it('manual fallback: corrupted LUT data → fail-closed mismatch', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      addressTableLookups: [{ accountKey: LUT_ACCOUNT_KEY, writableIndexes: [0], readonlyIndexes: [] }],
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      getAccountInfo: () =>
+        Promise.resolve({
+          result: {
+            data: [makeLutAccountData([REFERENCE_BYTES], { discriminator: 2 }), 'base64'],
+            owner: LUT_PROGRAM_ID,
+          },
+        }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(result.reason).toBe('REFERENCE_MISMATCH');
+  });
+
+  it('caches resolved LUTs: a second verification does not re-fetch the account', async () => {
+    const tx = makeTransferTx({
+      reference: REFERENCE_B58,
+      payTo: 'payTo123',
+      lamports: 1e9,
+      addressTableLookups: [{ accountKey: LUT_ACCOUNT_KEY, writableIndexes: [0], readonlyIndexes: [] }],
+      referenceInStaticKeys: false,
+    });
+    const mockFetch = makeMockFetch({
+      getTransaction: () => Promise.resolve({ result: tx }),
+      getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      getAccountInfo: () =>
+        Promise.resolve({
+          result: { data: [makeLutAccountData([REFERENCE_BYTES]), 'base64'], owner: LUT_PROGRAM_ID },
+        }),
+    });
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
+    const r1 = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    const r2 = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
+    expect(r1.status).toBe('success');
+    expect(r2.status).toBe('success');
+    expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(1);
   });
 });

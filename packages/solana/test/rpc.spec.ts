@@ -205,3 +205,24 @@ describe('RpcClient — Ф5 methods (pay)', () => {
     await expect(rpc.sendTransaction('QUJD')).rejects.toThrow(/empty signature/);
   });
 });
+
+describe('RpcClient — protocol-level failures', () => {
+  it('throws when the response carries neither result nor error (empty result)', async () => {
+    // makeJsonRpcResponse() with no args → `{ jsonrpc, result: undefined, id }`
+    const mockFetch = makeMockFetch({ ...makeJsonRpcResponse() });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    await expect(rpc.getTransaction('sig123')).rejects.toThrow(/RPC getTransaction: empty result/);
+  });
+
+  it('getLatestBlockhash throws when the whole result is null', async () => {
+    const mockFetch = makeMockFetch({ ...makeJsonRpcResponse(null) });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    await expect(rpc.getLatestBlockhash()).rejects.toThrow(/empty result/);
+  });
+
+  it('sendTransaction throws on a non-string signature', async () => {
+    const mockFetch = makeMockFetch({ ...makeJsonRpcResponse(12345) });
+    const rpc = new RpcClient({ endpoint: 'http://localhost:8899', fetch: mockFetch as unknown as typeof globalThis.fetch });
+    await expect(rpc.sendTransaction('QUJD')).rejects.toThrow(/empty signature/);
+  });
+});

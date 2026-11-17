@@ -251,6 +251,20 @@ describe('pay — validation (TypeError contract)', () => {
     ).rejects.toThrow(TypeError);
   });
 
+  it('derivation index above the SLIP-0010 ceiling → TypeError (out of range)', async () => {
+    const { fetch } = makeHappyRpc();
+    await expect(
+      pay(
+        // 0x80000000 > MAX_PAYMENT_INDEX (0x7fffffff) — matches the path
+        // regex, so the guard must catch it by value, not by shape.
+        { ...FROM, derivationPath: "m/44'/501'/2147483648'/0'" },
+        makeRequest(),
+        { seed: SEED },
+        makeCtx(fetch)
+      )
+    ).rejects.toThrow(/out of range/);
+  });
+
   it('derived address ≠ from.address → TypeError (descriptor/seed disagree)', async () => {
     const { fetch } = makeHappyRpc();
     await expect(
@@ -325,6 +339,23 @@ describe('pay — transport failures', () => {
     await expect(pay(FROM, makeRequest(), { seed: SEED }, makeCtx(fetch))).rejects.toThrow(
       /empty signature/
     );
+  });
+
+  it('non-string/empty txRef from a custom transport → Error (defense-in-depth beyond RpcClient)', async () => {
+    // RpcClient.sendTransaction already rejects empty signatures; this
+    // pins pay's own guard for transports that bypass RpcClient.
+    const stubRpc = {
+      getLatestBlockhash: async () => ({ blockhash: BLOCKHASH, lastValidBlockHeight: 12345 }),
+      sendTransaction: vi.fn<() => Promise<unknown>>()
+        .mockResolvedValueOnce('') // length arm
+        .mockResolvedValueOnce(undefined), // typeof arm
+    } as unknown as RpcClient;
+    await expect(
+      pay(FROM, makeRequest(), { seed: SEED }, { rpc: stubRpc, chain: CHAIN })
+    ).rejects.toThrow(/empty signature from sendTransaction/);
+    await expect(
+      pay(FROM, makeRequest(), { seed: SEED }, { rpc: stubRpc, chain: CHAIN })
+    ).rejects.toThrow(/empty signature from sendTransaction/);
   });
 });
 
