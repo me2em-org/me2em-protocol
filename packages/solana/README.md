@@ -4,14 +4,11 @@
 
 # @me2em/solana
 
-Solana adapter for the Me2eM payment layer: deterministic wallet trees over SLIP-0010, chain-bound wallet adapters, payment references and Solana Pay request URLs — offline by design (no RPC in this release).
+Solana adapter for the Me2eM payment layer: deterministic wallet trees over SLIP-0010, chain-bound wallet/payment adapters, payment references, Solana Pay request URLs, on-chain payment verification (`verifyPayment`) and programmatic payment submission (`pay`).
 
 ## Status
 
-**Wallet-only release.** Deterministic wallets, adapter registration and
-the external-wallet URL flow are shipped. Payment verification
-(`verifyPayment`, `verifyWalletBinding`) and payment submission (`pay`)
-are **not** part of this release — see [Roadmap](#roadmap).
+**Payment-adapter release (rc.4).** Deterministic wallets, adapter registration, the external-wallet URL flow (Ф3), payment verification (Ф4: `verifyPayment`, `verifyWalletBindingSolana`, `deriveForVerification`) and payment submission (Ф5: `pay` — SOL-only, seed per call) are shipped. SPL transfers and x402 signer integration are on the [Roadmap](#roadmap).
 
 ## Install
 
@@ -22,13 +19,14 @@ from the Identity seed:
 pnpm add @me2em/solana @me2em/core @me2em/crypto
 ```
 
-> 💡 `@me2em/core` is a **peer** dependency (`>=1.0.0-rc.3 <2.0.0-0`) —
-> the adapter registry, CAIP-2 grammar and `DisposedError` live there.
-> `@me2em/crypto` supplies SLIP-0010 derivation and `secureWipe`; it is
-> a direct dependency of `@me2em/solana` and installs automatically, so
-> `pnpm add @me2em/solana @me2em/core` is sufficient if you never import
-> `@me2em/crypto` yourself — listing it explicitly keeps the manifest
-> honest, because the examples below call its API directly.
+> 💡 `@me2em/core` is a **peer** dependency (`>=1.0.0-rc.6 <2.0.0-0`) —
+> the adapter registry, CAIP-2 grammar, payment-layer interfaces and
+> `DisposedError` live there. `@me2em/crypto` supplies SLIP-0010
+> derivation and `secureWipe`; both are resolved automatically.
+> `pay` brings `@solana/kit` + `@solana-program/system`/`memo` as
+> regular dependencies (installed with the package); `@me2em/crypto`
+> stays a direct dependency, so listing it explicitly keeps the
+> manifest honest — the examples below call its API directly.
 > This package is headless-only — browser and Node.js ≥ 22.
 
 Payments mode (planned): the install set stays the same plus the future
@@ -114,31 +112,91 @@ dispose(); // test hygiene
 > Registering is a privilege of the application's trusted code; do not
 > import untrusted dependencies before registration.
 
+### verify/ + rpc/ — on-chain verification (Ф4)
+
+- **`SolanaPaymentAdapter`** — core's `PaymentAdapter` for one exact
+  chain: the wallet surface (`resolveWallet`, `isValidAddress`,
+  `nextIndex`) delegated to `SolanaWalletAdapter`, plus
+  `verifyPayment` (normative order `NOT_FOUND` → `REFERENCE_MISMATCH`
+  → `EXPIRED` → `REPLAYED` → `WRONG_RECIPIENT` → `UNDERPAID` →
+  success; SOL-only — SPL → `WRONG_ASSET`) and the on-curve
+  `verifyWalletBinding` override. RPC transport: the minimal
+  **`RpcClient`** (JSON-RPC 2.0; `getTransaction`,
+  `getSignaturesForAddress`, `getAccountInfo`,
+  `getLatestBlockhash`, `sendTransaction`) with a `fetch` injection
+  point for tests. `SolanaPaymentAdapterOptions.endpoint` overrides
+  the network's default public RPC — production passes its own.
+
+### pay/ — programmatic spend (Ф5)
+
+`pay` spends from a wallet **you** control: pass the 64-byte seed
+**per call** — the adapter never retains key material and stays
+stateless. Returns the transaction signature; confirmation is
+`verifyPayment`'s job (no confirmation wait inside `pay`).
+
+```ts
+import { SolanaPaymentAdapter } from '@me2em/solana';
+
+const adapter = new SolanaPaymentAdapter({ network: 'devnet' }); // prod: endpoint override
+const txRef = await adapter.pay(from, request, { seed });
+// later / recipient side:
+const result = await adapter.verifyPayment(txRef, request); // status: 'success' | 'failure'
+```
+
+Contract highlights:
+
+- **SOL-only** — `request.asset !== 'sol'` throws `TypeError` (SPL
+  transfer-checked is deferred).
+- **Seed per call** — without `opts.seed` it throws `TypeError` (the
+  same contract as `resolveWallet`); the derived address is checked
+  against `from.address`, so a stale descriptor cannot spend from the
+  wrong wallet.
+- **`request.reference`** rides the transaction as a read-only,
+  non-signing account key — chain-level `REPLAYED` detection and
+  `verifyPayment`'s containment check key on it.
+- **Amounts** are strict decimal strings (`solToLamports`, bigint —
+  never float); zero and > 9 fractional digits are rejected.
+- **`opts.memo`** — optional on-chain memo (memo program).
+- Direct use without the registry: import **`pay`** and supply
+  `ctx = { rpc: new RpcClient({ endpoint }), chain }` yourself.
+
+### Sweep (documentation only)
+
+`@me2em/solana` does **not** implement a `sweep` method. Sweeping is
+application logic: derive the source wallet (via `SolanaWalletTree`),
+build a transfer to the target address, and submit it — the same
+primitives `pay` uses. Track this in your app's reconciliation flow;
+the protocol does not standardize it.
+
 ## Error model
 
 | Condition | Error |
 |---|---|
 | Seed not exactly 64 bytes / not `Uint8Array` | `TypeError` |
 | Index not a safe integer in `0..2^31−1` | `TypeError` |
-| Missing `opts.seed` in `resolveWallet` | `TypeError` |
+| Missing `opts.seed` in `resolveWallet` / `pay` | `TypeError` |
 | Malformed request fields in `createPaymentRequestURL` | `TypeError` |
 | Unknown network name (adapter / registration) | `TypeError` |
+| `pay`: chain/asset mismatch, invalid payTo/reference, missing or foreign derivation path, derived ≠ `from.address`, zero or malformed amount | `TypeError` |
+| `pay`: JSON-RPC / HTTP / preflight failure, empty signature | `Error` (transport contract) |
 | Key-requiring call after `dispose()` | `DisposedError` (`code: 'DISPOSED'`) |
 | Malformed address in `isValidSolanaAddress` | returns `false` (never throws) |
 
-Programmer errors are bare `TypeError` — the same contract as `crypto.slip10` and `Identity.fromSeed`. Runtime/operational failures of the future payment flow will be exposed as core's `PaymentFailureReason` (see [Roadmap](#roadmap)).
+Programmer errors are bare `TypeError` — the same contract as `crypto.slip10` and `Identity.fromSeed`. Payment-verification outcomes are core's `PaymentResult` with `PaymentFailureReason`; `pay` itself throws on failure (v1.2 §5.1).
 
 ## Invariants
 
-- **Offline:** no RPC, no network calls, no transaction building — verification and `pay` are out of scope for this release.
-- **No SLIP-0010 and no curve code of its own:** derivation is `crypto.slip10`; base58 is `@scure/base`. `@noble/curves` is never imported directly.
-- **Stateless adapter, stateful tree, never both:** the adapter holds nothing; the tree holds only master key material and dies with `dispose()`.
+- **Submission without confirmation wait:** `pay` submits and returns the signature; checking execution is `verifyPayment`'s job. `getLatestBlockhash` is fetched per call — no blockhash injection (that stays M2-signer's contract).
+- **No SLIP-0010 and no curve code of its own:** derivation is `crypto.slip10`; base58 is `@scure/base`; on-curve checks and signing use `@noble/curves` / `@solana/kit`.
+- **Stateless adapter, stateful tree, never both:** the adapter holds nothing; the tree holds only master key material and dies with `dispose()`. `pay` derives from the per-call seed through a throwaway tree.
 - **Descriptors carry no key material** — ever.
 
 ## Roadmap
 
-- **Payment verification** — `verifyPayment` (JSON-RPC; check order `NOT_FOUND` → `REFERENCE_MISMATCH` → `EXPIRED` → `REPLAYED` → `WRONG_RECIPIENT` → `UNDERPAID`), `verifyWalletBinding` override (on-curve), `deriveForVerification`.
-- **Payment submission** — `pay` via `@solana/kit` and x402 integration.
+- ~~Payment verification~~ — shipped in rc.3 (`verifyPayment`, `verifyWalletBindingSolana`, `deriveForVerification`).
+- ~~Payment submission~~ — shipped in rc.4 (`pay`, SOL-only, seed per call).
+- **SPL transfers** — transfer-checked instructions for token assets (deferred from rc.4).
+- **x402 integration** — `SolanaX402Signer` (M2) and the `@me2em/x402` wire layer.
 
 See the [@me2em/core README](https://www.npmjs.com/package/@me2em/core) for the payment-layer interfaces and the [repository README](https://github.com/me2em-org/me2em-protocol) for the full package map.
 
