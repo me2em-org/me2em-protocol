@@ -28,5 +28,5 @@ export { verifyWalletBindingSolana } from './wallet-binding.js';
 export { createPaymentReference } from './reference.js';
 export { createPaymentRequestURL, SOLANA_NATIVE_ASSET } from './url.js';
 export { registerSolanaAdapters, type RegisterSolanaAdaptersOptions } from './register.js';
-export { RpcClient, type ParsedTransactionResponse, type SignatureInfo, type LutAddresses } from './rpc.js';
+export { RpcClient, type RpcClientOptions, type ParsedTransactionResponse, type SignatureInfo, type LutAddresses } from './rpc.js';
 export { parseLutAddresses } from './lut.js';
