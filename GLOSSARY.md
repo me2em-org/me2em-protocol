@@ -83,6 +83,9 @@ Record in [BACKLOG.md](./BACKLOG.md).
 | **RegulatoryProfile** | Декларация compliance-режима: `none` / `kyc` / `aml` / `age-gated` / `sanctions` (x402 не enforce'ит). |
 | **PaymentSigner** | Контракт `@me2em/x402` (M1): `capabilities` + `signPayment(requirements, resource)`. |
 | **FacilitatorClient** | Интерфейс `@me2em/x402` (M1): `supported()` / `verify()` / `settle()`. |
+| **B402Facilitator** | HTTP-клиент `@me2em/x402` к внешнему B402 (subpath `./b402`, `@experimental` до контракта ТЗ №8). |
+| **X402Config** | Серверный конфиг продавца в `@me2em/x402` (mode + policy-декларации); fail-fast `assertValidX402Config`, без enforcement. |
+| **X402Me2emExtra** | Wire-формат `extra.me2em` (`sellerId` обязателен, `agreementProof` в base64) — в отличие от прикладного `Me2emExtra` в core. |
 | **atomic units** | Наименьшая неделимая единица актива (`X402PaymentRequirements.amount`, строка `/^[0-9]+$/`). |
 | **whole units** | Целые токен-единицы (`PaymentRequest.amount`, десятичная строка; конверсия в atomic — на приложении). |
 

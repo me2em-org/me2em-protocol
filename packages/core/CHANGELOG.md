@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0-rc.7] — 2026-11-17
+
+M1 prep: `isX402SettleResponse` accepted only non-empty `transaction` —
+fix. Found by the M1 golden vectors (upstream x402 v2 spec, commit
+`51a0664c`).
+
+### Fixed
+- **`isX402SettleResponse` — an empty `transaction` is legal.** The x402
+  v2 specification (§5.3.2) carries `"transaction": ""` when nothing was
+  broadcast (failure settlements), requiring non-empty only for
+  `errorReason: settlement_pending`. The M0 guard rejected every such
+  response as malformed — the M1 codec would have refused legitimate
+  failure settles. Still fail-closed: non-strings are rejected, and
+  `settlement_pending` with an empty transaction is rejected. Behavior
+  is strictly more permissive on one dimension (empty transaction
+  without `settlement_pending`).
+
 ## [1.0.0-rc.6] — 2026-11-17
 
 P0.6.5: `PaymentAdapter.pay` gains an optional chain-specific call

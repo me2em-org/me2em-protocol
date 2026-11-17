@@ -252,6 +252,34 @@ describe('isX402SettleResponse', () => {
     expect(isX402SettleResponse({ success: true, transaction: 42, network: 'solana:mainnet-beta' })).toBe(false);
   });
 
+  it('empty transaction: legal without settlement_pending, illegal with it (upstream §5.3.2)', () => {
+    expect(isX402SettleResponse({ success: false, transaction: '', network: 'solana:mainnet-beta' })).toBe(true);
+    expect(
+      isX402SettleResponse({
+        success: false,
+        errorReason: 'insufficient_funds',
+        transaction: '',
+        network: 'solana:mainnet-beta',
+      })
+    ).toBe(true);
+    expect(
+      isX402SettleResponse({
+        success: false,
+        errorReason: 'settlement_pending',
+        transaction: '',
+        network: 'solana:mainnet-beta',
+      })
+    ).toBe(false);
+    expect(
+      isX402SettleResponse({
+        success: false,
+        errorReason: 'settlement_pending',
+        transaction: '0xabc',
+        network: 'solana:mainnet-beta',
+      })
+    ).toBe(true);
+  });
+
   it('network not CAIP-2 → false', () => {
     expect(isX402SettleResponse({ success: true, transaction: 'tx', network: 'solana' })).toBe(false);
   });

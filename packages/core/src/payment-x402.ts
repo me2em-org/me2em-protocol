@@ -101,9 +101,13 @@ export interface X402SettleResponse {
   readonly errorMessage?: string;
   /** Payer address, when known. */
   readonly payer?: string;
-  /** Settlement transaction reference. */
+  /**
+   * Settlement transaction reference. Empty string is legal when no
+   * transaction was broadcast (upstream §5.3.2) — except for
+   * `errorReason: 'settlement_pending'`, where it MUST be non-empty.
+   */
   readonly transaction: string;
-  /** Exact CAIP-2 chain id of the settlement. */
+  /** Blockchain network identifier in CAIP-2 format. */
   readonly network: string;
   /** Settled amount in atomic units. */
   readonly amount?: string;
@@ -271,7 +275,10 @@ export function isX402SettleResponse(value: unknown): value is X402SettleRespons
   if (value.errorReason !== undefined && typeof value.errorReason !== 'string') return false;
   if (value.errorMessage !== undefined && typeof value.errorMessage !== 'string') return false;
   if (value.payer !== undefined && typeof value.payer !== 'string') return false;
-  if (!isNonEmptyString(value.transaction)) return false;
+  // Upstream §5.3.2: an empty transaction is legal when nothing was
+  // broadcast; it MUST be non-empty for `errorReason: settlement_pending`.
+  if (typeof value.transaction !== 'string') return false;
+  if (value.transaction === '' && value.errorReason === 'settlement_pending') return false;
   if (typeof value.network !== 'string' || parseChain(value.network) === null) return false;
   if (value.amount !== undefined && (typeof value.amount !== 'string' || !AMOUNT_RE.test(value.amount))) return false;
   if (value.extra !== undefined && !isPlainObject(value.extra)) return false;
