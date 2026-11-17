@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0-rc.6] — 2026-11-17
+
+P0.6.5: `PaymentAdapter.pay` gains an optional chain-specific call
+options parameter (`opts`) — the additive core change Ф5
+(`@me2em/solana` `pay`, rc.4) needs for per-call seeds. Not breaking:
+2-argument call sites and 2-argument implementations stay
+type-compatible (TS fewer-parameters rule).
+
+### Changed
+- **`PaymentAdapter.pay` — optional third parameter
+  `opts?: { seed?: Uint8Array; memo?: string }` (additive, not
+  breaking).** Deterministic adapters require `opts.seed` — the same
+  seed contract as `resolveWallet` — and throw `TypeError` without
+  it; adapters never retain seed or derived key material. `opts` are
+  chain-specific call options; the pinned shape is what the Solana
+  adapter consumes in rc.4 (Ф5). v1.2 §5.1 signature amendment:
+  `pay(from, request, opts?)`.
+
 ## [1.0.0-rc.5] — 2026-11-17
 
 x402 payment-layer base: wire types and structural guards for the
