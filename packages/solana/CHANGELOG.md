@@ -35,7 +35,8 @@ stateless). No API surface change beyond `pay` (previously
   propagate the `RpcClient`'s `Error` (v1.2 §5.1 — `pay` throws on
   failure, never returns an empty `txRef`).
 - **`solToLamports`** — strict decimal-string → lamports (bigint,
-  never float, BL-55): `/^\d+(\.\d{1,9})?$/`, zero rejected;
+  never float; cf. BL-56 for the verifier-side `#verifyAmount`):
+  `/^\d+(\.\d{1,9})?$/`, zero rejected;
   `'1.2.3'`/`'-1'`/`'1e3'` are TypeErrors, not silent math.
 - **`RpcClient.getLatestBlockhash()`** and
   **`RpcClient.sendTransaction(wireBase64)`** — the two RPC methods
