@@ -4,11 +4,11 @@
 
 # @me2em/solana
 
-Solana adapter for the Me2eM payment layer: deterministic wallet trees over SLIP-0010, chain-bound wallet/payment adapters, payment references, Solana Pay request URLs, on-chain payment verification (`verifyPayment`) and programmatic payment submission (`pay`).
+Solana adapter for the Me2eM payment layer: deterministic wallet trees over SLIP-0010, chain-bound wallet/payment adapters, payment references, Solana Pay request URLs, on-chain payment verification (`verifyPayment`), programmatic payment submission (`pay`) and the x402 `PaymentSigner` (`SolanaX402Signer`).
 
 ## Status
 
-**Payment-adapter release (rc.4).** Deterministic wallets, adapter registration, the external-wallet URL flow (Ф3), payment verification (Ф4: `verifyPayment`, `verifyWalletBindingSolana`, `deriveForVerification`) and payment submission (Ф5: `pay` — SOL-only, seed per call) are shipped. SPL transfers and x402 signer integration are on the [Roadmap](#roadmap).
+**x402-signer release (1.1.0-rc.1, M2).** Deterministic wallets, adapter registration, the external-wallet URL flow (Ф3), payment verification (Ф4), payment submission (Ф5: `pay` — SOL-only, seed per call) and the x402 payment signer (M2: `SolanaX402Signer` — offline legacy-transfer signing, blockhash by injection) are shipped. SPL transfers and the Solana-facilitator payload contract are on the [Roadmap](#roadmap).
 
 ## Install
 
@@ -23,14 +23,20 @@ pnpm add @me2em/solana @me2em/core @me2em/crypto
 > the adapter registry, CAIP-2 grammar, payment-layer interfaces and
 > `DisposedError` live there. `@me2em/crypto` supplies SLIP-0010
 > derivation and `secureWipe`; both are resolved automatically.
-> `pay` brings `@solana/kit` + `@solana-program/system`/`memo` as
-> regular dependencies (installed with the package); `@me2em/crypto`
-> stays a direct dependency, so listing it explicitly keeps the
-> manifest honest — the examples below call its API directly.
+> `@me2em/x402` is a **peer** dependency (`>=1.0.0-rc.1 <2.0.0-0`) used
+> **type-only** (zero runtime code — the sanctioned §0.3 exception):
+> `SolanaX402Signer` implements the x402 `PaymentSigner` interface,
+> while the transport itself (`createPaymentFetch`) stays with
+> `@me2em/x402` on the application side. `pay` brings `@solana/kit` +
+> `@solana-program/system`/`memo` as regular dependencies (installed
+> with the package); `@me2em/crypto` stays a direct dependency, so
+> listing it explicitly keeps the manifest honest — the examples below
+> call its API directly.
 > This package is headless-only — browser and Node.js ≥ 22.
 
-Payments mode (planned): the install set stays the same plus the future
-x402 payment layer once it ships — nothing extra is needed today.
+x402 payments mode: the same install set plus `@me2em/x402` — the
+signer composes with `createPaymentFetch` (see
+[x402-signer](#x402-signer--the-x402-paymentsigner-m2)).
 
 ## Modules
 
@@ -160,6 +166,64 @@ Contract highlights:
 - Direct use without the registry: import **`pay`** and supply
   `ctx = { rpc: new RpcClient({ endpoint }), chain }` yourself.
 
+### x402-signer/ — the x402 PaymentSigner (M2)
+
+`SolanaX402Signer` implements the x402 `PaymentSigner` contract
+(ТЗ @me2em/x402 v1.2 §4) for **native SOL**: it signs one accepted
+`exact` requirement into a legacy system-program transfer, signed by
+the wallet derived from the injected `SolanaWalletTree`. The payload
+it returns becomes `PaymentPayload.payload` inside `PAYMENT-SIGNATURE`.
+
+- **Offline by construction** — no RPC inside the signer. The recent
+  blockhash arrives through the mandatory `getRecentBlockhash`
+  injection (missing → constructor `TypeError`); transaction
+  submission is the facilitator's `settle`, never the signer's.
+- **Serialization by hand** — the legacy wire format is assembled
+  byte-by-byte (compact-u16 lengths, canonical system transfer
+  layout); `@solana/kit` is not used on this path. 151-byte message,
+  216-byte signed transaction, pinned by golden vectors.
+- **`@me2em/x402` is type-only** — `import type { PaymentSigner }`;
+  zero x402 runtime code lands in this package's dist.
+- **Capabilities** — exactly `exact` ×
+  `solana:mainnet-beta`/`solana:devnet`/`solana:testnet`; wildcards
+  are never declared, `solana:localnet` is not a payment capability.
+  The final network/asset set follows the §8.7 facilitator contract.
+- **Fail-closed** — non-native assets (SPL, §8.3 map pending), other
+  schemes, zero/oversized amounts (u64 bound), invalid or self-pay
+  `payTo`, malformed blockhashes → bare `TypeError`; the x402 client
+  surfaces them as `SIGNER_REJECTED` with the cause attached.
+- **Key hygiene** — the derived private key is wiped in `finally` on
+  every path.
+
+⚠️ **@experimental payload convention** (§8.7): the payload shape is a
+me2em convention until the Solana-facilitator contract lands — the
+`kind` tag versions it:
+
+| Field | Meaning |
+|---|---|
+| `kind` | `'solana-legacy-transfer'` — convention tag |
+| `network` | exact CAIP-2 chain id, echoed |
+| `transaction` | signed legacy transaction wire bytes, standard base64 (RPC `sendTransaction`-ready) |
+| `blockhash` | the injected recent blockhash, base58 |
+| `from` | signer address (base58 of the Ed25519 public key) |
+| `to` | recipient, echoed from `payTo` |
+| `lamports` | atomic amount, canonical decimal string |
+
+```ts
+import { SolanaWalletTree, SolanaX402Signer } from '@me2em/solana';
+import { createPaymentFetch } from '@me2em/x402';
+
+const tree = SolanaWalletTree.fromSeed(seed64);
+const signer = new SolanaX402Signer({
+  tree,
+  index: 0, // nextPaymentIndex(usedPaths) for fresh indices
+  getRecentBlockhash: () => rpc.getLatestBlockhash(), // app-owned RPC
+});
+const payFetch = createPaymentFetch({ signer });
+const response = await payFetch('https://api.example.com/premium/feed');
+const settlement = readSettlement(response);
+```
+
 ### Sweep (documentation only)
 
 `@me2em/solana` does **not** implement a `sweep` method. Sweeping is
@@ -179,6 +243,9 @@ the protocol does not standardize it.
 | Unknown network name (adapter / registration) | `TypeError` |
 | `pay`: chain/asset mismatch, invalid payTo/reference, missing or foreign derivation path, derived ≠ `from.address`, zero or malformed amount | `TypeError` |
 | `pay`: JSON-RPC / HTTP / preflight failure, empty signature | `Error` (transport contract) |
+| `SolanaX402Signer`: missing `getRecentBlockhash` injection, non-tree, bad index | `TypeError` (constructor, fail-fast) |
+| `SolanaX402Signer`: non-exact scheme, non-native asset, malformed/zero/oversized amount, invalid or self-pay `payTo`, malformed blockhash | `TypeError` (per call, fail-closed) |
+| `SolanaX402Signer`: whatever `getRecentBlockhash` throws | propagated (the application owns its RPC) |
 | Key-requiring call after `dispose()` | `DisposedError` (`code: 'DISPOSED'`) |
 | Malformed address in `isValidSolanaAddress` | returns `false` (never throws) |
 
@@ -186,8 +253,8 @@ Programmer errors are bare `TypeError` — the same contract as `crypto.slip10` 
 
 ## Invariants
 
-- **Submission without confirmation wait:** `pay` submits and returns the signature; checking execution is `verifyPayment`'s job. `getLatestBlockhash` is fetched per call — no blockhash injection (that stays M2-signer's contract).
-- **No SLIP-0010 and no curve code of its own:** derivation is `crypto.slip10`; base58 is `@scure/base`; on-curve checks and signing use `@noble/curves` / `@solana/kit`.
+- **Submission without confirmation wait:** `pay` submits and returns the signature; checking execution is `verifyPayment`'s job. `getLatestBlockhash` is fetched per call — the x402 signer, by contrast, takes the blockhash ONLY by injection (no RPC of its own).
+- **No SLIP-0010 and no curve code of its own:** derivation is `crypto.slip10`; base58 is `@scure/base`; on-curve checks and signing use `@noble/curves` / `@solana/kit` (`pay` path) — the x402 signer signs via `signRaw` (`@me2em/crypto`) and serializes the legacy wire format by hand.
 - **Stateless adapter, stateful tree, never both:** the adapter holds nothing; the tree holds only master key material and dies with `dispose()`. `pay` derives from the per-call seed through a throwaway tree.
 - **Descriptors carry no key material** — ever.
 
@@ -195,8 +262,9 @@ Programmer errors are bare `TypeError` — the same contract as `crypto.slip10` 
 
 - ~~Payment verification~~ — shipped in rc.3 (`verifyPayment`, `verifyWalletBindingSolana`, `deriveForVerification`).
 - ~~Payment submission~~ — shipped in rc.4 (`pay`, SOL-only, seed per call).
-- **SPL transfers** — transfer-checked instructions for token assets (deferred from rc.4).
-- **x402 integration** — `SolanaX402Signer` (M2) and the `@me2em/x402` wire layer.
+- ~~x402 integration~~ — shipped in 1.1.0-rc.1 (`SolanaX402Signer`, M2; payload convention `@experimental` until §8.7).
+- **SPL transfers** — transfer-checked instructions for token assets (deferred from rc.4); SPL in x402 requirements follows the §8.3 facilitator contract.
+- **Payload-convention fixation** — finalize the x402 Solana payload shape and blockhash source with the §8.7 facilitator contract.
 
 See the [@me2em/core README](https://www.npmjs.com/package/@me2em/core) for the payment-layer interfaces and the [repository README](https://github.com/me2em-org/me2em-protocol) for the full package map.
 

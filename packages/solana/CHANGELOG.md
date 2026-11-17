@@ -11,6 +11,76 @@ layer.
 > `@me2em/solano@1.0.0-rc.1` on npm are deprecated placeholders —
 > install `@me2em/solana` instead.
 
+## [1.1.0-rc.1] — 2026-11-17
+
+M2 (ТЗ @me2em/x402 v1.2 §4): the x402 `PaymentSigner` for Solana —
+`SolanaX402Signer`. The first real consumer of the `@me2em/x402`
+transport contract: one accepted `exact` requirement becomes a signed
+legacy system-program SOL transfer, ready for a facilitator's
+`settle`. Offline by construction — the blockhash is an injection,
+the transaction is never submitted here.
+
+### Added
+- **`SolanaX402Signer`** (`src/x402-signer.ts`) — implements the x402
+  `PaymentSigner` (type-only peer-import, the sanctioned §0.3
+  exception: zero x402 runtime code in the dist). `capabilities` are
+  exactly `exact` × `solana:mainnet-beta`/`devnet`/`testnet` (explicit
+  CAIP-2, no wildcard; `localnet` is not a payment capability — final
+  set per the §8.7 facilitator contract). `signPayment(requirements,
+  resource)` derives the wallet via `tree.deriveWallet(index)`
+  (default `0`; fresh indices via `nextPaymentIndex`), validates the
+  requirement fail-closed, signs with `signRaw`
+  (`@me2em/crypto`) and wipes the private key in `finally` on every
+  path.
+- **Constructor contract** — `getRecentBlockhash` is the mandatory
+  injection (missing → `TypeError`, fail-fast; no RPC inside the
+  signer — the application owns its cluster and freshness policy);
+  `tree` must be a `SolanaWalletTree`; `index` is a safe integer in
+  `0..2^31 − 1`.
+- **Hand-built legacy serialization** — the wire format is assembled
+  without `@solana/kit` (ТЗ §4.2: fewer dependencies, deterministic
+  bytes): compact-u16 (shortvec) lengths, header `[1, 0, 1]`, account
+  keys `[source, destination, system program]`, the raw 32-byte
+  blockhash, one system transfer instruction
+  (`u32 LE 2` + `u64 LE lamports`). 151-byte message → signature →
+  216-byte transaction
+  (`compact-u16(1) || sig || message`), pinned by golden vectors
+  (message hex + full transaction base64, computed independently
+  against the published-shape `@me2em/crypto` build).
+- **`SolanaX402Payload`** — ⚠️ **@experimental** payload convention
+  (§8.7): `{ kind: 'solana-legacy-transfer', network, transaction
+  (standard base64, RPC `sendTransaction`-ready), blockhash, from,
+  to, lamports }`. Final fixation happens with the Solana-facilitator
+  contract; a change is a **Breaking:** note here.
+- **Peer dependency:** `@me2em/x402 >=1.0.0-rc.1 <2.0.0-0` —
+  **type-only** (interface + capability types). The x402 package does
+  not appear in the runtime graph: `dist-artifact.spec.ts` fails the
+  build if any x402 runtime marker lands in the bundle.
+
+### Fail-closed
+- Networks outside the declared capabilities (`solana:*` wildcards,
+  `solana:localnet`, foreign namespaces) → `TypeError` — the client
+  surfaces `NO_VIABLE_OPTION`/`SIGNER_REJECTED`.
+- Non-exact schemes, non-native assets (SPL mints follow the §8.3
+  facilitator contract), amounts violating the atomic grammar, zero
+  amounts, amounts beyond the `u64` bound, invalid or self-pay
+  `payTo`, malformed blockhashes → `TypeError` with precise messages.
+- Whatever `getRecentBlockhash` throws propagates — RPC failures
+  belong to the application.
+
+### Tests
+- `test/x402-signer.spec.ts` — constructor fail-fast, capability
+  shape, golden-vector signing (byte-exact), offline `verifyRaw`
+  verification (incl. tamper), determinism, index selection, wipe on
+  success and throwing paths, `DisposedError` after disposal, all
+  fail-closed branches, and the e2e loop:
+  `SolanaX402Signer` + `createPaymentFetch` + mock server
+  (402 → `PAYMENT-SIGNATURE` → 200, payload convention decoded
+  server-side, no retry after the paid attempt).
+- `test/dist-artifact.spec.ts` extended: the signer reproduces the
+  golden transaction from `dist`, the constructor contract holds
+  there, and the bundle carries no x402 runtime markers.
+
 ## [1.0.0-rc.4] — 2026-11-17
 
 Ф5: payment submission (`pay`) — programmatic SOL spend from a managed

@@ -55,3 +55,41 @@ export const PHANTOM_MNEMONIC =
  * Placeholder until filled: CI skips the test via skipIf.
  */
 export const PHANTOM_GOLDEN_ADDRESS = '<fill at acceptance>';
+
+// ---------------------------------------------------------------------------
+// M2 x402-signer goldens (ТЗ @me2em/x402 v1.2 §4.5 — "golden-векторы
+// ручной сериализации legacy transfer").
+//
+// Computed INDEPENDENTLY of the solana sources with the published-shape
+// @me2em/crypto + @scure/base builds (script copies kept outside the
+// repo; layout documented in src/x402-signer.ts):
+//
+//   seed      = TV2_SEED, index 0 (→ GOLDEN_ADDRESSES[0] as source)
+//   payTo     = GOLDEN_ADDRESSES[1], amount = 1000 lamports (0.000001 SOL)
+//   blockhash = the 32 bytes below (deterministic fixture, not a
+//               network value)
+//   msg       = 01 | 01 00 01 | 03 | src(32) | dst(32) | sysprog(32×00)
+//               | blockhash(32) | 01 | 02 | 02 | 00 01 | 0C
+//               | u32LE(2 Transfer) | u64LE(1000)          → 151 bytes
+//   tx        = compact-u16(1) || sig(64, RFC 8032 — deterministic)
+//               || msg                                    → 216 bytes
+//
+// If the wire layout, signature encoding or base64 drifts, these pins
+// fail. Regenerate only with a documented layout change ( Breaking
+// note in the CHANGELOG).
+// ---------------------------------------------------------------------------
+
+/** 32-byte blockhash fixture (hex) injected by the golden tests. */
+export const X402_GOLDEN_BLOCKHASH_HEX =
+  '4685f64b2eea7a114e2f17a199ac9b0ba8eb5b7fb8c9f6c3e2d1a09f8e7d6c5b';
+
+/** Golden payment amount in atomic units (lamports), decimal string. */
+export const X402_GOLDEN_AMOUNT = '1000';
+
+/** The unsigned 151-byte legacy message (hex) for the golden inputs. */
+export const X402_GOLDEN_MESSAGE_HEX =
+  '010100010306047c31eaa9019e64465bf89208ec196a579a05b97c3b2ad68b78de81ccd337de87406a921e4e01c4b3d01e98c10f013331979ab2b42cff92716bebc6fb05fb00000000000000000000000000000000000000000000000000000000000000004685f64b2eea7a114e2f17a199ac9b0ba8eb5b7fb8c9f6c3e2d1a09f8e7d6c5b01020200010c02000000e803000000000000';
+
+/** The signed 216-byte legacy transaction (standard base64). */
+export const X402_GOLDEN_TX_BASE64 =
+  'AZn7WEQRLv8+zLokNeB0AEWV7b4hvtQilIZhQVsMXki2/FhmkOHQhREdM3bWp1iD7nXyM4pkjTXuR4x4hTHS/Q8BAQABAwYEfDHqqQGeZEZb+JII7BlqV5oFuXw7KtaLeN6BzNM33odAapIeTgHEs9AemMEPATMxl5qytCz/knFr68b7BfsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEaF9ksu6noRTi8XoZmsmwuo61t/uMn2w+LRoJ+OfWxbAQICAAEMAgAAAOgDAAAAAAAA';

@@ -1,16 +1,26 @@
 // packages/solana/test/dist-artifact.spec.ts
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 // Imports the BUILT artifact, not src. CI runs `build` before tests,
 // so dist always exists in CI; locally run `pnpm --filter @me2em/solana
 // build` first.
 import {
   SolanaWalletTree,
+  SolanaX402Signer,
   isValidSolanaAddress,
   SolanaPaymentAdapter,
   verifyWalletBindingSolana,
   pay,
 } from '../dist/index.js';
-import { GOLDEN_ADDRESSES, TV2_SEED } from './goldens.js';
+import { base58 } from '@scure/base';
+import { fromHex, fromBase64 } from '@me2em/crypto';
+import {
+  GOLDEN_ADDRESSES,
+  TV2_SEED,
+  X402_GOLDEN_BLOCKHASH_HEX,
+  X402_GOLDEN_AMOUNT,
+  X402_GOLDEN_TX_BASE64,
+} from './goldens.js';
 
 // Import deriveForVerification as a static method (no named import needed)
 
@@ -66,5 +76,53 @@ describe('dist artifact (published shape)', () => {
         }
       )
     ).rejects.toThrow(TypeError);
+  });
+
+  it('SolanaX402Signer is exported from dist and reproduces the golden transaction (M2)', async () => {
+    const tree = SolanaWalletTree.fromSeed(TV2_SEED);
+    try {
+      const signer = new SolanaX402Signer({
+        tree,
+        getRecentBlockhash: async () => base58.encode(fromHex(X402_GOLDEN_BLOCKHASH_HEX)),
+      });
+      const payload = (await signer.signPayment(
+        {
+          scheme: 'exact',
+          network: 'solana:devnet',
+          amount: X402_GOLDEN_AMOUNT,
+          asset: 'sol',
+          payTo: GOLDEN_ADDRESSES[1],
+          maxTimeoutSeconds: 60,
+        },
+        { url: 'https://api.example.com/premium/feed' }
+      )) as Record<string, string>;
+      expect(payload.transaction).toBe(X402_GOLDEN_TX_BASE64);
+      expect(fromBase64(payload.transaction)[0]).toBe(1);
+    } finally {
+      tree.dispose();
+    }
+  });
+
+  it('SolanaX402Signer without the blockhash injection → TypeError from dist (§4.4)', () => {
+    const tree = SolanaWalletTree.fromSeed(TV2_SEED);
+    try {
+      // @ts-expect-error — exercising the runtime contract
+      expect(() => new SolanaX402Signer({ tree })).toThrow(/getRecentBlockhash is required/);
+    } finally {
+      tree.dispose();
+    }
+  });
+
+  it('@me2em/x402 stays a TYPE-ONLY dependency — zero x402 runtime code in dist (§0.3)', () => {
+    const dist = readFileSync(new URL('../dist/index.js', import.meta.url), 'utf8');
+    // Distinctive x402 runtime literals, checked QUOTED — as they exist
+    // in the x402 bundle only as actual string constants / error codes.
+    // Unquoted prose mentions (JSDoc references like `SIGNER_REJECTED`)
+    // stay in the solana comments legitimately and must not trip this.
+    for (const marker of ["'PAYMENT-REQUIRED'", "'PAYMENT-SIGNATURE'", "'PAYMENT-RESPONSE'", "'NO_VIABLE_OPTION'", "'PAYMENT_REQUIRED_MALFORMED'", "'ME2EM_EXTRA_INVALID'"]) {
+      expect(dist.includes(marker), `dist must not contain x402 runtime literal: ${marker}`).toBe(false);
+    }
+    // The signer itself ships, obviously.
+    expect(dist.includes('solana-legacy-transfer')).toBe(true);
   });
 });
