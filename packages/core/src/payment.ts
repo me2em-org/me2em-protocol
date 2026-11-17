@@ -133,7 +133,28 @@ export interface PaymentAdapter extends WalletAdapter {
 export type PaymentFailureReason =
   | 'NOT_FOUND' | 'UNDERPAID' | 'WRONG_RECIPIENT' | 'WRONG_ASSET'
   | 'EXPIRED' | 'REPLAYED' | 'CHAIN_UNAVAILABLE' | 'REJECTED'
-  | 'REFERENCE_MISMATCH';
+  | 'REFERENCE_MISMATCH'
+  | 'PACT_INVALID' | 'BUYER_NOT_ATTESTED' | 'SELLER_NOT_ATTESTED';
+
+/**
+ * Me2eM metadata for the direct payment flow (ТЗ x402 v1.1 §2.4).
+ * In the x402 wire format these fields travel as `extra.me2em`
+ * (`X402Me2emExtra`, base64 — lives in `@me2em/x402`, M1).
+ */
+export interface Me2emExtra {
+  /** Seller entity id (base64url public key). */
+  readonly sellerId?: string;
+  /** Buyer entity id (base64url public key). */
+  readonly buyerId?: string;
+  /** Free-form memo. */
+  readonly memo?: string;
+  /** Correlation reference echoed into the transaction. */
+  readonly reference?: string;
+  /** Agreement proof bytes (base64 on the x402 wire). */
+  readonly agreementProof?: Uint8Array;
+  /** Application-defined extras. */
+  readonly [key: string]: unknown;
+}
 
 /**
  * A signed-off payment demand (v1.2 §0.1): every parameter a verifier
@@ -158,6 +179,8 @@ export interface PaymentRequest {
   readonly reference: string;
   /** Unix seconds — payments observed after this are `EXPIRED` (block time first, observed time as fallback). */
   readonly expiresAt: number;
+  /** Me2eM metadata of the direct flow. On the x402 wire — nested `extra.me2em` (ТЗ x402 v1.1 §3.6). */
+  readonly extra?: Me2emExtra;
 }
 
 /**

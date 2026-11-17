@@ -446,7 +446,10 @@ export class Attestation {
    *   omitted (byte-identity for tokens without them). Pairing and
    *   structural rules are enforced at issue time; when an adapter is
    *   registered for the chain, the address must pass
-   *   `adapter.isValidAddress()` (fail-closed).
+   *   `adapter.isValidAddress()` (fail-closed). `subjectWallet` is a
+   *   property of the attested entity, not of the grant; rules 1–5 are
+   *   enforced by `validateWalletOpts` in this module. x402 metadata
+   *   belongs to `PaymentRequest.extra`, not here.
    * @returns The attestation with `payload`, `token` and `jti` accessors.
    * @throws {AttestationError} `MALFORMED`/`FORMAT` if the grant is
    *   structurally invalid (bad scopes/TTL/audiences or a wildcard
