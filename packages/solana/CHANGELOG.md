@@ -81,11 +81,12 @@ stateless). No API surface change beyond `pay` (previously
   decoders to pin the assembly. The non-CI devnet integration
   (`ME2EM_DEVNET_PAY_SEED`) closes on Ф4: `pay` → `verifyPayment` =
   success; repeat → `REPLAYED`.
-- Coverage: `pay.ts` 96.7 % lines, `rpc.ts` 96.4 %; the package
-  branch total rises 81.69 → 84.72 % vs rc.3. The remaining branch
-  gap is the Ф4 LUT-fallback paths in `verify.ts` — pre-existing
-  debt, tracked by BL-54/56/57 (the 90 % branch threshold was
-  already failing on rc.3).
+- Coverage (final, incl. the debt-closure tests): statements 99.41 %,
+  branches 95.07 %, functions 100 %, lines 100 % — all thresholds
+  (90) pass. The Ф4 LUT-fallback gap in `verify.ts` — pre-existing
+  debt on rc.3, where the 90 % branch threshold was already failing —
+  is closed by the LUT-containment, RPC-protocol-failure and
+  pay-bound tests added in this release (BL-54/56/57).
 
 ## [1.0.0-rc.3] — 2026-11-16
 

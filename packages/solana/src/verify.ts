@@ -7,9 +7,9 @@
 // - Wallet resolution delegates to `SolanaWalletAdapter` (unchanged).
 // - `verifyPayment` — normative check order (v1.2 §5.4).
 // - `verifyWalletBinding` — on-curve override.
-// - `pay` — throws `NOT_IMPLEMENTED` (Ф5).
-//
-// No payment submission in Ф4 — `pay` is Ф5 (`@solana/kit`).
+// - `pay` — Ф5 (rc.4): SOL-only programmatic spend — transaction
+//   built and signed with `@solana/kit`, seed supplied per call (the
+//   adapter stays stateless), submitted without a confirmation wait.
 
 import type {
   PaymentAdapter,
@@ -97,14 +97,15 @@ interface ParsedTransactionWithInstructions extends ParsedTransactionResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * Solana payment adapter (Ф4): read-only verification of confirmed
- * transactions and on-curve wallet-binding. `pay` is NOT part of Ф4 —
- * it throws `NOT_IMPLEMENTED` until Ф5.
+ * Solana payment adapter (Ф4 verify + Ф5 pay): read-only verification
+ * of confirmed transactions, on-curve wallet-binding, and programmatic
+ * SOL spend — `pay` (Ф5, rc.4) takes the seed per call, stays SOL-only
+ * and submits without a confirmation wait.
  *
  * Implements core's `PaymentAdapter`. The wallet-resolution surface
  * (`resolveWallet`, `isValidAddress`, `nextIndex`) is delegated to
- * `SolanaWalletAdapter` — this adapter adds `verifyPayment` and
- * `verifyWalletBinding`.
+ * `SolanaWalletAdapter` — this adapter adds `verifyPayment`,
+ * `verifyWalletBinding` and `pay`.
  */
 export class SolanaPaymentAdapter implements PaymentAdapter {
   readonly #wallet: SolanaWalletAdapter;
