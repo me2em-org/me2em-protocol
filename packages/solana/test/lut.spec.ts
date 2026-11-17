@@ -155,6 +155,13 @@ describe('parseLutAddresses — corrupted data', () => {
     const base64Data = base64.encode(random);
     expect(parseLutAddresses(base64Data)).toBeNull();
   });
+
+  it('returns null for an invalid authority Option tag (outer catch, fail-closed)', () => {
+    const data = buildLutData(['DeXb83pRNqBf3owXLST8qUNPvCAB9JaA41TcBfYn1bKm']);
+    data[21] = 2; // authority: Option<Pubkey> tag = 2 → readOptionPubkey throws
+    const base64Data = base64.encode(data);
+    expect(parseLutAddresses(base64Data)).toBeNull();
+  });
 });
 
 describe('parseLutAddresses — short buffer', () => {

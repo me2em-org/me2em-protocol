@@ -6,5 +6,11 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  external: ['@me2em/core'],
+  external: [
+    '@me2em/core',
+    '@solana/kit',
+    '@solana/keys',
+    '@solana-program/system',
+    '@solana-program/memo',
+  ],
 });

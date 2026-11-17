@@ -7,9 +7,9 @@
 // - Wallet resolution delegates to `SolanaWalletAdapter` (unchanged).
 // - `verifyPayment` — normative check order (v1.2 §5.4).
 // - `verifyWalletBinding` — on-curve override.
-// - `pay` — throws `NOT_IMPLEMENTED` (Ф5).
-//
-// No payment submission in Ф4 — `pay` is Ф5 (`@solana/kit`).
+// - `pay` — Ф5 (rc.4): SOL-only programmatic spend — transaction
+//   built and signed with `@solana/kit`, seed supplied per call (the
+//   adapter stays stateless), submitted without a confirmation wait.
 
 import type {
   PaymentAdapter,
@@ -22,6 +22,7 @@ import { base58 } from '@scure/base';
 import { SolanaWalletAdapter } from './adapter.js';
 import type { SolanaNetwork } from './networks.js';
 import { SOLANA_RPC_ENDPOINTS, solanaChain } from './networks.js';
+import { pay } from './pay.js';
 import {
   RpcClient,
   type ParsedTransactionResponse,
@@ -96,14 +97,15 @@ interface ParsedTransactionWithInstructions extends ParsedTransactionResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * Solana payment adapter (Ф4): read-only verification of confirmed
- * transactions and on-curve wallet-binding. `pay` is NOT part of Ф4 —
- * it throws `NOT_IMPLEMENTED` until Ф5.
+ * Solana payment adapter (Ф4 verify + Ф5 pay): read-only verification
+ * of confirmed transactions, on-curve wallet-binding, and programmatic
+ * SOL spend — `pay` (Ф5, rc.4) takes the seed per call, stays SOL-only
+ * and submits without a confirmation wait.
  *
  * Implements core's `PaymentAdapter`. The wallet-resolution surface
  * (`resolveWallet`, `isValidAddress`, `nextIndex`) is delegated to
- * `SolanaWalletAdapter` — this adapter adds `verifyPayment` and
- * `verifyWalletBinding`.
+ * `SolanaWalletAdapter` — this adapter adds `verifyPayment`,
+ * `verifyWalletBinding` and `pay`.
  */
 export class SolanaPaymentAdapter implements PaymentAdapter {
   readonly #wallet: SolanaWalletAdapter;
@@ -175,13 +177,30 @@ export class SolanaPaymentAdapter implements PaymentAdapter {
   }
 
   /**
-   * `pay` is NOT part of Ф4. Throws `NOT_IMPLEMENTED` until Ф5
-   * (payment submission via `@solana/kit`).
+   * Programmatic spend (Ф5, В-1/E — seed per call). The adapter is
+   * STATELESS: the 64-byte seed arrives with the call, is handed to
+   * the throwaway tree in `pay`, and is never retained. Without
+   * `opts.seed` this is a programmer error → `TypeError` (the same
+   * contract as `resolveWallet`).
+   *
+   * SOL-only (В-3/A); transport is the verifier's own `RpcClient`
+   * (В-7/A). Chain contract: v1.2 §5.1 amended — `pay(from, request,
+   * opts?)`.
    */
-  async pay(_from: WalletDescriptor, _request: PaymentRequest): Promise<string> {
-    throw new Error(
-      'SolanaPaymentAdapter.pay is NOT_IMPLEMENTED in rc.3 — Ф5 (payment submission) is a separate track'
-    );
+  async pay(
+    from: WalletDescriptor,
+    request: PaymentRequest,
+    opts?: { seed?: Uint8Array; memo?: string }
+  ): Promise<string> {
+    if (opts?.seed === undefined) {
+      throw new TypeError(
+        'SolanaPaymentAdapter.pay requires opts.seed — the adapter is stateless; pass the 64-byte seed per call'
+      );
+    }
+    return pay(from, request, { seed: opts.seed, memo: opts.memo }, {
+      rpc: this.#verify.rpc,
+      chain: this.chain,
+    });
   }
 }
 
@@ -210,6 +229,15 @@ class SolanaPaymentVerifier {
       endpoint: this.#endpoint,
       fetch: this.#fetch,
     });
+  }
+
+  /**
+   * The verifier's JSON-RPC transport — `pay` (Ф5) reuses the SAME
+   * client (В-7/A: one transport, one endpoint, one error contract).
+   * Package-internal; not part of the public adapter surface.
+   */
+  get rpc(): RpcClient {
+    return this.#rpc;
   }
 
   /**

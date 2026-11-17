@@ -11,6 +11,83 @@ layer.
 > `@me2em/solano@1.0.0-rc.1` on npm are deprecated placeholders —
 > install `@me2em/solana` instead.
 
+## [1.0.0-rc.4] — 2026-11-17
+
+Ф5: payment submission (`pay`) — programmatic SOL spend from a managed
+wallet, SOL-only, seed per call (the adapter and the registry stay
+stateless). No API surface change beyond `pay` (previously
+`NOT_IMPLEMENTED`) and the two `RpcClient` methods it needs.
+
+### Added
+- **`pay(from, request, opts, ctx)`** (`src/pay.ts`) — validates
+  chain (`request`/`from` vs `ctx.chain`), asset (SOL-only,
+  `SOLANA_NATIVE_ASSET`), seed shape, recipient/reference structure
+  (base58-32) and the derivation path, verifies the derived address
+  against `from.address` (fail-closed against a descriptor/seed
+  mismatch — no default index exists), builds a system transfer with
+  `request.reference` as a read-only non-signing account key (the
+  Solana Pay convention; optional memo via the memo program), signs
+  with a throwaway `SolanaWalletTree`, submits via
+  `RpcClient.sendTransaction` (fresh `getLatestBlockhash` per call,
+  preflight on, no confirmation wait) and returns the tx signature.
+  Seed and node key are wiped in `finally`; the tree is disposed.
+  Contract violations throw bare `TypeError`; transport failures
+  propagate the `RpcClient`'s `Error` (v1.2 §5.1 — `pay` throws on
+  failure, never returns an empty `txRef`).
+- **`solToLamports`** — strict decimal-string → lamports (bigint,
+  never float, BL-55): `/^\d+(\.\d{1,9})?$/`, zero rejected;
+  `'1.2.3'`/`'-1'`/`'1e3'` are TypeErrors, not silent math.
+- **`RpcClient.getLatestBlockhash()`** and
+  **`RpcClient.sendTransaction(wireBase64)`** — the two RPC methods
+  `pay` needs (В-7/A): one transport, one endpoint, one error
+  contract as Ф4; empty `sendTransaction` signature → `Error`.
+- **`PayOptions` / `PayContext`** — per-call spend options (`seed`,
+  optional `memo`) and transport context (`rpc` + exact CAIP-2
+  `chain`).
+- **Dependencies:** `@solana/kit ^8.6.0`,
+  `@solana-program/system ^0.16.0`, `@solana-program/memo ^0.16.0`,
+  `@solana/keys ^2.3.0` (regular; kit types do not appear in the
+  public `pay` signature, so no peer range on kit — the program
+  clients pin `@solana/kit ^8.5.0` themselves).
+- **Peer floor bumped** to `@me2em/core >=1.0.0-rc.6`
+  (`PaymentAdapter.pay` gained an optional third `opts` parameter —
+  core rc.6, additive, not breaking).
+
+### Changed
+- **`SolanaPaymentAdapter.pay(from, request, opts?)`** — now
+  implemented (was `NOT_IMPLEMENTED`). Requires `opts.seed`; without
+  it throws `TypeError` — the same contract as `resolveWallet`. The
+  adapter remains stateless; `registerSolanaAdapters` instances are
+  fully functional.
+- **`tsup` external** — `@solana/kit`, `@solana/keys`,
+  `@solana-program/system`, `@solana-program/memo` are no longer
+  inlined into dist.
+- **`src/index.ts` scope header** — the package is no longer
+  offline; `pay`, `solToLamports`, `PayOptions`, `PayContext` are
+  exported.
+- **README** — `pay` usage example and the sweep note (sweep is
+  application logic, not a package method — В-4/В-5).
+
+### Notes
+- SOL-only in rc.4 (В-3/A): `request.asset !== 'sol'` → `TypeError`
+  (`pay` contract: throws — not a `PaymentResult`; symmetric with Ф4
+  step 6a). SPL transfer-checked → deferred (amendment to P0.3 §7).
+- No blockhash injection: `pay` calls `getLatestBlockhash` itself
+  (В-7/A). `SolanaX402Signer` (M2) keeps its `getRecentBlockhash`
+  injection — different contracts.
+- Unit tests use the existing `fetch` injection point
+  (`SolanaPaymentAdapterOptions.fetch` / `RpcClientOptions.fetch`)
+  — no module mocks; the wire payload is decoded with kit's own
+  decoders to pin the assembly. The non-CI devnet integration
+  (`ME2EM_DEVNET_PAY_SEED`) closes on Ф4: `pay` → `verifyPayment` =
+  success; repeat → `REPLAYED`.
+- Coverage (final, incl. the debt-closure tests): statements 99.41 %,
+  branches 95.07 %, functions 100 %, lines 100 % — all thresholds
+  (90) pass. The Ф4 LUT-fallback gap in `verify.ts` — pre-existing
+  debt on rc.3, where the 90 % branch threshold was already failing —
+  is closed by the LUT-containment, RPC-protocol-failure and
+  pay-bound tests added in this release (BL-54/56/57).
+
 ## [1.0.0-rc.3] — 2026-11-16
 
 Ф4: payment verification (`verifyPayment` — 7-step normative order),

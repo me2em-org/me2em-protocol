@@ -8,6 +8,7 @@ import {
   isValidSolanaAddress,
   SolanaPaymentAdapter,
   verifyWalletBindingSolana,
+  pay,
 } from '../dist/index.js';
 import { GOLDEN_ADDRESSES, TV2_SEED } from './goldens.js';
 
@@ -44,5 +45,26 @@ describe('dist artifact (published shape)', () => {
   it('deriveForVerification works from dist', async () => {
     const addr = await SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/0'/0'");
     expect(addr).toBe(GOLDEN_ADDRESSES[0]);
+  });
+
+  it('pay is exported from dist (Ф5)', () => {
+    expect(typeof pay).toBe('function');
+  });
+
+  it('SolanaPaymentAdapter.pay without seed → TypeError from dist (stateless contract)', async () => {
+    const adapter = new SolanaPaymentAdapter({ network: 'devnet' });
+    await expect(
+      adapter.pay(
+        { chain: 'solana:devnet', address: GOLDEN_ADDRESSES[0] },
+        {
+          chain: 'solana:devnet',
+          payTo: GOLDEN_ADDRESSES[1],
+          amount: '1',
+          asset: 'sol',
+          reference: GOLDEN_ADDRESSES[2],
+          expiresAt: 9999999999,
+        }
+      )
+    ).rejects.toThrow(TypeError);
   });
 });
