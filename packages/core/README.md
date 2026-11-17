@@ -3,7 +3,13 @@
 Core primitives for the Me2eM authorization protocol: hierarchical
 deterministic identities (`Identity` → `Handle` → `SubHandle`), stateless
 signed sessions, and parent-signed **attestation chains** for delegatable,
-externally verifiable authorization — all on Ed25519.
+externally verifiable authorization — all on Ed25519. Since 1.0.0-rc.3 the
+package also hosts the **payment-layer contracts** — chain-agnostic
+`PaymentRequest`/`PaymentResult`, `WalletAdapter`/`PaymentAdapter` with a
+CAIP-2 registry, wallet binding, and the x402 v2 wire types (`payment.ts` /
+`payment-x402.ts` / `wallet-binding.ts`) — while execution lives in chain
+packages ([`@me2em/solana`](https://www.npmjs.com/package/@me2em/solana)) and
+transport in [`@me2em/x402`](https://www.npmjs.com/package/@me2em/x402).
 
 [![npm version](https://img.shields.io/npm/v/@me2em/core.svg)](https://www.npmjs.com/package/@me2em/core)
 [![License](https://img.shields.io/npm/l/@me2em/core.svg)](https://github.com/me2em-org/me2em-protocol/blob/main/LICENSE)
@@ -28,6 +34,12 @@ externally verifiable authorization — all on Ed25519.
 - **UKS-Safe ECDH** — `deriveSharedSecret` binds both peers'
   public keys into the KDF (`p2p-channel/v2`), preventing
   unknown key-share attacks.
+- **Payment-Layer Base** — `PaymentRequest`/`PaymentResult` with a
+  fail-closed reason model, `WalletAdapter`/`PaymentAdapter` contracts
+  and a process-wide CAIP-2 adapter registry, the default
+  `verifyWalletBinding` check, and the x402 v2 wire types with
+  structural guards (`isX402*`, `X402_VERSION = 2`). No network, no
+  chain code — adapters and transport are separate packages.
 
 ---
 
@@ -75,7 +87,10 @@ pnpm add @me2em/core
 > 💡 This package is self-contained. For E2EE channels, X3DH key
 >  agreement, and Argon2id use [`@me2em/crypto`](https://www.npmjs.com/package/@me2em/crypto).
 >  For React hooks and seed phrase UX components use
->  [`@me2em/react`](https://www.npmjs.com/package/@me2em/react). The three packages are
+>  [`@me2em/react`](https://www.npmjs.com/package/@me2em/react). For the x402 v2 payment
+>  transport use [`@me2em/x402`](https://www.npmjs.com/package/@me2em/x402); for the Solana
+>  chain adapter (wallet trees, verification, pay, the x402 signer) use
+>  [`@me2em/solana`](https://www.npmjs.com/package/@me2em/solana). The five packages are
 >  designed to work together — see the
 >  [repository README](https://github.com/me2em-org/me2em-protocol) for the full package map.
 
@@ -283,6 +298,8 @@ class Identity {
   attestHandle(name: string, grant: AttestationGrant,
                opts?: { ttlSeconds?, expiresAt?, jti?, now? }): Promise<Attestation>;
   getPublicKey(): Uint8Array;
+  bindWallet(descriptor: WalletDescriptor): void;  // attach a chain wallet (rc.3)
+  getWallet(chain: string): WalletDescriptor | null;
   dispose(): void;                    // zeroize key; capability methods throw DisposedError
 }
 ```
@@ -305,6 +322,8 @@ class Handle {
   attestSubHandle(subName: string, grant: AttestationGrant,
                   opts?: { ttlSeconds?, expiresAt?, jti?, now? }): Promise<Attestation>;
   validateSessionOptions(options: { audience: string; scopes: string[]; ttl: number }): void;
+  bindWallet(descriptor: WalletDescriptor): void;  // attach a chain wallet (rc.3)
+  getWallet(chain: string): WalletDescriptor | null;   // SubHandle inherits both
   dispose(): void;                    // zeroize key; capability methods throw DisposedError
 }
 ```
@@ -406,6 +425,90 @@ class AttestationError extends Error {
   readonly code: AttestationErrorCode;
   readonly level: AttestationLevel;
 }
+```
+
+### Payment layer (`payment.ts` / `payment-x402.ts` / `wallet-binding.ts`)
+
+The chain-agnostic payment surface (landed rc.3–rc.7; execution lives in
+[`@me2em/solana`](https://www.npmjs.com/package/@me2em/solana), transport in
+[`@me2em/x402`](https://www.npmjs.com/package/@me2em/x402)):
+
+```typescript
+interface PaymentRequest {          // what the buyer must execute (v1.2 §3)
+  chain: string;                    // exact CAIP-2 chain id
+  payTo: string;                    // recipient address on that chain
+  amount: string;                   // decimal string in WHOLE token units
+  asset: string;                    // chain-native sentinel or token id (Solana native: 'sol')
+  reference: string;                // 32-byte correlation key — chain-level REPLAYED detection
+  expiresAt: number;                // unix seconds — observations after this are EXPIRED
+  extra?: Me2emExtra;               // sellerId?, buyerId?, memo?, reference?, agreementProof?
+}
+
+type PaymentResult =
+  | { status: 'success'; observedAt: number }
+  | { status: 'failure'; reason: PaymentFailureReason; observedAt: number };
+
+type PaymentFailureReason =
+  | 'NOT_FOUND' | 'UNDERPAID' | 'WRONG_RECIPIENT' | 'WRONG_ASSET'
+  | 'EXPIRED' | 'REPLAYED' | 'CHAIN_UNAVAILABLE' | 'REJECTED'
+  | 'REFERENCE_MISMATCH'            // the tx exists but is not an execution of THIS request
+  | 'PACT_INVALID' | 'BUYER_NOT_ATTESTED' | 'SELLER_NOT_ATTESTED';
+// fail-safe rule for consumers: unknown runtime values MUST be treated as 'REJECTED'
+
+interface WalletDescriptor {        // a wallet bound to an entity — never carries key material
+  chain: string; address: string; derivationPath?: string; label?: string;
+}
+
+interface WalletAdapter {           // registered per exact CAIP-2 chain (registry key = chain)
+  readonly chain: string;
+  resolveWallet(entity: WalletEntityRef, opts?: { seed?: Uint8Array; index?: number }):
+    Promise<WalletDescriptor>;      // deterministic adapters require opts.seed → else TypeError
+  isValidAddress(address: string): boolean;   // structural format check only
+  nextIndex?(usedPaths: string[]): number;    // chain-scoped allocation; core has no fallback
+}
+
+interface PaymentAdapter extends WalletAdapter {
+  pay(from: WalletDescriptor, request: PaymentRequest,
+      opts?: { seed?: Uint8Array; memo?: string }): Promise<string>;  // → txRef; throws on failure
+  verifyPayment(txRef: string, request: PaymentRequest): Promise<PaymentResult>;
+  verifyWalletBinding?(wallet: WalletDescriptor, entity: WalletEntityRef,
+                       attestation: Attestation): Promise<boolean>; // chain-specific strength
+}
+
+registerWalletAdapter(adapter: WalletAdapter): () => void;  // last-wins per chain; idempotent disposer
+getWalletAdapter(chain: string): WalletAdapter | null;
+parseChain(chain: string): { namespace: string; reference: string } | null;  // CAIP-2 grammar
+isValidChain(chain: string): boolean;
+```
+
+The x402 v2 wire types (`payment-x402.ts` — types + structural guards
+only, no network; `X402_VERSION = 2`):
+
+```typescript
+interface X402PaymentRequirements {  // one payable option inside a 402 response
+  scheme: string;                    // 'exact', 'eip3009', 'permit2-exact', …
+  network: string;                   // exact CAIP-2 chain id
+  amount: string;                    // ATOMIC units — decimal string, /^[0-9]+$/
+  asset: string;                     // contract address or ISO 4217 code
+  payTo: string;                     // recipient address on network
+  maxTimeoutSeconds: number;         // integer ≥ 1
+  extra?: Readonly<Record<string, unknown>>;
+}
+interface X402ResourceInfo { url: string; description?; mimeType?; serviceName?; tags? }
+// + X402PaymentRequired / X402PaymentPayload / X402SettleResponse / X402VerifyResponse / X402Supported
+isX402PaymentRequired(v) / isX402PaymentRequirements(v) / isX402PaymentPayload(v) /
+isX402SettleResponse(v) / isX402VerifyResponse(v) / isX402Supported(v)   // never throw
+```
+
+Wallet binding (`wallet-binding.ts` — the default Mode-1/Mode-2 check,
+v1.2 §6): three fail-closed checks, `false` on any miss, never throws:
+
+```typescript
+verifyWalletBinding(wallet, entity, attestation, { issuerPublicKey }): Promise<boolean>
+//   1. attestation signature verifies under the issuer's public key
+//   2. attestation.subjectId === entity.id   (subject agreement)
+//   3. attestation.subjectWallet === wallet.address
+// Chain adapters may add strength (Solana: on-curve check) — see @me2em/solana.
 ```
 
 ### Name normalization
@@ -515,7 +618,7 @@ Redis `RevocationChecker`.
 
 **Runtimes**
 
-- **Node.js ≥ 22** (`engines.node`, A2 — Node 18/20 are EOL; CI pins
+- **Node.js ≥ 22.6** (`engines.node`, A2 — Node 18/20 are EOL; CI pins
   Node 22).
 - Modern browsers and edge runtimes. Portability is pinned by tests:
   base64url comes from `@scure/base` — `btoa`/`atob` are banned from
@@ -568,28 +671,39 @@ GC/JIT may retain copies (see `THREAT_MODEL.md` §5.2 in the repository).
 cd packages/core && pnpm test
 ```
 
-The test suite covers: deterministic derivation and cross-entry-point key
-consistency, name canonicalization, derivation revisions (r1 byte-parity,
-r2 independence, NFKC contexts), session lifecycle (create, verify,
-tamper, expiry, iat), revocation, SubHandle constraint enforcement,
-MAX_DEPTH leaf enforcement, attestation issue/decode/signature
-determinism and validation, the full `verifyAttested` chain
-(28 cases including nesting, wildcard permitting, revocation at every
-level, signature robustness, BIP39 passphrase derivation, and wordlist
-validation), module-structure and crypto-boundary pins, and parser fuzz
-(~1 050 rounds).
+The test suite (447 tests) covers: deterministic derivation and
+cross-entry-point key consistency, name canonicalization, derivation
+revisions (r1 byte-parity, r2 independence, NFKC contexts), session
+lifecycle (create, verify, tamper, expiry, iat), revocation, SubHandle
+constraint enforcement, MAX_DEPTH leaf enforcement, attestation
+issue/decode/signature determinism and validation, the full
+`verifyAttested` chain (28 cases including nesting, wildcard permitting,
+revocation at every level, signature robustness, BIP39 passphrase
+derivation, and wordlist validation), module-structure and
+crypto-boundary pins, and parser fuzz (~1 050 rounds) — plus the
+payment surface: `PaymentRequest`/`PaymentResult` semantics, the
+adapter-registry last-wins contract, CAIP-2 grammar, the `isX402*`
+guards against upstream spec vectors, the `verifyWalletBinding`
+fail-closed order, and `bindWallet`/`getWallet` on entities.
 
 ## 🗺️ Roadmap
 
-Passphrase support and `dispose()` zeroization have shipped. Remaining
-recommendations — session lineage (`sid`), zeroization hardening,
-attestation reference compression,
-and the full package strategy (`@me2em/crypto`, `@me2em/messenger`,
-`@me2em/iot`) — are tracked in the repository backlog, which is
-advisory and not part of the shipped API contract.
+Passphrase support and `dispose()` zeroization have shipped, and the
+payment-layer surface landed additively in rc.3–rc.7 (contracts +
+registry + wallet binding in rc.3, x402 wire types in rc.5, the `pay`
+`opts` parameter in rc.6, the settle-response guard fix in rc.7) under
+the payment-layer specification (`specs/tz-x402.md` in the repository).
+Remaining recommendations — session lineage (`sid`), zeroization
+hardening, attestation reference compression, and the vertical
+packages (`@me2em/messenger`, `@me2em/iot`) — are tracked in the
+repository backlog, which is advisory and not part of the shipped API
+contract.
 
-The public API is **frozen** as of `1.0.0-rc.1` — see
-`specs/v1.0.md` §12 in the repository for the evolution rules.
+The identity/session public API is **frozen** as of `1.0.0-rc.1` — see
+`specs/v1.0.md` §12 in the repository for the evolution rules; the
+payment surface follows the same freeze discipline per its own spec
+(the only post-freeze breaking change, `PaymentFailureReason` growth in
+rc.5, is recorded in the CHANGELOG).
 
 ## 📜 License
 

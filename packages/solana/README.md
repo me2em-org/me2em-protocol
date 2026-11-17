@@ -27,7 +27,7 @@ pnpm add @me2em/solana @me2em/core @me2em/crypto
 > **type-only** (zero runtime code — the sanctioned §0.3 exception):
 > `SolanaX402Signer` implements the x402 `PaymentSigner` interface,
 > while the transport itself (`createPaymentFetch`) stays with
-> `@me2em/x402` on the application side. `pay` brings `@solana/kit` +
+> `@me2em/x402` on the application side. `pay` brings `@solana/kit`, `@solana/keys` and
 > `@solana-program/system`/`memo` as regular dependencies (installed
 > with the package); `@me2em/crypto` stays a direct dependency, so
 > listing it explicitly keeps the manifest honest — the examples below
@@ -52,6 +52,8 @@ signer composes with `createPaymentFetch` (see
 - **`tree.deriveWallet(index)`** — `m/44'/501'/{index}'/0'` → SLIP-0010 ed25519 (via `crypto.slip10`) → base58 address. Returns `{ address, privateKey, derivationPath }`; the private key is a fresh 32-byte buffer — **the caller MUST wipe it** (`secureWipe`).
 - **`tree.nextIndex(usedPaths)`** — chain-scoped index allocation: unparseable/foreign paths are ignored, empty input yields `0`, otherwise `max(indexes) + 1` — holes are never reused. Works after `dispose()` (no key material involved).
 - **`tree.dispose()`** — zeroizes the master material; further key-requiring calls throw `DisposedError`. Idempotent.
+- **`SolanaWalletTree.deriveForVerification(seed, path)`** (static) — Mode 1 verification helper (v1.2 §6.1): re-derives the address for a canonical `m/44'/501'/{N}'/0'` path from a seed the verifier already holds — a trusted backend proving a child entity did not lie about its wallet (the signature proves the entity *said* "this is my address"; re-derivation proves the address *actually* comes from the seed). Mode 2 (third party, root public key only) does not use it. Uses a throwaway tree, disposed in `finally`.
+- **`nextPaymentIndex(usedPaths)`** — the top-level export that `tree.nextIndex` delegates to (same chain-scoped allocation rules).
 
 ```ts
 import { SolanaWalletTree } from '@me2em/solana';
@@ -71,7 +73,11 @@ try {
 ### adapter/ — the WalletAdapter
 
 - **`SolanaWalletAdapter`** — implements core's `WalletAdapter` for one exact CAIP-2 chain. `resolveWallet(entity, { seed, index? })` derives per call (throwaway tree, disposed in `finally`) and returns a descriptor with **no key material** — the derived private key is wiped inside; use `SolanaWalletTree` directly when you need the raw key. A missing `seed` is a `TypeError` (deterministic-adapter contract).
-- **`isValidSolanaAddress(address)`** — structural check: base58 decoding to exactly 32 bytes. **Off-curve (PDA) addresses are valid** — no on-curve filter exists in this package; on-curve strengthening belongs to the future `verifyWalletBinding` verifier (see [Roadmap](#roadmap)).
+- **`isValidSolanaAddress(address)`** — structural check: base58 decoding to exactly 32 bytes. **Off-curve (PDA) addresses are valid here** — destinations (including PDAs) must pass; the on-curve strengthening applies where a SOURCE wallet is verified for binding: [`verifyWalletBindingSolana`](#wallet-binding--mode-1-strengthening-v12-63) and the `SolanaPaymentAdapter.verifyWalletBinding` override (see [verify/](#verify--rpc--on-chain-verification-%D1%844)).
+
+### wallet-binding/ — Mode 1 strengthening (v1.2 §6.3)
+
+- **`verifyWalletBindingSolana(wallet: WalletDescriptor): boolean`** — a synchronous on-curve check: the address must decode to exactly 32 bytes **on the ed25519 curve**. A wallet must be able to sign, and off-curve PDAs cannot (deliberately rejected; never throws). It does **not** replace core's default `verifyWalletBinding` (issuer signature → subject agreement → address equality): the application calls **both**, and both must return `true` for a complete binding — `SolanaPaymentAdapter` composes them in its override.
 
 ### reference/ — payment correlation
 
@@ -130,7 +136,9 @@ dispose(); // test hygiene
   **`RpcClient`** (JSON-RPC 2.0; `getTransaction`,
   `getSignaturesForAddress`, `getAccountInfo`,
   `getLatestBlockhash`, `sendTransaction`) with a `fetch` injection
-  point for tests. `SolanaPaymentAdapterOptions.endpoint` overrides
+  point for tests; **`parseLutAddresses(data)`** — a minimal
+  Address-Lookup-Table parser (base64 account data → 32-byte pubkeys)
+  for reading transactions that reference ALTs. `SolanaPaymentAdapterOptions.endpoint` overrides
   the network's default public RPC — production passes its own.
 
 ### pay/ — programmatic spend (Ф5)
