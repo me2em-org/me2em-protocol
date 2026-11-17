@@ -10,6 +10,9 @@
 // Ф5 adds `pay` — programmatic SOL spend from a managed wallet with
 // the seed supplied PER CALL (the adapter stays stateless, В-1/E);
 // SOL-only, submission without confirmation wait (В-7/A).
+// M2 (ТЗ @me2em/x402 v1.2 §4) adds `SolanaX402Signer` — the x402
+// `PaymentSigner` for native SOL: offline legacy-transfer signing,
+// blockhash by injection, experimental payload convention (§8.7).
 
 export {
   SOLANA_CHAINS,
@@ -30,3 +33,8 @@ export { createPaymentRequestURL, SOLANA_NATIVE_ASSET } from './url.js';
 export { registerSolanaAdapters, type RegisterSolanaAdaptersOptions } from './register.js';
 export { RpcClient, type RpcClientOptions, type ParsedTransactionResponse, type SignatureInfo, type LutAddresses } from './rpc.js';
 export { parseLutAddresses } from './lut.js';
+export {
+  SolanaX402Signer,
+  type SolanaX402Payload,
+  type SolanaX402SignerOptions,
+} from './x402-signer.js';
