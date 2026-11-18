@@ -5,9 +5,12 @@
 // Dependency-leaf: imports only `parseChain` from `payment.js`.
 // No runtime dependencies, no network code — pure types and guards.
 //
-// These are WIRE data shapes from the x402 v2 specification. They are
-// carried in @me2em/core so that @me2em/x402 (M1) and chain packages
-// (M2, via `PaymentSigner`) share one definition. Core does not
+// These are the WIRE data shapes from the x402 v2 specification plus
+// the `PaymentSigner` contract (moved here in rc.8 from `@me2em/x402`).
+// They are carried in @me2em/core so that @me2em/x402 (M1) and chain
+// packages (M2) share one definition without a cross-dependency: the
+// transport imports the shapes from here, chain packages implement the
+// signer contract from here — neither sees the other. Core does not
 // interpret them logically; guards are structural only.
 
 import { parseChain } from './payment.js';
@@ -53,6 +56,34 @@ export interface X402PaymentRequirements {
   readonly maxTimeoutSeconds: number;
   /** Scheme-specific and extension metadata. */
   readonly extra?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * One (scheme, network) pair a signer can pay for — the routing half
+ * of an `X402PaymentRequirements` entry.
+ */
+export interface SignerCapability {
+  /** x402 execution scheme the signer can pay for (e.g. `exact`). */
+  readonly scheme: string;
+  /** Exact CAIP-2 chain id the signer can pay on. */
+  readonly network: string;
+}
+
+/**
+ * The key-owner side of the x402 payment contract (ТЗ x402 v1.2 §3.3):
+ * implementations live with the wallet owners — `@me2em/solana` ships
+ * one (M2); EVM wallets are the application's side. Chain-specific
+ * parameters (e.g. a blockhash source) go through the implementation's
+ * constructor — the contract itself never changes.
+ */
+export interface PaymentSigner {
+  /** What this signer can pay for; matched against `accepts` entries. */
+  readonly capabilities: readonly SignerCapability[];
+  /** Signs the payment; the result becomes `PaymentPayload.payload`. */
+  signPayment(
+    requirements: X402PaymentRequirements,
+    resource: X402ResourceInfo
+  ): Promise<Record<string, unknown>>;
 }
 
 /**

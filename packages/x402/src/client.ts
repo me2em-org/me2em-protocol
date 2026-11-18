@@ -13,9 +13,10 @@
 
 import {
   X402_VERSION,
+  type PaymentSigner,
+  type SignerCapability,
   type X402PaymentPayload,
   type X402PaymentRequirements,
-  type X402ResourceInfo,
   type X402SettleResponse,
 } from '@me2em/core';
 import {
@@ -28,27 +29,11 @@ import {
 } from './codec.js';
 import { X402Error } from './errors.js';
 
-/** One (scheme, network) pair a signer can pay for. */
-export interface SignerCapability {
-  readonly scheme: string;
-  readonly network: string; // CAIP-2
-}
-
-/**
- * The key-owner side of the contract (ТЗ §3.3): implementations live
- * with the wallet owners — `@me2em/solana` ships one (M2); EVM wallets
- * are the application's side. Chain-specific parameters (e.g. a
- * blockhash source) go through the implementation's constructor — the
- * contract itself never changes.
- */
-export interface PaymentSigner {
-  readonly capabilities: readonly SignerCapability[];
-  /** Signs the payment; the result becomes `PaymentPayload.payload`. */
-  signPayment(
-    requirements: X402PaymentRequirements,
-    resource: X402ResourceInfo
-  ): Promise<Record<string, unknown>>;
-}
+// `PaymentSigner` / `SignerCapability` moved to `@me2em/core` (rc.8):
+// the contract is chain-agnostic, and chain packages must implement it
+// without depending on the transport. Re-exported here so existing
+// `@me2em/x402` imports keep working.
+export type { PaymentSigner, SignerCapability };
 
 export interface PaymentFetchOptions {
   /** The signer injected by the application. */

@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0-rc.8] — 2026-11-18
+
+Contract glue for M1/M2: the x402 `PaymentSigner` contract moves into
+core, so chain packages implement it without depending on the x402
+transport.
+
+### Added
+- **`PaymentSigner` / `SignerCapability`** (`payment-x402.ts`) — the
+  key-owner side of the x402 payment contract (ТЗ x402 v1.2 §3.3),
+  moved from `@me2em/x402` (type-only move; the transport re-exports
+  both types for compatibility). Chain packages now implement the
+  contract against core — `@me2em/solana` drops its `@me2em/x402` peer
+  dependency entirely. The definitions reference only
+  `X402PaymentRequirements` / `X402ResourceInfo`, which already lived
+  here since rc.5.
+
+### Notes
+- Additive and type-only — no runtime code, no behavior change.
+- Peer floors move with the contract: `@me2em/x402` bumps to
+  `>=1.0.0-rc.8` (its client imports the contract from core), and
+  `@me2em/solana@1.1.0-rc.1` raises its core floor to `>=1.0.0-rc.8`
+  for the same reason.
+
 ## [1.0.0-rc.7] — 2026-11-17
 
 M1 prep: `isX402SettleResponse` accepted only non-empty `transaction` —

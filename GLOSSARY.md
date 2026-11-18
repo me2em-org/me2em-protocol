@@ -81,7 +81,7 @@ Record in [BACKLOG.md](./BACKLOG.md).
 | **Me2emErrorCode** | Подмножество `PaymentFailureReason` для x402 (REFERENCE_MISMATCH, PACT_INVALID, BUYER_NOT_ATTESTED, SELLER_NOT_ATTESTED). |
 | **BuyerAttestationPolicy** | Декларация приложения: `none` / `optional` / `required` (x402 не enforce'ит). |
 | **RegulatoryProfile** | Декларация compliance-режима: `none` / `kyc` / `aml` / `age-gated` / `sanctions` (x402 не enforce'ит). |
-| **PaymentSigner** | Контракт `@me2em/x402` (M1): `capabilities` + `signPayment(requirements, resource)`. |
+| **PaymentSigner** | Контракт `@me2em/core` (rc.8, перенесён из `@me2em/x402`): `capabilities` + `signPayment(requirements, resource)`. |
 | **FacilitatorClient** | Интерфейс `@me2em/x402` (M1): `supported()` / `verify()` / `settle()`. |
 | **B402Facilitator** | HTTP-клиент `@me2em/x402` к внешнему B402 (subpath `./b402`, `@experimental` до контракта ТЗ №8). |
 | **X402Config** | Серверный конфиг продавца в `@me2em/x402` (mode + policy-декларации); fail-fast `assertValidX402Config`, без enforcement. |

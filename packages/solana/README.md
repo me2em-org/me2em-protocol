@@ -19,15 +19,15 @@ from the Identity seed:
 pnpm add @me2em/solana @me2em/core @me2em/crypto
 ```
 
-> 💡 `@me2em/core` is a **peer** dependency (`>=1.0.0-rc.6 <2.0.0-0`) —
-> the adapter registry, CAIP-2 grammar, payment-layer interfaces and
-> `DisposedError` live there. `@me2em/crypto` supplies SLIP-0010
-> derivation and `secureWipe`; both are resolved automatically.
-> `@me2em/x402` is a **peer** dependency (`>=1.0.0-rc.1 <2.0.0-0`) used
-> **type-only** (zero runtime code — the sanctioned §0.3 exception):
-> `SolanaX402Signer` implements the x402 `PaymentSigner` interface,
-> while the transport itself (`createPaymentFetch`) stays with
-> `@me2em/x402` on the application side. `pay` brings `@solana/kit`, `@solana/keys` and
+> 💡 `@me2em/core` is a **peer** dependency (`>=1.0.0-rc.8 <2.0.0-0`) —
+> the adapter registry, CAIP-2 grammar, payment-layer interfaces, the
+> x402 `PaymentSigner` contract and `DisposedError` live there.
+> `@me2em/crypto` supplies SLIP-0010 derivation and `secureWipe`; both
+> are resolved automatically. `SolanaX402Signer` implements the x402
+> `PaymentSigner` contract from `@me2em/core` — this package carries
+> **no x402 dependency** (not even type-only); the transport itself
+> (`createPaymentFetch`) is added by the application when x402 payments
+> are needed. `pay` brings `@solana/kit`, `@solana/keys` and
 > `@solana-program/system`/`memo` as regular dependencies (installed
 > with the package); `@me2em/crypto` stays a direct dependency, so
 > listing it explicitly keeps the manifest honest — the examples below
@@ -190,8 +190,9 @@ it returns becomes `PaymentPayload.payload` inside `PAYMENT-SIGNATURE`.
   byte-by-byte (compact-u16 lengths, canonical system transfer
   layout); `@solana/kit` is not used on this path. 151-byte message,
   216-byte signed transaction, pinned by golden vectors.
-- **`@me2em/x402` is type-only** — `import type { PaymentSigner }`;
-  zero x402 runtime code lands in this package's dist.
+- **Zero x402 dependency** — `import type { PaymentSigner }` comes
+  from `@me2em/core` (rc.8); no x402 runtime code lands in this
+  package's dist, and the manifest carries no x402 peer at all.
 - **Capabilities** — exactly `exact` ×
   `solana:mainnet-beta`/`solana:devnet`/`solana:testnet`; wildcards
   are never declared, `solana:localnet` is not a payment capability.
