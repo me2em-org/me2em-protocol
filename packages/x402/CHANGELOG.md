@@ -5,7 +5,8 @@
 M1: the x402 v2 transport (ТЗ `@me2em/x402` v1.2). New package — pure
 transport, no policy: attestation and Pact decisions stay with the
 application. No runtime dependencies; `@me2em/core` is a peer
-(`>=1.0.0-rc.7` — the release with the settle-guard fix).
+(`>=1.0.0-rc.8` — the settle-guard fix rc.7 plus the `PaymentSigner`
+contract, which moved from this package into core rc.8).
 
 ### Added
 - **Codec** (`codec.ts`) — base64-JSON for `PAYMENT-REQUIRED` /
@@ -48,9 +49,12 @@ application. No runtime dependencies; `@me2em/core` is a peer
   `@me2em/core` stays external (guards are not inlined).
 
 ### Notes
-- Peer floor `@me2em/core >=1.0.0-rc.7`: `isX402SettleResponse` must
+- Peer floor `@me2em/core >=1.0.0-rc.8`: `isX402SettleResponse` must
   accept the upstream §5.3.2 empty-transaction failure settles (fixed
-  in core rc.7; spotted by these golden vectors).
+  in core rc.7; spotted by these golden vectors), and the
+  `PaymentSigner`/`SignerCapability` contract moved into core rc.8 —
+  the client imports it from core and re-exports both types, so
+  existing `@me2em/x402` imports keep working.
 - x402 v1 payloads and non-CAIP-2 networks are refused (fail-closed).
 - `SETTLEMENT_FAILED` is thrown by the application on
   `success: false` — the facilitator client returns the response as-is.

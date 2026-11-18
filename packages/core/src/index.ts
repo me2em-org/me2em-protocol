@@ -36,6 +36,8 @@ export {
   type X402SettleResponse,
   type X402VerifyResponse,
   type X402Supported,
+  type PaymentSigner,
+  type SignerCapability,
   type Me2emErrorCode,
   type BuyerAttestationPolicy,
   type RegulatoryProfile,
