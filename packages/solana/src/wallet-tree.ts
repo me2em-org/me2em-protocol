@@ -38,22 +38,23 @@ function paymentPath(index: number): string {
 }
 
 /**
- * Recognizes the paths this tree issues — `m/44'/501'/N'/0'` — with
- * the plain index captured. Deliberately a SUPerset of what the tree
- * emits: the index alternative is `(\d+)`, not the canonical
- * `(0|[1-9][0-9]*)`, so a padded rendering persisted by external
- * tooling (`m/44'/501'/00'/0'`) still counts as used — rejecting it
- * could reallocate an existing index (address reuse), the exact
- * failure v1.2 §2.2 forbids. `Number()` canonicalizes the capture
- * (`'007'` → 7) and the range check drops overflows; the capture is
- * never fed to `derivePath` as a string (issuance goes through
- * {@link paymentPath} with a validated number), so liberal matching
- * here has no derivation surface. Everything else (foreign coin
- * types, missing levels, non-numeric junk) is not ours and is
- * ignored by {@link nextPaymentIndex}, never thrown on (v1.2 §2.2
- * tolerance).
+ * Recognizes BOTH the canonical 4-level shape this tree issues
+ * (`m/44'/501'/{N}'/0'`) and the 3-level "phantom" shape
+ * (`m/44'/501'/{N}'`) produced by Phantom and other SLIP-0010
+ * wallets over the same seed — one seed, one wallet family; foreign
+ * accounts must not collide semantically with ours on index
+ * allocation (v1.2 §2.2).
+ *
+ * The index grammar is canonical — `(0|[1-9][0-9]*)` — matching
+ * `crypto.slip10.derivePath`: a padded rendering (`m/44'/501'/00'/0'`)
+ * can never be produced by our derivation, so it is NOT a used index
+ * (treating it as used would block a legitimate allocation; treating
+ * it as absent is safe — we never emit padded paths ourselves).
+ *
+ * Out-of-range indices (≥ 2^31) are captured but filtered by the
+ * range check in `nextPaymentIndex`.
  */
-const PAYMENT_PATH_RE = /^m\/44'\/501'\/(\d+)'\/0'$/;
+const PAYMENT_PATH_RE = /^m\/44'\/501'\/(0|[1-9][0-9]*)'(?:\/0')?$/;
 
 /**
  * Chain-scoped index allocation from used derivation paths
@@ -63,6 +64,11 @@ const PAYMENT_PATH_RE = /^m\/44'\/501'\/(\d+)'\/0'$/;
  * the caller persists the used paths (from attestation
  * `subjectWalletPath` values), neither the tree nor the adapter
  * keeps state.
+ *
+ * Recognizes both `m/44'/501'/{N}'/0'` (canonical 4-level) and
+ * `m/44'/501'/{N}'` (3-level phantom shape from foreign SLIP-0010
+ * wallets); padded renderings (`00`, `007`) are ignored (canonical
+ * grammar `(0|[1-9][0-9]*)`).
  *
  * @throws {TypeError} if `usedPaths` is not an array.
  */
@@ -197,8 +203,10 @@ export class SolanaWalletTree {
   /**
    * Chain-scoped index allocation over used `m/44'/501'/N'/0'` paths
    * (v1.2 §2.2) — pure planning over the caller's persisted paths.
-   * Needs no key material, so it keeps working after
-   * {@link SolanaWalletTree.dispose}.
+   * Recognizes both canonical 4-level (`m/44'/501'/{N}'/0'`) and
+   * 3-level phantom (`m/44'/501'/{N}'`) shapes; padded renderings
+   * (`00`, `007`) are ignored. Needs no key material, so it keeps
+   * working after {@link SolanaWalletTree.dispose}.
    *
    * @throws {TypeError} if `usedPaths` is not an array.
    */
@@ -218,5 +226,50 @@ export class SolanaWalletTree {
     this.#disposed = true;
     secureWipe(this.#masterKey);
     secureWipe(this.#masterChainCode);
+  }
+
+  /**
+   * Mode 1 verification helper (v1.2 §6.1): re-derive the address
+   * from a known `subjectWalletPath` and compare with `subjectWallet`.
+   *
+   * Use this when the verifier holds the seed (Mode 1) — e.g. a trusted
+   * backend of the operator checking that a child entity did not lie
+   * about its wallet. It is STRONGER than trusting the Handle's
+   * signature: the signature proves the entity SAID "this is my
+   * address"; re-derivation proves the address ACTUALLY comes from the
+   * seed.
+   *
+   * The seed is CONSUMED by derivation (master-key snapshot) and NOT
+   * retained — the caller's buffer is untouched (caller owns it).
+   *
+   * Mode 2 (third party, root public key only) does NOT use this —
+   * path↔address consistency there is accepted on the strength of the
+   * Identity signature (v1.2 §6.1).
+   *
+   * @param seed - 64-byte seed (the same contract as `fromSeed`).
+   * @param path - Canonical Solana payment path `m/44'/501'/{N}'/0'`.
+   * @returns The derived base58 address.
+   * @throws {TypeError} if `seed` is not 64 bytes or `path` is not a
+   *   canonical Solana payment path.
+   */
+  static async deriveForVerification(
+    seed: Uint8Array,
+    path: string
+  ): Promise<string> {
+    // Validate path is canonical m/44'/501'/{N}'/0' and extract index
+    const match = /^m\/44'\/501'\/(0|[1-9][0-9]*)'\/0'$/.exec(path);
+    if (!match) {
+      throw new TypeError(
+        `deriveForVerification: path must be m/44'/501'/{N}'/0', got ${JSON.stringify(path)}`
+      );
+    }
+    const index = Number(match[1]);
+    const tree = SolanaWalletTree.fromSeed(seed);
+    try {
+      const wallet = await tree.deriveWallet(index);
+      return wallet.address;
+    } finally {
+      tree.dispose();
+    }
   }
 }

@@ -10,6 +10,8 @@ import {
   isValidChain,
   parseChain,
   verifyWalletBinding,
+  type PaymentAdapter,
+  type PaymentRequest,
   type WalletAdapter,
   type WalletDescriptor,
   type WalletEntityRef,
@@ -279,5 +281,69 @@ describe('verifyWalletBinding default (core)', () => {
       { issuerPublicKey: identity.getPublicKey() }
     );
     expect(ok).toBe(false);
+  });
+});
+
+describe('PaymentAdapter.pay opts (rc.6 — additive third parameter)', () => {
+  const request: PaymentRequest = {
+    chain: 'solana:devnet',
+    payTo: 'RecipientAddress',
+    amount: '1.5',
+    asset: 'sol',
+    reference: 'ReferenceKey',
+    expiresAt: Math.floor(Date.now() / 1000) + 600,
+  };
+
+  // A pre-rc.6 implementer with strictly two parameters must remain
+  // type-compatible (TS fewer-parameters rule) — this class assignment
+  // IS the compile-time assertion.
+  class TwoArgAdapter implements PaymentAdapter {
+    readonly chain = 'solana:devnet';
+    async resolveWallet(): Promise<WalletDescriptor> {
+      throw new TypeError('not exercised here');
+    }
+    isValidAddress(): boolean {
+      return true;
+    }
+    async pay(_from: WalletDescriptor, _request: PaymentRequest): Promise<string> {
+      return 'two-arg-ref';
+    }
+  }
+
+  class ThreeArgAdapter implements PaymentAdapter {
+    readonly chain = 'solana:devnet';
+    async resolveWallet(): Promise<WalletDescriptor> {
+      throw new TypeError('not exercised here');
+    }
+    isValidAddress(): boolean {
+      return true;
+    }
+    async pay(
+      _from: WalletDescriptor,
+      _request: PaymentRequest,
+      opts?: { seed?: Uint8Array; memo?: string }
+    ): Promise<string> {
+      return opts?.seed?.length === 64 ? 'seed-ok' : 'no-seed';
+    }
+  }
+
+  it('2-arg implementer stays assignable; opts are silently ignored at runtime', async () => {
+    const adapter: PaymentAdapter = new TwoArgAdapter();
+    const from: WalletDescriptor = { chain: 'solana:devnet', address: 'A' };
+    // Compile-time pin: a 2-arg implementer stays assignable to
+    // PaymentAdapter (fewer-parameters rule).
+    // Runtime: JS drops the extra argument for a 2-arg function — the
+    // implementer does NOT receive opts. Implementations that need
+    // opts.seed MUST accept the third parameter (documented in the
+    // interface JSDoc and CHANGELOG rc.6).
+    const txRef = await adapter.pay(from, request, { seed: new Uint8Array(64) });
+    expect(txRef).toBe('two-arg-ref');
+  });
+
+  it('3-arg implementer receives opts through the interface', async () => {
+    const adapter: PaymentAdapter = new ThreeArgAdapter();
+    const from: WalletDescriptor = { chain: 'solana:devnet', address: 'A' };
+    expect(await adapter.pay(from, request, { seed: new Uint8Array(64) })).toBe('seed-ok');
+    expect(await adapter.pay(from, request)).toBe('no-seed');
   });
 });

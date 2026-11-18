@@ -1,6 +1,91 @@
 # Changelog
 
+## [1.0.0-rc.7] — 2026-11-17
+
+M1 prep: `isX402SettleResponse` accepted only non-empty `transaction` —
+fix. Found by the M1 golden vectors (upstream x402 v2 spec, commit
+`51a0664c`).
+
+### Fixed
+- **`isX402SettleResponse` — an empty `transaction` is legal.** The x402
+  v2 specification (§5.3.2) carries `"transaction": ""` when nothing was
+  broadcast (failure settlements), requiring non-empty only for
+  `errorReason: settlement_pending`. The M0 guard rejected every such
+  response as malformed — the M1 codec would have refused legitimate
+  failure settles. Still fail-closed: non-strings are rejected, and
+  `settlement_pending` with an empty transaction is rejected. Behavior
+  is strictly more permissive on one dimension (empty transaction
+  without `settlement_pending`).
+
+## [1.0.0-rc.6] — 2026-11-17
+
+P0.6.5: `PaymentAdapter.pay` gains an optional chain-specific call
+options parameter (`opts`) — the additive core change Ф5
+(`@me2em/solana` `pay`, rc.4) needs for per-call seeds. Not breaking:
+2-argument call sites and 2-argument implementations stay
+type-compatible (TS fewer-parameters rule).
+
+### Changed
+- **`PaymentAdapter.pay` — optional third parameter
+  `opts?: { seed?: Uint8Array; memo?: string }` (additive, not
+  breaking).** Deterministic adapters require `opts.seed` — the same
+  seed contract as `resolveWallet` — and throw `TypeError` without
+  it; adapters never retain seed or derived key material. `opts` are
+  chain-specific call options; the pinned shape is what the Solana
+  adapter consumes in rc.4 (Ф5). v1.2 §5.1 signature amendment:
+  `pay(from, request, opts?)`.
+
+## [1.0.0-rc.5] — 2026-11-17
+
+x402 payment-layer base: wire types and structural guards for the
+x402 v2 protocol, Me2eM error codes, declaration constants, and the
+`PaymentRequest.extra` metadata slot. No network, no runtime — types
+and pure guards only.
+
+### Added
+- **`payment-x402.ts`** — new dependency-leaf module with x402 v2 wire
+  types (`X402PaymentRequired`, `X402PaymentRequirements`,
+  `X402PaymentPayload`, `X402SettleResponse`, `X402VerifyResponse`,
+  `X402Supported`, `X402ResourceInfo`) and structural guards
+  (`isX402*`) that never throw. `X402_VERSION = 2`.
+- **`Me2emErrorCode`** — subset of `PaymentFailureReason`:
+  `REFERENCE_MISMATCH`, `PACT_INVALID`, `BUYER_NOT_ATTESTED`,
+  `SELLER_NOT_ATTESTED`.
+- **`BUYER_ATTESTATION_POLICY` / `REGULATORY_PROFILES`** — declaration
+  constants (`BuyerAttestationPolicy`, `RegulatoryProfile`); x402 does
+  not enforce, only fails fast on contradictory configuration (in
+  `@me2em/x402`).
+- **`PaymentRequest.extra?`** — optional `Me2emExtra` slot for
+  Me2eM metadata on the direct flow (`sellerId`, `buyerId`, `memo`,
+  `reference`, `agreementProof: Uint8Array`). x402 wire shape
+  (`X402Me2emExtra`, base64) lives in `@me2em/x402` (M1).
+
+### Changed
+- **`PaymentFailureReason` — three new failure values (Breaking).**
+  `PACT_INVALID`, `BUYER_NOT_ATTESTED`, `SELLER_NOT_ATTESTED` added.
+  Exhaustive `switch` consumers will get a TypeScript compile error;
+  the fail-safe runtime rule stands: unknown values MUST be treated
+  as `REJECTED`, never as success.
+
+### Notes
+- No change to `PaymentResult` (still `{ status: 'success';
+  observedAt } | { status: 'failure'; reason; observedAt }`).
+- No change to `subjectWallet` validation (already implemented in
+  rc.4; M0 adds JSDoc only).
+- `GLOSSARY.md` — payment-layer terms (PaymentRequired,
+  PaymentRequirements, PaymentPayload, SettleResponse, facilitator,
+  scheme, extra.me2em, Me2emErrorCode, BuyerAttestationPolicy,
+  RegulatoryProfile, PaymentSigner, FacilitatorClient, atomic units,
+  whole units).
+- `PaymentSigner` / `FacilitatorClient` — **not** in M0; they live in
+  `@me2em/x402` (M1, §3.3/§3.5 of the x402 spec). M0 exposes only the
+  wire types those contracts reference.
+
 ## [Unreleased]
+
+### Changed
+- **Breaking:** none (documentation-only). Docs: freeze policy revised — rc
+  line is not frozen, API freezes at v1.0.0 (spec §12.1, DR-8).
 
 ## [1.0.0-rc.4] — 2026-11-04
 

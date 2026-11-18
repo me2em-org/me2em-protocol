@@ -1,7 +1,7 @@
 {
   "name": "@me2em/solana",
-  "version": "1.0.0-rc.1",
-  "description": "Solana adapter for the Me2eM payment layer: deterministic wallet trees, chain adapters, payment references and request URLs",
+  "version": "1.1.0-rc.1",
+  "description": "Solana adapter for the Me2eM payment layer: deterministic wallet trees, chain adapters, payment references, request URLs, payment verification/submission and the x402 PaymentSigner (SolanaX402Signer)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,17 +35,25 @@
   },
   "dependencies": {
     "@me2em/crypto": "workspace:^",
-    "@scure/base": "^2.4.0"
+    "@noble/curves": "^1.8.1",
+    "@scure/base": "^2.4.0",
+    "@solana-program/memo": "^0.16.0",
+    "@solana-program/system": "^0.16.0",
+    "@solana/keys": "^2.3.0",
+    "@solana/kit": "^8.6.0"
   },
   "peerDependencies": {
-    "@me2em/core": ">=1.0.0-rc.3 <2.0.0-0"
+    "@me2em/core": ">=1.0.0-rc.6 <2.0.0-0",
+    "@me2em/x402": ">=1.0.0-rc.1 <2.0.0-0"
   },
   "devDependencies": {
     "@me2em/core": "workspace:^",
+    "@me2em/x402": "workspace:^",
     "@types/node": "^25.9.1",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "tsup": "^8.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.1.7"
+    "vite": "^8.3.8",
+    "vitest": "^4.1.12"
   }
 }

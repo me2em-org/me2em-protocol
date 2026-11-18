@@ -2,8 +2,8 @@
 
 Baseline: core · react · crypto all at **1.0.0-rc.1** (648 tests =
 core 364 · crypto 182 · react 102). tsc/build-docs clean per package.
-The API-freeze release candidate of the LTS program (PR-12); the
-original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
+The release-candidate line of the LTS program (PR-12); the API stabilizes
+through the `rc.N` line and freezes at `v1.0.0` stable. The original tracking baseline (core 0.7.0-alpha.2 = 438 tests) is history.
 npm (2026-11-03): **@me2em/core 1.0.0-rc.1 published as `latest`** —
 tag `v1.0.0-rc.1` on the publish source `9bcf0f3`; verified by
 dist-tags and a clean-install consumer smoke (all four core exports).
@@ -45,10 +45,10 @@ development, not part of the shipped API contract.
   `treatWarningsAsErrors: true` — every exported symbol needs complete
   TSDoc (description, params/returns, `@example` for non-trivial API).
 - `crypto` namespace includes documented raw Ed25519 wrappers
-  (`crypto/ed25519.ts`): they are frozen public API surface
-  (specs/v1.0.md §12), kept for TSDoc documentation ownership and
-  `@noble` typing isolation under `treatWarningsAsErrors`; removal is a
-  breaking 2.0.0 decision — do not propose (PLAN amendment A5).
+  (`crypto/ed25519.ts`): they are part of the frozen-at-`v1.0.0` public API
+  (specs/v1.0.md §12.2), kept for TSDoc documentation ownership and
+  `@noble` typing isolation under `treatWarningsAsErrors`; removal after
+  `v1.0.0` is a breaking 2.0.0 decision — do not propose (PLAN amendment A5).
 - Versioning: independent per-package semver. Cross-package
   dependencies inside the monorepo use `workspace:^` — `pnpm publish`
   substitutes `workspace:*` with an EXACT version, which breaks
@@ -282,6 +282,77 @@ development, not part of the shipped API contract.
   semantic change, no sleeps. Optional same-file extension: the older
   timer-path tests sleep 2–3 s (`useSession.spec.tsx:151/191`) and can
   move to bounded `waitFor` too.
+- **BL-55 · open · `deriveStateKey` + structuredClone-safe `Channel`
+  brand (`@me2em/react` persistence).** `Channel` (D1 in
+  `@me2em/crypto`) carries a symbol-keyed runtime brand
+  (`Symbol('Channel')`, non-enumerable via `Object.defineProperty`) —
+  the structured clone algorithm does **not** transfer symbol-keyed
+  properties, so `structuredClone(channel)` produces an object that
+  fails `isChannel()` and is rejected by every channel API with
+  `INVALID_ARGUMENT`. This matters when `@me2em/react` begins cloning
+  `Channel` across boundaries that use `structuredClone` — IndexedDB
+  persistence, Web Worker message passing, or a warm-restart pattern
+  (see BL-27: "Isolation and warm-restart patterns live in
+  `@me2em/react`"). The fix has two halves: (1) a new `deriveStateKey`
+  function in `@me2em/core` (session-bound state key, companion to the
+  existing `derivePassword`/`deriveChannelKey` rotation model), and
+  (2) `Channel`'s brand switched from symbol-keyed to a non-enumerable
+  string-keyed property (e.g. `_me2emChannel`) so the structured clone
+  algorithm preserves it. Both halves ship together in a single PR
+  after `@me2em/solana` Ф3. **Not related to the crypto security
+  batch or solana** — tracked here so the React persistence path does
+  not regress. Reviewer note until the fix lands: `@me2em/react` MUST
+  NOT clone `Channel` via `structuredClone`; it MUST hold the channel
+  as an opaque reference (object identity) or re-derive from the
+  shared secret at the consumer boundary.
+- **BL-54 · open · `parseLutAddresses` — explicit minimal-length
+  check.**
+  `packages/solana/src/lut.ts` currently fails closed on a short
+  buffer only *indirectly*: `readOptionPubkey` reads `undefined` past
+  the end of the array and throws, which the outer `try/catch`
+  converts to `null`. This works, but a short buffer is a
+  distinguishable failure that deserves an explicit guard before any
+  reads: `if (raw.length < 22) return null;` (minimum = discriminator
+  4 + deactivationSlot 8 + lastExtendedSlot 8 + lastExtendedSlot
+  StartIndex 1 + authority tag 1). Add the guard + a test that
+  constructs a 21-byte buffer. Non-blocking for rc.3 (current
+  behaviour is fail-closed); robustness only.
+- **BL-56 · open · `#verifyAmount` — string-based SOL→lamports
+  parsing.**
+  `SolanaPaymentVerifier.#verifyAmount`
+  (`packages/solana/src/verify.ts`) converts `request.amount` to
+  lamports via `BigInt(Math.round(parseFloat(amount) * 1e9))`. For the
+  current whole-unit SOL contract (≤ 9 decimals, seller-controlled)
+  this is exact — but `parseFloat` for money is a latent precision
+  hazard if the amount ever carries more than 9 decimal digits.
+  Replace with string-based parsing:
+  ```ts
+  function solToLamports(amount: string): bigint {
+    const parts = amount.split('.');
+    const whole = parts[0] || '0';
+    const frac = (parts[1] || '').padEnd(9, '0');
+    if (frac.length > 9) {
+      throw new TypeError(`verifyPayment: amount has more than 9 decimals: ${JSON.stringify(amount)}`);
+    }
+    return BigInt(whole) * 1_000_000_000n + BigInt(frac);
+  }
+  ```
+  Add tests: `'0'`, `'1'`, `'1.0'`, `'1.23456789'` (exact lamports),
+  `'0.000000001'` (1 lamport), `'1.2345678901'` (throws — >9 decimals).
+  Non-blocking for rc.3 (amount is seller-controlled ≤ 9 decimals);
+  robustness only.
+- **BL-57 · open · `verify.spec.ts` fixtures — realistic base58
+  addresses.**
+  `packages/solana/test/verify.spec.ts` uses string literals
+  `'refPubkey123'`, `'payTo123'`, `'otherRef123'` as `reference` /
+  `payTo` values. `#containsReference` compares strings
+  (`staticKeys.includes(reference)`), so mocks work — but the values
+  are not realistic base58 32-byte pubkeys, and a future change that
+  adds an address-format check (e.g. `isValidSolanaAddress`) would
+  silently break the tests. Replace the literals with
+  `base58.encode(crypto.getRandomValues(new Uint8Array(32)))` (a
+  fixed seed per test for determinism). Non-blocking for rc.3 (mocks
+  work); test realism only.
 
 ## P3 — Protocol Extensions (0.8+)
 
@@ -503,6 +574,20 @@ quotes in this entry are intentional).
   the drafts (retrievable at `e0f4dc5`). This supersedes the
   archive disposition of D9/PLAN-LTS as the final one; those
   records remain untouched as history.
+
+- **DR-8 (2026-11-16)** — Freeze policy revision. The `1.0.0-rc.N` freeze
+  is a recommendation, not an absolute: the rc line is a release candidate,
+  and breaking changes that improve clarity,
+  correctness or security may land in `rc.N+1`, each documented in the
+  CHANGELOG with an explicit `**Breaking:**` marker and a rationale. The
+  derivation freeze (info strings, salts, formulas; wire formats and
+  limits) remains in force throughout the rc line — derivation-affecting
+  changes still require a new versioned path and a new vector-file
+  revision. The API freeze takes effect at `v1.0.0` stable; from that
+  point, additive changes land in 1.x minors and breaking changes
+  require 2.0.0 plus a new spec revision. Normative text:
+  `specs/v1.0.md` §12.1. Supersedes the "API frozen as of rc.1" language
+  in DR-6, README, THREAT_MODEL §8 and the spec's status paragraphs.
 
 ## Package Roadmap (strategy)
 

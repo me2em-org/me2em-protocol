@@ -128,7 +128,7 @@ describe('SolanaWalletTree.nextIndex — v1.2 §2.2 allocation semantics', () =>
     expect(
       nextPaymentIndex([
         "m/44'/60'/0'/0'", // foreign coin type
-        "m/44'/501'/5'", // missing level
+        "m/44'/501'/5'", // 3-level phantom — recognized as used (Б-1)
         "m/0'/1'/2'", // not ours
         'garbage',
         '',
@@ -136,7 +136,7 @@ describe('SolanaWalletTree.nextIndex — v1.2 §2.2 allocation semantics', () =>
         'm/44\'/501\'/4294967296\'/0\'', // beyond the plain-index range
         null as unknown as string, // tolerated mixed input
       ])
-    ).toBe(0);
+    ).toBe(6);
     expect(
       nextPaymentIndex(["m/44'/501'/9'/0'", 'garbage', "m/44'/501'/3'/0'"])
     ).toBe(10);
@@ -147,19 +147,39 @@ describe('SolanaWalletTree.nextIndex — v1.2 §2.2 allocation semantics', () =>
     expect(() => nextPaymentIndex(undefined as unknown as string[])).toThrow(TypeError);
   });
 
-  // Deliberate tolerance (v1.2 §2.2): the scanner accepts padded index
-  // renderings (`00`, `007`) and canonicalizes via Number() — a strict
-  // `(0|[1-9][0-9]*)` grammar would silently ignore such persisted
-  // paths and could reallocate an existing index (address reuse).
-  // Overflowing captures (2^31 and beyond) stay filtered by the range
-  // check.
-  it('padded index renderings count as used; overflows stay filtered', () => {
-    expect(nextPaymentIndex(["m/44'/501'/00'/0'"])).toBe(1);
-    expect(nextPaymentIndex(["m/44'/501'/007'/0'"])).toBe(8);
-    expect(
-      nextPaymentIndex(["m/44'/501'/3'/0'", "m/44'/501'/002'/0'"])
-    ).toBe(4);
-    expect(nextPaymentIndex(["m/44'/501'/2147483648'/0'"])).toBe(0);
+  describe('padded renderings ignored (В-1) + phantom 3-level recognized (Б-1)', () => {
+    it('padded index renderings are NOT used (cannot be produced by crypto.slip10.derivePath)', () => {
+      expect(nextPaymentIndex(["m/44'/501'/00'/0'"])).toBe(0);
+      expect(nextPaymentIndex(["m/44'/501'/007'/0'"])).toBe(0);
+      expect(
+        nextPaymentIndex(["m/44'/501'/3'/0'", "m/44'/501'/002'/0'"])
+      ).toBe(4); // only the canonical 3 counts
+    });
+
+    it('3-level phantom shape m/44\'/501\'/{N}\' is recognized as used', () => {
+      expect(nextPaymentIndex(["m/44'/501'/5'"])).toBe(6);
+      expect(nextPaymentIndex(["m/44'/501'/5'/0'"])).toBe(6); // our shape, same index
+      expect(nextPaymentIndex(["m/44'/501'/5'", "m/44'/501'/3'/0'"])).toBe(6);
+      expect(nextPaymentIndex(["m/44'/501'/5'", "m/44'/501'/5'/0'"])).toBe(6); // both forms of 5
+    });
+
+    it('overflows stay filtered in both shapes', () => {
+      expect(nextPaymentIndex(["m/44'/501'/2147483648'"])).toBe(0);
+      expect(nextPaymentIndex(["m/44'/501'/2147483648'/0'"])).toBe(0);
+      expect(nextPaymentIndex(["m/44'/501'/2147483647'"])).toBe(2147483648); // max legal + 1
+    });
+
+    it('mixed foreign / padded / phantom / canonical input', () => {
+      expect(
+        nextPaymentIndex([
+          "m/44'/60'/0'/0'",     // foreign coin type — ignored
+          "m/44'/501'/00'/0'",   // padded — ignored (В-1)
+          "m/44'/501'/5'",       // phantom — used (Б-1)
+          "m/44'/501'/3'/0'",    // canonical — used
+          'garbage',             // ignored
+        ])
+      ).toBe(6);
+    });
   });
 
   it('works after dispose (no key material involved)', async () => {
@@ -227,5 +247,79 @@ describe('nextPaymentIndex — independent function surface', () => {
     } finally {
       tree.dispose();
     }
+  });
+});
+
+describe('deriveForVerification — golden parity + seed safety + path validation', () => {
+  it('returns the same address as deriveWallet for index 0', async () => {
+    const addr = await SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/0'/0'");
+    expect(addr).toBe(GOLDEN_ADDRESSES[0]);
+  });
+
+  it('returns the same address as deriveWallet for index 1', async () => {
+    const addr = await SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/1'/0'");
+    expect(addr).toBe(GOLDEN_ADDRESSES[1]);
+  });
+
+  it('returns the same address as deriveWallet for index 2', async () => {
+    const addr = await SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/2'/0'");
+    expect(addr).toBe(GOLDEN_ADDRESSES[2]);
+  });
+
+  it('returns the same address as deriveWallet for index 100', async () => {
+    const addr = await SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/100'/0'");
+    expect(addr).toBe(GOLDEN_ADDRESSES[100]);
+  });
+
+  it('does not consume the seed (caller retains it)', async () => {
+    const seed = TV2_SEED.slice();
+    await SolanaWalletTree.deriveForVerification(seed, "m/44'/501'/0'/0'");
+    expect(Array.from(seed)).toEqual(Array.from(TV2_SEED));
+  });
+
+  it('throws TypeError for non-canonical 4-level path (padded)', async () => {
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/00'/0'")
+    ).rejects.toThrow(TypeError);
+  });
+
+  it('throws TypeError for non-canonical 4-level path (padded non-zero)', async () => {
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/01'/0'")
+    ).rejects.toThrow(TypeError);
+  });
+
+  it('throws TypeError for 3-level phantom path', async () => {
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/5'")
+    ).rejects.toThrow(TypeError);
+  });
+
+  it('throws TypeError for wrong purpose/coin type', async () => {
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/0'/1'")
+    ).rejects.toThrow(TypeError);
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/60'/0'/0'")
+    ).rejects.toThrow(TypeError);
+  });
+
+  it('throws TypeError for malformed path', async () => {
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "m/44'/501'/0'")
+    ).rejects.toThrow(TypeError);
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "invalid")
+    ).rejects.toThrow(TypeError);
+    await expect(
+      SolanaWalletTree.deriveForVerification(TV2_SEED, "")
+    ).rejects.toThrow(TypeError);
+  });
+
+  it('throws TypeError for non-64-byte seed', async () => {
+    const shortSeed = new Uint8Array(32);
+    await expect(
+      SolanaWalletTree.deriveForVerification(shortSeed, "m/44'/501'/0'/0'")
+    ).rejects.toThrow(TypeError);
   });
 });

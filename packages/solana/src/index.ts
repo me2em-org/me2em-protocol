@@ -1,19 +1,23 @@
 // packages/solana/src/index.ts
 //
 // @me2em/solana — the Solana track of the Me2eM payment layer
-// (Документ 2 v1.2 §9, Ф3 "wallet-only"): deterministic wallet
-// trees over `crypto.slip10`, chain-bound wallet adapters, payment
-// references and Solana Pay request URLs.
+// (Документ 2 v1.2 §9, Ф3 "wallet-only" → Ф4 "verify" → Ф5 "pay"):
+// deterministic wallet trees over `crypto.slip10`, chain-bound wallet
+// adapters, payment references and Solana Pay request URLs.
 //
-// Scope boundary: this release is OFFLINE — no RPC, no
-// transaction building, no signing backend. `verifyPayment` /
-// `verifyWalletBinding` override arrive with Ф4 (rc.2), `pay` with
-// Ф5 (rc.3). The package imports no curve library: derivation is
-// delegated to `@me2em/crypto`'s SLIP-0010 namespace.
+// Scope boundary: Ф4 adds `verifyPayment`, `verifyWalletBinding`
+// (on-curve override) and `deriveForVerification` (Mode 1 helper).
+// Ф5 adds `pay` — programmatic SOL spend from a managed wallet with
+// the seed supplied PER CALL (the adapter stays stateless, В-1/E);
+// SOL-only, submission without confirmation wait (В-7/A).
+// M2 (ТЗ @me2em/x402 v1.2 §4) adds `SolanaX402Signer` — the x402
+// `PaymentSigner` for native SOL: offline legacy-transfer signing,
+// blockhash by injection, experimental payload convention (§8.7).
 
 export {
   SOLANA_CHAINS,
   SOLANA_NAMESPACE,
+  SOLANA_RPC_ENDPOINTS,
   isSolanaChain,
   isSolanaNetwork,
   solanaChain,
@@ -21,6 +25,16 @@ export {
 } from './networks.js';
 export { SolanaWalletTree, nextPaymentIndex, type SolanaDerivedWallet } from './wallet-tree.js';
 export { SolanaWalletAdapter, isValidSolanaAddress } from './adapter.js';
+export { SolanaPaymentAdapter, type SolanaPaymentAdapterOptions } from './verify.js';
+export { pay, solToLamports, type PayOptions, type PayContext } from './pay.js';
+export { verifyWalletBindingSolana } from './wallet-binding.js';
 export { createPaymentReference } from './reference.js';
 export { createPaymentRequestURL, SOLANA_NATIVE_ASSET } from './url.js';
 export { registerSolanaAdapters, type RegisterSolanaAdaptersOptions } from './register.js';
+export { RpcClient, type RpcClientOptions, type ParsedTransactionResponse, type SignatureInfo, type LutAddresses } from './rpc.js';
+export { parseLutAddresses } from './lut.js';
+export {
+  SolanaX402Signer,
+  type SolanaX402Payload,
+  type SolanaX402SignerOptions,
+} from './x402-signer.js';
