@@ -17,13 +17,18 @@
 // bytes (`signRaw` from @me2em/crypto); `verifyRaw` re-derives it
 // offline.
 //
-// `@me2em/x402` is imported TYPE-ONLY (zero runtime code — the
-// sanctioned §0.3 exception): the class implements the interface, it
-// does not run the transport. `createPaymentFetch` composes with this
-// class on the application side (see README).
+// Zero x402 runtime code, and — since the `PaymentSigner` contract
+// moved to `@me2em/core` (rc.8) — no x402 DEPENDENCY of any kind: the
+// class implements the contract, it does not run the transport.
+// `createPaymentFetch` composes with it on the application side (see
+// README).
 
-import type { PaymentSigner, SignerCapability } from '@me2em/x402';
-import type { X402PaymentRequirements, X402ResourceInfo } from '@me2em/core';
+import type {
+  PaymentSigner,
+  SignerCapability,
+  X402PaymentRequirements,
+  X402ResourceInfo,
+} from '@me2em/core';
 import { base58 } from '@scure/base';
 import { secureWipe, signRaw, toBase64 } from '@me2em/crypto';
 import { SolanaWalletTree } from './wallet-tree.js';

@@ -14,16 +14,16 @@ layer.
 ## [1.1.0-rc.1] — 2026-11-17
 
 M2 (ТЗ @me2em/x402 v1.2 §4): the x402 `PaymentSigner` for Solana —
-`SolanaX402Signer`. The first real consumer of the `@me2em/x402`
-transport contract: one accepted `exact` requirement becomes a signed
-legacy system-program SOL transfer, ready for a facilitator's
-`settle`. Offline by construction — the blockhash is an injection,
-the transaction is never submitted here.
+`SolanaX402Signer`. The first real consumer of the `PaymentSigner`
+contract (living in `@me2em/core` rc.8): one accepted `exact`
+requirement becomes a signed legacy system-program SOL transfer, ready
+for a facilitator's `settle`. Offline by construction — the blockhash
+is an injection, the transaction is never submitted here.
 
 ### Added
-- **`SolanaX402Signer`** (`src/x402-signer.ts`) — implements the x402
-  `PaymentSigner` (type-only peer-import, the sanctioned §0.3
-  exception: zero x402 runtime code in the dist). `capabilities` are
+- **`SolanaX402Signer`** (`src/x402-signer.ts`) — implements the
+  `PaymentSigner` contract (from `@me2em/core` rc.8; zero x402 runtime
+  code in the dist). `capabilities` are
   exactly `exact` × `solana:mainnet-beta`/`devnet`/`testnet` (explicit
   CAIP-2, no wildcard; `localnet` is not a payment capability — final
   set per the §8.7 facilitator contract). `signPayment(requirements,
@@ -52,10 +52,15 @@ the transaction is never submitted here.
   (standard base64, RPC `sendTransaction`-ready), blockhash, from,
   to, lamports }`. Final fixation happens with the Solana-facilitator
   contract; a change is a **Breaking:** note here.
-- **Peer dependency:** `@me2em/x402 >=1.0.0-rc.1 <2.0.0-0` —
-  **type-only** (interface + capability types). The x402 package does
-  not appear in the runtime graph: `dist-artifact.spec.ts` fails the
-  build if any x402 runtime marker lands in the bundle.
+- **No x402 dependency at all.** The first cut of this entry declared
+  `@me2em/x402` as a type-only peer; since the `PaymentSigner`/
+  `SignerCapability` contract moved into `@me2em/core` (rc.8), that
+  peer was dropped entirely — view-only consumers (wallet trees,
+  `verifyPayment`, `pay`) install nothing from the transport line, and
+  applications that wire x402 payments add `@me2em/x402` on the
+  application side. `@me2em/x402` never appears in the runtime graph:
+  `dist-artifact.spec.ts` fails the build if any x402 runtime marker
+  lands in the bundle.
 
 ### Fail-closed
 - Networks outside the declared capabilities (`solana:*` wildcards,
