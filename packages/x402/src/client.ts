@@ -17,7 +17,6 @@ import {
   type SignerCapability,
   type X402PaymentPayload,
   type X402PaymentRequirements,
-  type X402ResourceInfo,
   type X402SettleResponse,
 } from '@me2em/core';
 import {
