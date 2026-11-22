@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.0.0-rc.9] — 2026-11-22
+
+P0.8 (decisions B1 + A4): the two additive core changes the pact ТЗ
+(M1.0) consumes — a JCS module and the dated revocation hook.
+
+### Added
+- **`crypto/jcs.ts` — JSON Canonicalization Scheme (RFC 8785)**
+  (`canonicalize` / `canonicalizeToString` / `CanonicalizationError`,
+  type `JsonValue`). UTF-16 code-unit property sorting, ECMAScript
+  number serialization (engine shortcut per ТЗ §2.2.2, pinned by the
+  RFC 8785 §3.2.4 byte vector and the Appendix B number table),
+  JSON string escaping with lone-surrogate rejection, fail-closed on
+  every input outside the I-JSON domain (BigInt, undefined, functions,
+  symbols, NaN/±Infinity, sparse arrays, `undefined` property values,
+  non-plain objects, cycles). Exported from the `crypto` namespace AND
+  at the package root. Deliberately separate from the byte-frozen
+  attestation/session serialization (ТЗ §2.3).
+- **`RevocationChecker.isRevokedAt?(jti, at)`** — optional dated
+  revocation lookup (PACTS D17, Tier 3): raw `jti`, unix seconds,
+  inclusive on `at`. Existing implementations compile unchanged;
+  `Session.verify` semantics untouched (still `isRevoked`, present
+  tense). Retrospective consumers (pact `verifyAct`) probe for the
+  method and degrade to Tier-3-unsupported when absent.
+- **Anchor-material pointer** in `crypto/derivation.ts` — documentation
+  only: which public derivation functions hand the raw node keys to
+  `@me2em/pact` (`deriveRootKey` / `deriveHandleKey` /
+  `deriveSubHandleKey`; ТЗ §5).
+
+### Notes
+- Strictly additive — consumers of rc.8 compile and behave identically
+  on rc.9; no existing vector changes.
+- Peer floor for `@me2em/pact` becomes `>=1.0.0-rc.9` (JCS +
+  `isRevokedAt`, specs/tz-pact.md §1).
+
 ## [1.0.0-rc.8] — 2026-11-18
 
 Contract glue for M1/M2: the x402 `PaymentSigner` contract moves into

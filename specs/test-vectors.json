@@ -234,5 +234,144 @@
         "expected_token": "eyJoSWQiOiJJRFBGTHhCa3dLaGlBTGR5V25tS1l4YS1idWVvam9GSzlSMUI2bGZUdnBnIiwiaE5tIjoiY29ubmVjdG9yLTEiLCJhdWQiOiJldi1hcHAuY29tIiwic2NwIjpbImNoYXJnZTpzdGFydCJdLCJleHAiOjE3NjcyMjc0MDAsImlhdCI6MTc2NzIyNTYwMCwianRpIjoidmVjdG9yLXNlc3Npb24tc3ViaGFuZGxlLTAwMDEiLCJoUGF0aCI6WyJ3b3JrIiwiY29ubmVjdG9yLTEiXX0.ZULFAFrH3MvBZ6exkOFcijPlvODlEM_E-UxYzwPJaqfG7ML8USb755zmkdPe1l47A_d3DsRRiaULg9mmMrRRCQ"
       }
     ]
+  },
+  "jcs": {
+    "spec": "JSON Canonicalization Scheme (RFC 8785)",
+    "spec_version": "1.0",
+    "vector_file_version": 1,
+    "algorithm": "JCS (RFC 8785 §3.2): UTF-16 code-unit property sorting + ECMAScript Number::toString + JSON string escaping + UTF-8",
+    "notes": [
+      "Transcribed byte-exact from the RFC text: §3.2.2 input sample, §3.2.3 canonical output, §3.2.4 canonical UTF-8 bytes, Appendix B Table 1.",
+      "I-JSON (RFC 7493) number-range constraints apply at the JSON-text parsing boundary (RFC 8785 §3.3); serialization accepts any finite double — Appendix B pins 1e+30, 2^53 and ~2^68 beyond the safe range.",
+      "NaN / ±Infinity and every other input outside the JSON domain (BigInt, undefined, functions, symbols, lone surrogates, sparse arrays, non-plain objects, cycles) terminate with CanonicalizationError (MALFORMED @ JCS).",
+      "Executed by packages/core/test/jcs.spec.ts (471-test core suite, Node 24, 2026-11-22); the section is a shared fixture for @me2em/pact M1.2 (specs/tz-pact.md §6)."
+    ],
+    "vectors": [
+      {
+        "id": "jcs-main-sample",
+        "source": "RFC 8785 §3.2.2 → §3.2.3 → §3.2.4",
+        "input_text": "{\"numbers\":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],\"string\":\"\\u20ac$\\u000F\\u000aA'\\u0042\\u0022\\u005c\\\\\\\"\\/\",\"literals\":[null,true,false]}",
+        "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+        "canonical_hex": "7b226c69746572616c73223a5b6e756c6c2c747275652c66616c73655d2c226e756d62657273223a5b3333333333333333332e333333333333332c31652b33302c342e352c302e3030322c31652d32375d2c22737472696e67223a22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f227d"
+      },
+      {
+        "id": "jcs-sorting-sample",
+        "source": "RFC 8785 §3.2.3",
+        "input_text": "{\"\\u20ac\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"\\ufb33\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"\\ud83d\\ude00\":\"Emoji: Grinning Face\",\"\\u0080\":\"Control\",\"\\u00f6\":\"Latin Small Letter O With Diaeresis\"}",
+        "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
+      },
+      {
+        "id": "jcs-numbers-appendix-b",
+        "source": "RFC 8785 Appendix B, Table 1",
+        "cases": [
+          {
+            "bits": "0000000000000001",
+            "canonical": "5e-324"
+          },
+          {
+            "bits": "8000000000000001",
+            "canonical": "-5e-324"
+          },
+          {
+            "bits": "7fefffffffffffff",
+            "canonical": "1.7976931348623157e+308"
+          },
+          {
+            "bits": "ffefffffffffffff",
+            "canonical": "-1.7976931348623157e+308"
+          },
+          {
+            "bits": "4340000000000000",
+            "canonical": "9007199254740992"
+          },
+          {
+            "bits": "c340000000000000",
+            "canonical": "-9007199254740992"
+          },
+          {
+            "bits": "4430000000000000",
+            "canonical": "295147905179352830000"
+          },
+          {
+            "bits": "44b52d02c7e14af5",
+            "canonical": "9.999999999999997e+22"
+          },
+          {
+            "bits": "44b52d02c7e14af6",
+            "canonical": "1e+23"
+          },
+          {
+            "bits": "44b52d02c7e14af7",
+            "canonical": "1.0000000000000001e+23"
+          },
+          {
+            "bits": "444b1ae4d6e2ef4e",
+            "canonical": "999999999999999700000"
+          },
+          {
+            "bits": "444b1ae4d6e2ef4f",
+            "canonical": "999999999999999900000"
+          },
+          {
+            "bits": "444b1ae4d6e2ef50",
+            "canonical": "1e+21"
+          },
+          {
+            "bits": "3eb0c6f7a0b5ed8c",
+            "canonical": "9.999999999999997e-7"
+          },
+          {
+            "bits": "3eb0c6f7a0b5ed8d",
+            "canonical": "0.000001"
+          },
+          {
+            "bits": "41b3de4355555553",
+            "canonical": "333333333.3333332"
+          },
+          {
+            "bits": "41b3de4355555554",
+            "canonical": "333333333.33333325"
+          },
+          {
+            "bits": "41b3de4355555555",
+            "canonical": "333333333.3333333"
+          },
+          {
+            "bits": "41b3de4355555556",
+            "canonical": "333333333.3333334"
+          },
+          {
+            "bits": "41b3de4355555557",
+            "canonical": "333333333.33333343"
+          },
+          {
+            "bits": "becbf647612f3696",
+            "canonical": "-0.0000033333333333333333"
+          },
+          {
+            "bits": "43143ff3c1cb0959",
+            "canonical": "1424953923781206.2"
+          }
+        ]
+      },
+      {
+        "id": "jcs-numbers-invalid",
+        "source": "RFC 8785 Appendix B (3) + §3.2.2.3 Note",
+        "cases": [
+          {
+            "bits": "7fffffffffffffff",
+            "error": "CanonicalizationError (NaN)"
+          },
+          {
+            "bits": "7ff0000000000000",
+            "error": "CanonicalizationError (Infinity)"
+          },
+          {
+            "value": "1n (BigInt)",
+            "error": "CanonicalizationError (MALFORMED @ JCS)"
+          }
+        ]
+      }
+    ]
   }
 }

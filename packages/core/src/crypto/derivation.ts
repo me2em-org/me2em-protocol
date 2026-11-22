@@ -11,6 +11,18 @@
 // All functions derive with HKDF-SHA256 (RFC 5869), salt = "" (zero
 // length), 32-byte output — see specs/v1.0.md §3. The info strings come
 // exclusively from {@link DERIVATION_PATHS} (single source of truth).
+//
+// Anchor material for @me2em/pact (P0.8 §5 — documentation pointer):
+// the pact package derives its keys from the RAW PRIVATE KEY of the
+// anchor node, obtained with the public functions below — pact accepts
+// Uint8Array only (Identity/Handle instances never expose #privateKey):
+//
+//   Identity  anchor  → deriveRootKey(seed)
+//   Handle    anchor  → deriveHandleKey(rootKey, name)
+//   SubHandle anchor  → deriveSubHandleKey(handleKey, handleName, subName)
+//
+// See specs/tz-pact.md §1/§3.2 for how the bytes feed
+// `derivePactKey(anchorSecretKey, pid, ch, gen)`.
 
 import { hkdf } from './hkdf.js';
 import { DERIVATION_PATHS } from './derivation-paths.js';

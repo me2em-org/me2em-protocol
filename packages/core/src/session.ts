@@ -102,6 +102,30 @@ export interface RevocationChecker {
    * @returns A Promise resolving to `true` if revoked, `false` otherwise.
    */
   isRevoked(sessionId: string): Promise<boolean>;
+
+  /**
+   * Dated revocation lookup (PACTS D17, Tier 3): был ли `jti` отозван
+   * на момент `at` (unix seconds) включительно. Реализации без метода
+   * означают «отзыв только в настоящем» — вызывающий деградирует до
+   * `isRevoked` (ретроспектива недоступна, Tier 3 unsupported).
+   *
+   * Introduced additively in rc.9 (P0.8, decision A4): existing
+   * implementations compile unchanged. `Session.verify` keeps using
+   * `isRevoked` (present tense); retrospective consumers — e.g. the
+   * pact journal verifier — probe
+   * `typeof checker.isRevokedAt === 'function'` and degrade to
+   * `isRevoked`-era semantics when the method is absent.
+   *
+   * @param sessionId - The raw `jti` from the payload, without any
+   *   namespace prefix (same convention as `isRevoked`; BL-15
+   *   namespaces like `att:{jti}` live at the revocation-record level,
+   *   not in checker arguments).
+   * @param at - Unix seconds; the answer covers `at` inclusively
+   *   (revoked at `at` or earlier → `true`).
+   * @returns A Promise resolving to `true` if revoked on or before `at`.
+   * @since 1.0.0-rc.9
+   */
+  isRevokedAt?(sessionId: string, at: number): Promise<boolean>;
 }
 
 /**

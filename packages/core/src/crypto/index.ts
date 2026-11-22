@@ -18,6 +18,11 @@
  *   functions). Building blocks for tooling outside the token flow;
  *   the protocol itself signs through `Identity` / `Handle` /
  *   `SubHandle`, which implement `Signer`.
+ * - **Canonicalization (JCS, RFC 8785):** `canonicalize` /
+ *   `canonicalizeToString` — the canonical bytes new protocol surfaces
+ *   (pact journals, P0.8 decision B1) sign and hash over. Deliberately
+ *   separate from the byte-frozen attestation/session token
+ *   serialization (see the jcs module header).
  *
  * The namespace is part of the frozen public API (specs/v1.0.md §12).
  * Note: `derivePassword` and `deriveChannelKey` are `Handle` methods,
@@ -29,3 +34,4 @@ export * from './hkdf.js';
 export * from './derivation-paths.js';
 export * from './derivation.js';
 export * from './ecdh.js';
+export * from './jcs.js';

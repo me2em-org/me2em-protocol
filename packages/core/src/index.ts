@@ -43,6 +43,12 @@ export {
   type RegulatoryProfile,
 } from './payment-x402.js';
 export { verifyWalletBinding, type WalletBindingOptions } from './wallet-binding.js';
+export {
+  canonicalize,
+  canonicalizeToString,
+  CanonicalizationError,
+  type JsonValue,
+} from './crypto/jcs.js';
 export * as crypto from './crypto/index.js';
 
 /**
