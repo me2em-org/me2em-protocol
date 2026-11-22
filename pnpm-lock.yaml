@@ -114,6 +114,30 @@ importers:
 
   packages/demo: {}
 
+  packages/pact:
+    devDependencies:
+      '@me2em/core':
+        specifier: workspace:^
+        version: link:../core
+      '@me2em/crypto':
+        specifier: workspace:^
+        version: link:../crypto
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.5
+      '@vitest/coverage-v8':
+        specifier: ^4.1.12
+        version: 4.1.12(vitest@4.1.12)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.3.8
+        version: 8.3.8(@types/node@25.9.5)(esbuild@0.28.2)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@types/node@25.9.5)(@vitest/coverage-v8@4.1.12)(jsdom@25.0.1)(vite@8.3.8(@types/node@25.9.5)(esbuild@0.28.2)(yaml@2.9.0))
+
   packages/react:
     dependencies:
       '@me2em/core':
