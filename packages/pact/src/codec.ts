@@ -361,12 +361,18 @@ export function assertValidPayload(
     }
   }
   for (const f of spec) {
-    const value = pl[f.name];
-    if (value === undefined) {
+    const present = Object.prototype.hasOwnProperty.call(pl, f.name);
+    if (!present) {
       if (f.required) {
         throw new PactError('MALFORMED', context, `pl: missing required field "${f.name}" for ${ty}`);
       }
       continue;
+    }
+    const value = pl[f.name];
+    if (value === undefined) {
+      // A key present with an undefined value is a caller bug — fail
+      // closed instead of silently treating it as absent.
+      throw new PactError('MALFORMED', context, `pl.${f.name}: undefined value`);
     }
     validateField(f, value, `pl.${f.name}`, context);
   }
