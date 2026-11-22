@@ -449,6 +449,19 @@ development, not part of the shipped API contract.
   Deferred until a real enterprise pilot exists (YAGNI). Merges the
   EV-station and drone-fleet patterns. Splitting later is easy; merging
   two separate packages later is expensive.
+- **BL-58 · open · Pacts — horizontal trust primitive.** Signed agreements
+  between independent Identities without merging trust roots: deterministic
+  Pact Keys (HKDF `me2em/pact/v1/{pid}/{ch}/g{gen}`), append-only Pact
+  Journal (11 event types, evHash chaining), anchors Identity/Handle/
+  SubHandle as lifetime policy, 2-party co-sign profile first, N-party
+  constitution/quotas second. Implementable spec: `specs/tz-pact.md`
+  (ТЗ v1.0, rev. 2); base design PACTS.md (D1–D47) lands in `docs/`
+  separately. Implementer: separate package @me2em/pact, peer
+  @me2em/core >=1.0.0-rc.9 (JCS + isRevokedAt, P0.8 — `specs/
+  tz-core-rc9-jcs-revocation.md`); transport via injected Channel,
+  optional @me2em/crypto peer. Depends on: BL-15 (namespace
+  convention); amplified by BL-12. Target: pact 1.0.0-rc.1
+  (M1.0–M1.7, ~6–7 нед.).
 
 ## P4 — Cosmetics
 
