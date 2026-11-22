@@ -373,5 +373,60 @@
         ]
       }
     ]
+  },
+  "pact": {
+    "spec": "@me2em/pact",
+    "spec_version": "1.0",
+    "vector_file_version": 1,
+    "algorithm": "HKDF-SHA256 (pact keys, PACTS D3/D38: me2em/pact/v1/{pid}/{ch}/g{gen}, salt \"\") + Ed25519 (RFC 8032, signatures) + JCS RFC 8785 (canonicalization)",
+    "notes": [
+      "Derived keys cross-checked against node:crypto hkdfSync (independent HKDF implementation); JCS vectors live in the \"jcs\" section (P0.8).",
+      "A swapped ch (context hash) yields a different key — fail-closed D4; pid and anchor material are equally load-bearing.",
+      "gen=0 on joining, +1 on ROTATE_KEY (B-4: AMEND never touches keys); pactPub = Ed25519 public key of the pact key (Р1).",
+      "Extended in M1.3–M1.7 with envelope/replay/fork/quorum/tier3/export groups (ТЗ §6)."
+    ],
+    "vectors": [
+      {
+        "id": "pact-derive",
+        "input": {
+          "anchorSecretKey_hex": "4242424242424242424242424242424242424242424242424242424242424242",
+          "pid": "BwcHBwcHBwcHBwcHBwcHBw",
+          "ch": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+        },
+        "outputs": [
+          {
+            "gen": 0,
+            "pactKey_hex": "840f7648efa03c2c4abbc05415dff080c0317147b4c7d3d876f926284a2dc2e3",
+            "pactPub_hex": "4ccee59a019eb0fcc0c2ecea9af99538cdc054196235746857e6b37f0044fa23"
+          },
+          {
+            "gen": 1,
+            "pactKey_hex": "fad70faab710a2949d90724875470a44745695cc1313e0887674ec3bd427cfb8",
+            "pactPub_hex": "736558189ab147d868f6ad037255412b2f69a99705d328e3c6ac5a70bc23775f"
+          },
+          {
+            "gen": 2,
+            "pactKey_hex": "c964759bbbef0f6f5e26744c9632bfa1be32ff39b07ca9d95dba9596a55bfcf4",
+            "pactPub_hex": "11d154cc763c69d80c3a45784ae4f26e932eca8305a49dc69fce4ca602a78bc2"
+          }
+        ]
+      },
+      {
+        "id": "pact-derive-negative-ch",
+        "input": {
+          "anchorSecretKey_hex": "4242424242424242424242424242424242424242424242424242424242424242",
+          "pid": "BwcHBwcHBwcHBwcHBwcHBw",
+          "ch": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo"
+        },
+        "outputs": [
+          {
+            "gen": 0,
+            "pactKey_hex": "921e8bbec9f6b6fa4d383a19a99babbee36c8a0baf1074fc00030ecc8279f586",
+            "pactPub_hex": "1c1e2ea2715b497a880090ada75da36ab7e59f4712e8762161e2e38ce69ae4b8"
+          }
+        ],
+        "note": "different ch ⇒ different key (fail-closed, D4)"
+      }
+    ]
   }
 }

@@ -14,7 +14,7 @@
 // where duplicate string keys cannot exist.
 
 import { canonicalize, crypto, type JsonValue } from '@me2em/core';
-import { PactError } from './errors.js';
+import { PactError, type PactErrorContext } from './errors.js';
 import { EVENT_TYPES, type Anchor, type Event, type EventType } from './types.js';
 
 /** Envelope key set — exact (unknown or missing envelope field ⇒ MALFORMED). */
@@ -61,10 +61,17 @@ export function b64urlEncode(bytes: Uint8Array): string {
 /**
  * Strict base64url decode: alphabet-checked, length-checked, canonical
  * (re-encode must match), byte length pinned when `expectedBytes` given.
+ * `context` — the layer reporting the failure (codec by default; the
+ * derivation module reports `derive`).
  */
-export function b64urlDecode(value: string, field: string, expectedBytes?: number): Uint8Array {
+export function b64urlDecode(
+  value: string,
+  field: string,
+  expectedBytes?: number,
+  context: PactErrorContext = 'codec'
+): Uint8Array {
   if (value.length % 4 === 1) {
-    throw new PactError('MALFORMED', 'codec', `${field}: invalid base64url length`);
+    throw new PactError('MALFORMED', context, `${field}: invalid base64url length`);
   }
   const outLen =
     value.length % 4 === 0
@@ -77,7 +84,7 @@ export function b64urlDecode(value: string, field: string, expectedBytes?: numbe
   for (let i = 0; i < value.length; i++) {
     const idx = B64_INDEX.get(value[i]);
     if (idx === undefined) {
-      throw new PactError('MALFORMED', 'codec', `${field}: invalid base64url character`);
+      throw new PactError('MALFORMED', context, `${field}: invalid base64url character`);
     }
     acc = ((acc << 6) | idx) & 0xffffff;
     bits += 6;
@@ -87,10 +94,10 @@ export function b64urlDecode(value: string, field: string, expectedBytes?: numbe
     }
   }
   if (b64urlEncode(out) !== value) {
-    throw new PactError('MALFORMED', 'codec', `${field}: non-canonical base64url`);
+    throw new PactError('MALFORMED', context, `${field}: non-canonical base64url`);
   }
   if (expectedBytes !== undefined && out.length !== expectedBytes) {
-    throw new PactError('MALFORMED', 'codec', `${field}: expected ${expectedBytes} bytes, got ${out.length}`);
+    throw new PactError('MALFORMED', context, `${field}: expected ${expectedBytes} bytes, got ${out.length}`);
   }
   return out;
 }
