@@ -110,13 +110,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function exactKeys(value: Record<string, unknown>, keys: readonly string[], field: string): void {
+function exactKeys(value: Record<string, unknown>, keys: readonly string[], field: string, ctx: PactErrorContext = 'codec'): void {
   const present = Object.keys(value);
   if (
     present.length !== keys.length ||
     !keys.every((k) => present.includes(k))
   ) {
-    throw new PactError('MALFORMED', 'codec', `${field}: unknown or missing field (expected ${keys.join(', ')})`);
+    throw new PactError('MALFORMED', ctx, `${field}: unknown or missing field (expected ${keys.join(', ')})`);
   }
 }
 
@@ -185,61 +185,61 @@ const PAYLOAD_SPECS: Record<EventType, readonly FieldSpec[]> = {
 const ANCHORS: readonly Anchor[] = ['identity', 'handle', 'subhandle'];
 const THRESHOLD_MODES = ['all', 'any', 'k-of-active', 'founder'] as const;
 
-function validateConstitution(value: unknown, field: string): void {
+function validateConstitution(value: unknown, field: string, ctx: PactErrorContext = 'codec'): void {
   if (!isPlainObject(value)) {
-    throw new PactError('MALFORMED', 'codec', `${field}: must be an object`);
+    throw new PactError('MALFORMED', ctx, `${field}: must be an object`);
   }
-  exactKeys(value, ['th', 'im', 'w'], field);
+  exactKeys(value, ['th', 'im', 'w'], field, ctx);
   const th = value['th'];
   if (!isPlainObject(th)) {
-    throw new PactError('MALFORMED', 'codec', `${field}.th: must be an object`);
+    throw new PactError('MALFORMED', ctx, `${field}.th: must be an object`);
   }
   for (const ty of Object.keys(th)) {
     if (!EVENT_TYPES.includes(ty as EventType)) {
-      throw new PactError('MALFORMED', 'codec', `${field}.th: unknown event type "${ty}"`);
+      throw new PactError('MALFORMED', ctx, `${field}.th: unknown event type "${ty}"`);
     }
     const t = th[ty];
     if (!isPlainObject(t)) {
-      throw new PactError('MALFORMED', 'codec', `${field}.th.${ty}: must be an object`);
+      throw new PactError('MALFORMED', ctx, `${field}.th.${ty}: must be an object`);
     }
     const tKeys = Object.keys(t);
     if (tKeys.length !== 1 && !(tKeys.length === 2 && tKeys.includes('k'))) {
-      throw new PactError('MALFORMED', 'codec', `${field}.th.${ty}: unknown field`);
+      throw new PactError('MALFORMED', ctx, `${field}.th.${ty}: unknown field`);
     }
     const m = t['m'];
     if (typeof m !== 'string' || !THRESHOLD_MODES.includes(m as never)) {
-      throw new PactError('MALFORMED', 'codec', `${field}.th.${ty}: unknown threshold mode`);
+      throw new PactError('MALFORMED', ctx, `${field}.th.${ty}: unknown threshold mode`);
     }
     const k = t['k'];
     if (m === 'k-of-active') {
       if (!Number.isSafeInteger(k) || (k as number) < 1) {
-        throw new PactError('MALFORMED', 'codec', `${field}.th.${ty}: k-of-active requires integer k ≥ 1`);
+        throw new PactError('MALFORMED', ctx, `${field}.th.${ty}: k-of-active requires integer k ≥ 1`);
       }
     } else if (k !== undefined) {
-      throw new PactError('MALFORMED', 'codec', `${field}.th.${ty}: k is only meaningful for k-of-active`);
+      throw new PactError('MALFORMED', ctx, `${field}.th.${ty}: k is only meaningful for k-of-active`);
     }
   }
   const im = value['im'];
   if (im !== 'pinned' && im !== 'bearer') {
-    throw new PactError('MALFORMED', 'codec', `${field}.im: must be 'pinned' or 'bearer'`);
+    throw new PactError('MALFORMED', ctx, `${field}.im: must be 'pinned' or 'bearer'`);
   }
   if (typeof value['w'] !== 'boolean') {
-    throw new PactError('MALFORMED', 'codec', `${field}.w: must be a boolean`);
+    throw new PactError('MALFORMED', ctx, `${field}.w: must be a boolean`);
   }
 }
 
-function validateVoucher(value: unknown, field: string): void {
+function validateVoucher(value: unknown, field: string, ctx: PactErrorContext = 'codec'): void {
   if (!isPlainObject(value)) {
-    throw new PactError('MALFORMED', 'codec', `${field}: must be an object`);
+    throw new PactError('MALFORMED', ctx, `${field}: must be an object`);
   }
-  exactKeys(value, ['rh', 'rp'], field);
-  b64urlDecode(value['rh'] as string, `${field}.rh`, 32);
-  b64urlDecode(value['rp'] as string, `${field}.rp`, 32);
+  exactKeys(value, ['rh', 'rp'], field, ctx);
+  b64urlDecode(value['rh'] as string, `${field}.rh`, 32, ctx);
+  b64urlDecode(value['rp'] as string, `${field}.rp`, 32, ctx);
 }
 
-function validateFounder(value: unknown, field: string): void {
+function validateFounder(value: unknown, field: string, ctx: PactErrorContext = 'codec'): void {
   if (!isPlainObject(value)) {
-    throw new PactError('MALFORMED', 'codec', `${field}: must be an object`);
+    throw new PactError('MALFORMED', ctx, `${field}: must be an object`);
   }
   const required = ['p', 'pp', 'an'];
   const present = Object.keys(value);
@@ -248,88 +248,97 @@ function validateFounder(value: unknown, field: string): void {
     extra.length !== required.length ||
     !required.every((k) => present.includes(k))
   ) {
-    throw new PactError('MALFORMED', 'codec', `${field}: unknown or missing field (expected p, pp, an, w?, vc?)`);
+    throw new PactError('MALFORMED', ctx, `${field}: unknown or missing field (expected p, pp, an, w?, vc?)`);
   }
-  b64urlDecode(value['p'] as string, `${field}.p`, 32);
-  b64urlDecode(value['pp'] as string, `${field}.pp`, 32);
+  b64urlDecode(value['p'] as string, `${field}.p`, 32, ctx);
+  b64urlDecode(value['pp'] as string, `${field}.pp`, 32, ctx);
   const an = value['an'];
   if (typeof an !== 'string' || !ANCHORS.includes(an as Anchor)) {
-    throw new PactError('MALFORMED', 'codec', `${field}.an: unknown anchor type`);
+    throw new PactError('MALFORMED', ctx, `${field}.an: unknown anchor type`);
   }
   const w = value['w'];
   if (w !== undefined && (!Number.isSafeInteger(w) || (w as number) < 1)) {
-    throw new PactError('MALFORMED', 'codec', `${field}.w: must be an integer ≥ 1`);
+    throw new PactError('MALFORMED', ctx, `${field}.w: must be an integer ≥ 1`);
   }
   if (value['vc'] !== undefined) {
-    validateVoucher(value['vc'], `${field}.vc`);
+    validateVoucher(value['vc'], `${field}.vc`, ctx);
   }
 }
 
-function validateField(spec: FieldSpec, value: unknown, field: string): void {
+function validateField(spec: FieldSpec, value: unknown, field: string, ctx: PactErrorContext = 'codec'): void {
   switch (spec.kind) {
     case 'b64': {
       if (typeof value !== 'string') {
-        throw new PactError('MALFORMED', 'codec', `${field}: must be a base64url string`);
+        throw new PactError('MALFORMED', ctx, `${field}: must be a base64url string`);
       }
-      b64urlDecode(value, field, spec.bytes);
+      b64urlDecode(value, field, spec.bytes, ctx);
       return;
     }
     case 'str': {
       if (typeof value !== 'string') {
-        throw new PactError('MALFORMED', 'codec', `${field}: must be a string`);
+        throw new PactError('MALFORMED', ctx, `${field}: must be a string`);
       }
       if (spec.maxChars !== undefined && [...value].length > spec.maxChars) {
-        throw new PactError('PAYLOAD_TOO_LARGE', 'codec', `${field}: exceeds ${spec.maxChars} characters`);
+        throw new PactError('PAYLOAD_TOO_LARGE', ctx, `${field}: exceeds ${spec.maxChars} characters`);
       }
       if (spec.maxBytes !== undefined && utf8(value).length > spec.maxBytes) {
-        throw new PactError('PAYLOAD_TOO_LARGE', 'codec', `${field}: exceeds ${spec.maxBytes} bytes`);
+        throw new PactError('PAYLOAD_TOO_LARGE', ctx, `${field}: exceeds ${spec.maxBytes} bytes`);
       }
       return;
     }
     case 'int': {
       if (!Number.isSafeInteger(value) || (spec.min !== undefined && (value as number) < spec.min)) {
-        throw new PactError('MALFORMED', 'codec', `${field}: must be an integer${spec.min !== undefined ? ` ≥ ${spec.min}` : ''}`);
+        throw new PactError('MALFORMED', ctx, `${field}: must be an integer${spec.min !== undefined ? ` ≥ ${spec.min}` : ''}`);
       }
       return;
     }
     case 'anchor': {
       if (typeof value !== 'string' || !ANCHORS.includes(value as Anchor)) {
-        throw new PactError('MALFORMED', 'codec', `${field}: unknown anchor type`);
+        throw new PactError('MALFORMED', ctx, `${field}: unknown anchor type`);
       }
       return;
     }
     case 'reverseKind': {
       if (value !== 'supersede' && value !== 'reversal') {
-        throw new PactError('MALFORMED', 'codec', `${field}: must be 'supersede' or 'reversal'`);
+        throw new PactError('MALFORMED', ctx, `${field}: must be 'supersede' or 'reversal'`);
       }
       return;
     }
     case 'constitution': {
-      validateConstitution(value, field);
+      validateConstitution(value, field, ctx);
       return;
     }
     case 'founders': {
       if (!Array.isArray(value)) {
-        throw new PactError('MALFORMED', 'codec', `${field}: must be an array`);
+        throw new PactError('MALFORMED', ctx, `${field}: must be an array`);
       }
       if (value.length < 1 || value.length > MAX_FOUNDERS) {
-        throw new PactError('PAYLOAD_TOO_LARGE', 'codec', `${field}: must contain 1..${MAX_FOUNDERS} founders`);
+        throw new PactError('PAYLOAD_TOO_LARGE', ctx, `${field}: must contain 1..${MAX_FOUNDERS} founders`);
       }
       let prev = '';
+      let vouchers = 0;
       for (let i = 0; i < value.length; i++) {
-        validateFounder(value[i], `${field}[${i}]`);
-        const p = (value[i] as Record<string, unknown>)['p'] as string;
+        validateFounder(value[i], `${field}[${i}]`, ctx);
+        const f = value[i] as Record<string, unknown>;
+        if (f['vc'] !== undefined) vouchers++;
+        const p = f['p'] as string;
         // Roster/founder order is normative (PACTS §7.3): strictly
         // ascending by pactPub, no duplicates.
         if (i > 0 && !(prev < p)) {
-          throw new PactError('MALFORMED', 'codec', `${field}: founders must be sorted by p (strictly ascending)`);
+          throw new PactError('MALFORMED', ctx, `${field}: founders must be sorted by p (strictly ascending)`);
         }
         prev = p;
+      }
+      // One voucher per membership event: founders share the GENESIS
+      // membership id, so chain artifacts (keyed by membership id) can
+      // only resolve unambiguously for a single vc.
+      if (vouchers > 1) {
+        throw new PactError('MALFORMED', ctx, `${field}: at most one founder voucher per membership event`);
       }
       return;
     }
     case 'voucher': {
-      validateVoucher(value, field);
+      validateVoucher(value, field, ctx);
       return;
     }
   }
@@ -337,45 +346,49 @@ function validateField(spec: FieldSpec, value: unknown, field: string): void {
 
 /**
  * Strict payload validation for `ty` (PACTS §7.3 + D35 limits + D34
- * check-verification). Used by `decodeEvent` and by every assembler —
- * both sides fail closed.
+ * check-verification). Used by `decodeEvent`, `validateEvent` and every
+ * assembler — all sides fail closed.
  */
-export function assertValidPayload(ty: EventType, pl: Record<string, unknown>): void {
+export function assertValidPayload(
+  ty: EventType,
+  pl: Record<string, unknown>,
+  context: PactErrorContext = 'codec'
+): void {
   const spec = PAYLOAD_SPECS[ty];
   for (const key of Object.keys(pl)) {
     if (!spec.some((f) => f.name === key)) {
-      throw new PactError('MALFORMED', 'codec', `pl: unknown payload field "${key}" for ${ty}`);
+      throw new PactError('MALFORMED', context, `pl: unknown payload field "${key}" for ${ty}`);
     }
   }
   for (const f of spec) {
     const value = pl[f.name];
     if (value === undefined) {
       if (f.required) {
-        throw new PactError('MALFORMED', 'codec', `pl: missing required field "${f.name}" for ${ty}`);
+        throw new PactError('MALFORMED', context, `pl: missing required field "${f.name}" for ${ty}`);
       }
       continue;
     }
-    validateField(f, value, `pl.${f.name}`);
+    validateField(f, value, `pl.${f.name}`, context);
   }
 
   // D34 check-verification of inline material against its commitment.
   if (ty === 'GENESIS' && pl['cx'] !== undefined) {
     if (b64urlEncode(crypto.sha256(utf8(pl['cx'] as string))) !== pl['ch']) {
-      throw new PactError('MALFORMED', 'codec', 'pl.cx: SHA-256(UTF-8(cx)) != ch');
+      throw new PactError('MALFORMED', context, 'pl.cx: SHA-256(UTF-8(cx)) != ch');
     }
   }
   if (ty === 'ACT' && pl['doc'] !== undefined) {
     if (pl['dh'] === undefined) {
-      throw new PactError('MALFORMED', 'codec', 'pl.doc: inline doc requires dh');
+      throw new PactError('MALFORMED', context, 'pl.doc: inline doc requires dh');
     }
     if (b64urlEncode(crypto.sha256(utf8(pl['doc'] as string))) !== pl['dh']) {
-      throw new PactError('MALFORMED', 'codec', 'pl.doc: SHA-256(UTF-8(doc)) != dh');
+      throw new PactError('MALFORMED', context, 'pl.doc: SHA-256(UTF-8(doc)) != dh');
     }
   }
 
   // D35: canonical payload ≤ 4096 B.
   if (canonicalize(pl as unknown as JsonValue).length > PAYLOAD_MAX_BYTES) {
-    throw new PactError('PAYLOAD_TOO_LARGE', 'codec', `pl exceeds ${PAYLOAD_MAX_BYTES} bytes`);
+    throw new PactError('PAYLOAD_TOO_LARGE', context, `pl exceeds ${PAYLOAD_MAX_BYTES} bytes`);
   }
 }
 
@@ -397,9 +410,66 @@ export function encodeEvent(event: Event): Uint8Array {
 }
 
 /**
+ * Strict validation of an event OBJECT (not bytes): exact envelope
+ * shape, per-type payload (PACTS §7.3), limits (D35). Throws with the
+ * given reporting `context` — codec decodes bytes with 'codec', the
+ * verifier re-validates journal objects with 'verify', assemblers
+ * report 'assemble'. An event type outside the v1 registry rejects
+ * with `UNKNOWN_EVENT_TYPE`.
+ */
+export function validateEvent(event: Event, context: PactErrorContext = 'codec'): void {
+  if (event.typ !== 'me2em/pact-event/v1') {
+    throw new PactError('MALFORMED', context, `typ: unknown envelope version ${JSON.stringify(event.typ)}`);
+  }
+  if (typeof event.pid !== 'string') {
+    throw new PactError('MALFORMED', context, 'pid: must be a base64url string');
+  }
+  b64urlDecode(event.pid, 'pid', 16, context);
+  if (!Number.isSafeInteger(event.sq) || event.sq < 0) {
+    throw new PactError('MALFORMED', context, 'sq: must be an integer ≥ 0');
+  }
+  if (typeof event.ph !== 'string') {
+    throw new PactError('MALFORMED', context, 'ph: must be a base64url string');
+  }
+  b64urlDecode(event.ph, 'ph', 32, context);
+  if (typeof event.ty !== 'string' || !EVENT_TYPES.includes(event.ty)) {
+    throw new PactError('UNKNOWN_EVENT_TYPE', context, `ty: unknown event type ${JSON.stringify(event.ty)}`);
+  }
+  if (!isPlainObject(event.pl)) {
+    throw new PactError('MALFORMED', context, 'pl: must be an object');
+  }
+  if (!Number.isSafeInteger(event.iat) || event.iat < 0) {
+    throw new PactError('MALFORMED', context, 'iat: must be an integer ≥ 0');
+  }
+  if (!Array.isArray(event.sig)) {
+    throw new PactError('MALFORMED', context, 'sig: must be an array');
+  }
+  if (event.sig.length > MAX_SIGNATURES) {
+    throw new PactError('PAYLOAD_TOO_LARGE', context, `sig exceeds ${MAX_SIGNATURES} signatures`);
+  }
+  const seen = new Set<string>();
+  for (let i = 0; i < event.sig.length; i++) {
+    const s = event.sig[i];
+    if (!isPlainObject(s)) {
+      throw new PactError('MALFORMED', context, `sig[${i}]: must be an object`);
+    }
+    exactKeys(s, ['p', 's'], `sig[${i}]`, context);
+    b64urlDecode(s['p'] as string, `sig[${i}].p`, 32, context);
+    b64urlDecode(s['s'] as string, `sig[${i}].s`, 64, context);
+    const p = s['p'] as string;
+    if (seen.has(p)) {
+      throw new PactError('MALFORMED', context, `sig[${i}].p: duplicate signer`);
+    }
+    seen.add(p);
+  }
+  assertValidPayload(event.ty, event.pl, context);
+}
+
+/**
  * Strict parse of canonical event bytes: UTF-8 → JSON → exact envelope
  * shape → per-type payload validation. Any deviation rejects
- * (`MALFORMED` / `PAYLOAD_TOO_LARGE`); nothing is skipped or coerced.
+ * (`MALFORMED` / `UNKNOWN_EVENT_TYPE` / `PAYLOAD_TOO_LARGE`); nothing
+ * is skipped or coerced.
  */
 export function decodeEvent(bytes: Uint8Array): Event {
   let text: string;
@@ -419,68 +489,18 @@ export function decodeEvent(bytes: Uint8Array): Event {
   }
   exactKeys(raw, ENVELOPE_KEYS, 'event');
 
-  const typ = raw['typ'];
-  if (typ !== 'me2em/pact-event/v1') {
-    throw new PactError('MALFORMED', 'codec', `typ: unknown envelope version ${JSON.stringify(typ)}`);
-  }
-  if (typeof raw['pid'] !== 'string') {
-    throw new PactError('MALFORMED', 'codec', 'pid: must be a base64url string');
-  }
-  b64urlDecode(raw['pid'], 'pid', 16);
-  const sq = raw['sq'];
-  if (!Number.isSafeInteger(sq) || (sq as number) < 0) {
-    throw new PactError('MALFORMED', 'codec', 'sq: must be an integer ≥ 0');
-  }
-  if (typeof raw['ph'] !== 'string') {
-    throw new PactError('MALFORMED', 'codec', 'ph: must be a base64url string');
-  }
-  b64urlDecode(raw['ph'], 'ph', 32);
-  const ty = raw['ty'];
-  if (typeof ty !== 'string' || !EVENT_TYPES.includes(ty as EventType)) {
-    throw new PactError('MALFORMED', 'codec', `ty: unknown event type ${JSON.stringify(ty)}`);
-  }
-  const pl = raw['pl'];
-  if (!isPlainObject(pl)) {
-    throw new PactError('MALFORMED', 'codec', 'pl: must be an object');
-  }
-  const iat = raw['iat'];
-  if (!Number.isSafeInteger(iat) || (iat as number) < 0) {
-    throw new PactError('MALFORMED', 'codec', 'iat: must be an integer ≥ 0');
-  }
-  const sig = raw['sig'];
-  if (!Array.isArray(sig)) {
-    throw new PactError('MALFORMED', 'codec', 'sig: must be an array');
-  }
-  if (sig.length > MAX_SIGNATURES) {
-    throw new PactError('PAYLOAD_TOO_LARGE', 'codec', `sig exceeds ${MAX_SIGNATURES} signatures`);
-  }
-  const seen = new Set<string>();
-  for (let i = 0; i < sig.length; i++) {
-    const s = sig[i];
-    if (!isPlainObject(s)) {
-      throw new PactError('MALFORMED', 'codec', `sig[${i}]: must be an object`);
-    }
-    exactKeys(s, ['p', 's'], `sig[${i}]`);
-    b64urlDecode(s['p'] as string, `sig[${i}].p`, 32);
-    b64urlDecode(s['s'] as string, `sig[${i}].s`, 64);
-    const p = s['p'] as string;
-    if (seen.has(p)) {
-      throw new PactError('MALFORMED', 'codec', `sig[${i}].p: duplicate signer`);
-    }
-    seen.add(p);
-  }
-
-  assertValidPayload(ty as EventType, pl);
-  return {
-    typ: 'me2em/pact-event/v1',
+  const event: Event = {
+    typ: raw['typ'] as Event['typ'],
     pid: raw['pid'] as string,
-    sq: sq as number,
+    sq: raw['sq'] as number,
     ph: raw['ph'] as string,
-    ty: ty as EventType,
-    pl,
-    iat: iat as number,
-    sig: sig as Event['sig'],
+    ty: raw['ty'] as EventType,
+    pl: raw['pl'] as Record<string, unknown>,
+    iat: raw['iat'] as number,
+    sig: raw['sig'] as Event['sig'],
   };
+  validateEvent(event, 'codec');
+  return event;
 }
 
 // ---------------------------------------------------------------------------

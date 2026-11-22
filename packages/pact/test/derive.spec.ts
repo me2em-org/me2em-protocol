@@ -74,6 +74,8 @@ describe('pact key derivation — M1.2', () => {
     expect(() => derivePactKey(bytes(32, 1), 'not!b64!!', CH, 0)).toThrow(PactError);
     expect(() => derivePactKey(bytes(32, 1), PID, b64urlEncode(bytes(31)), 0)).toThrow(PactError);
     expect(() => derivePactKey(bytes(32, 1), PID, ZERO32.slice(0, -1) + 'B', 0)).toThrow(PactError);
+    expect(() => derivePactKey(ANCHOR, 42 as never, CH, 0)).toThrow(PactError); // pid non-string
+    expect(() => derivePactKey(ANCHOR, PID, 42 as never, 0)).toThrow(PactError); // ch non-string
     for (const gen of [-1, 1.5, NaN]) {
       expect(() => derivePactKey(ANCHOR, PID, CH, gen)).toThrow(PactError);
     }

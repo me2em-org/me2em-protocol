@@ -188,7 +188,7 @@ describe('pact codec — M1.1', () => {
       expectPactError(() => decodeEvent(encodeEvent({ ...event, sq: -1 })), 'MALFORMED');
       expectPactError(() => decodeEvent(encodeEvent({ ...event, sq: 1.5 })), 'MALFORMED');
       expectPactError(() => decodeEvent(encodeEvent({ ...event, iat: -5 })), 'MALFORMED');
-      expectPactError(() => decodeEvent(encodeEvent({ ...event, ty: 'SIDE_DEAL' })), 'MALFORMED');
+      expectPactError(() => decodeEvent(encodeEvent({ ...event, ty: 'SIDE_DEAL' })), 'UNKNOWN_EVENT_TYPE');
     });
 
     it('rejects wrong field types before decoding (pid/ph/pl/iat/sig)', () => {
@@ -253,17 +253,18 @@ describe('pact codec — M1.1', () => {
       expectPactError(() => decodePl('AMEND', { cn: CN, no: 'a'.repeat(33) }), 'PAYLOAD_TOO_LARGE');
     });
 
-    it('D35: payload over 4096 B rejects (GENESIS: cx 2048 + 16 founders with vc)', () => {
-      const vc = { rh: H32, rp: H32 };
+    it('D35: payload over 4096 B rejects (GENESIS: cx 2048 + full th + 16 founders)', () => {
+      const th: Record<string, { m: string; k?: number }> = {};
+      for (const ty of ALL_TYPES) th[ty] = { m: 'k-of-active', k: 2 };
+      const cnFull: Constitution = { th, im: 'pinned', w: true };
       const ft: Founder[] = Array.from({ length: 16 }, (_, i) => ({
         p: b64urlEncode(bytes(32, i + 1)),
         pp: H32,
         an: 'identity' as const,
         w: 1,
-        vc,
       }));
-      // founders sorted by p: bytes(32, i+1) ascending ✓
-      const pl = { ch: sha256b64('a'.repeat(2048)), cx: 'a'.repeat(2048), cn: CN, ft };
+      // founders sorted by p: bytes(32, i+1) ascending ✓; no vc (≤ 1 rule)
+      const pl = { ch: sha256b64('a'.repeat(2048)), cx: 'a'.repeat(2048), cn: cnFull, ft };
       expectPactError(() => decodePl('GENESIS', pl), 'PAYLOAD_TOO_LARGE');
     });
 
@@ -309,6 +310,38 @@ describe('pact codec — M1.1', () => {
       expectPactError(() => decodePl('ROTATE_KEY', { np: b64urlEncode(bytes(31)) }), 'MALFORMED');
       expectPactError(() => decodePl('REVERSE_ACT', { ref: H32, k: 'cancel' }), 'MALFORMED');
       expectOk('REVERSE_ACT', { ref: H32, k: 'reversal' });
+    });
+  });
+
+  describe('validator negatives (coverage)', () => {
+    const decodePl = (ty: EventType, pl: Record<string, unknown>): void => {
+      decodeEvent(encodeEvent(mkEvent(ty, pl)));
+    };
+
+    it('constitution/voucher/founder/b64/int shape guards', () => {
+      expectPactError(() => decodePl('GENESIS', { ch: H32, cn: 'x', ft: FT }), 'MALFORMED'); // cn not object
+      expectPactError(() => decodePl('GENESIS', { ch: H32, cn: { th: 'x', im: 'pinned', w: false }, ft: FT }), 'MALFORMED'); // th not object
+      expectPactError(
+        () => decodePl('GENESIS', { ch: H32, cn: { th: { EVICT: 'x' }, im: 'pinned', w: false }, ft: FT }),
+        'MALFORMED'
+      ); // threshold entry not object
+      expectPactError(
+        () => decodePl('GENESIS', { ch: H32, cn: { th: { EVICT: { m: 'all', x: 1 } }, im: 'pinned', w: false }, ft: FT }),
+        'MALFORMED'
+      ); // unknown field in threshold entry
+      expectPactError(
+        () => decodePl('ENROLL', { ref: H32, vc: 'x' }),
+        'MALFORMED'
+      ); // voucher not object
+      expectPactError(() => decodePl('GENESIS', { ch: H32, cn: CN, ft: [42] }), 'MALFORMED'); // founder not object
+      expectPactError(
+        () => decodePl('GENESIS', { ch: H32, cn: CN, ft: [{ p: PUB_A, an: 'identity' }] }),
+        'MALFORMED'
+      ); // founder missing pp
+      expectPactError(() => decodePl('GENESIS', { ch: 42, cn: CN, ft: FT }), 'MALFORMED'); // b64 field non-string
+      expectPactError(() => decodePl('INVITE', { w: 'x', an: 'handle' }), 'MALFORMED'); // int non-integer
+      expectPactError(() => decodePl('GENESIS', { ch: H32, cn: CN, ft: 'x' }), 'MALFORMED'); // founders not array
+      expectPactError(() => decodePl('GENESIS', { ch: H32, cx: 42, cn: CN, ft: FT }), 'MALFORMED'); // str non-string
     });
   });
 });
