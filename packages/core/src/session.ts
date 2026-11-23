@@ -102,6 +102,30 @@ export interface RevocationChecker {
    * @returns A Promise resolving to `true` if revoked, `false` otherwise.
    */
   isRevoked(sessionId: string): Promise<boolean>;
+
+  /**
+   * Dated revocation lookup (PACTS D17, Tier 3): был ли `jti` отозван
+   * на момент `at` (unix seconds) включительно. Реализации без метода
+   * означают «отзыв только в настоящем» — вызывающий деградирует до
+   * `isRevoked` (ретроспектива недоступна, Tier 3 unsupported).
+   *
+   * Introduced additively in rc.9 (P0.8, decision A4): existing
+   * implementations compile unchanged. `Session.verify` keeps using
+   * `isRevoked` (present tense); retrospective consumers — e.g. the
+   * pact journal verifier — probe
+   * `typeof checker.isRevokedAt === 'function'` and degrade to
+   * `isRevoked`-era semantics when the method is absent.
+   *
+   * @param sessionId - The raw `jti` from the payload, without any
+   *   namespace prefix (same convention as `isRevoked`; BL-15
+   *   namespaces like `att:{jti}` live at the revocation-record level,
+   *   not in checker arguments).
+   * @param at - Unix seconds; the answer covers `at` inclusively
+   *   (revoked at `at` or earlier → `true`).
+   * @returns A Promise resolving to `true` if revoked on or before `at`.
+   * @since 1.0.0-rc.9
+   */
+  isRevokedAt?(sessionId: string, at: number): Promise<boolean>;
 }
 
 /**
@@ -323,11 +347,14 @@ export class Session {
       const jsonString = new TextDecoder().decode(payloadBytes);
       payload = safeJsonParse(jsonString) as SessionPayload;
     } catch (e) {
+      // No interpolation of `e.message` (see attestation.ts parseToken):
+      // native JSON.parse errors echo input snippets — attacker bytes
+      // must never reach the error message.
       throw new AttestationError(
         'MALFORMED',
         'FORMAT',
         e instanceof SyntaxError && e.message.includes('__proto__')
-          ? `Invalid token format: payload is not valid JSON — ${e.message}`
+          ? 'Invalid token format: payload is not valid JSON — payload contains the forbidden key "__proto__"'
           : 'Invalid token format: payload is not valid JSON'
       );
     }

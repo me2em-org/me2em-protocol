@@ -125,6 +125,37 @@ describe('specs/test-vectors.json golden test', () => {
     }
   });
 
+  describe('derive_resource_key (rc.9 states)', () => {
+    for (const [i, v] of (doc.vectors.derive_resource_key ?? []).entries()) {
+      it(`row ${i}: ${v.description}`, async () => {
+        const identity = await Identity.fromSeed(fromHex(v.seed_hex as string));
+        const handle = await identity.deriveHandle(v.handle_name as string);
+        const opts: { epoch?: number; revision?: number } = {};
+        if (v.epoch !== undefined) opts.epoch = v.epoch as number;
+        if (v.revision !== undefined) opts.revision = v.revision as number;
+        const key = handle.deriveResourceKey(
+          v.resource_type as string,
+          v.resource_id as string,
+          opts
+        );
+        expect(key.length).toBe(32);
+        expect(hex(key)).toBe(v.expected_key_hex);
+      });
+    }
+
+    it('canonicalized components equal the canonical row (determinism)', async () => {
+      const rows = doc.vectors.derive_resource_key ?? [];
+      // Row 0 uses the canonical 'chat-msg'; row 6 feeds the raw
+      // fullwidth 'Ｃhat-Msg ' — canonicalization must map it to row 0's key.
+      const canonical = rows[0];
+      const noisy = rows.find(
+        r => r.resource_type === 'Ｃhat-Msg '
+      );
+      expect(canonical && noisy).toBeTruthy();
+      expect(canonical.expected_key_hex).toBe(noisy!.expected_key_hex);
+    });
+  });
+
   describe('derive_shared_secret', () => {
     for (const [i, v] of (doc.vectors.derive_shared_secret ?? []).entries()) {
       it(`row ${i}: ${v.description} (order-independent)`, async () => {

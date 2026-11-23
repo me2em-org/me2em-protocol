@@ -1,4 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
-<!-- Фон: Круг (Экосистема me2em) — ТЗ @me2em/x402 §6: favicon — круг #2563EB -->
-<circle cx="8" cy="8" r="8" fill="#2563EB"/>
+  <!-- Фон: КРУГ (поток, глобальная сеть, непрерывное движение) -->
+  <circle cx="8" cy="8" r="8" fill="#2563EB"/>
+  
+  <!-- Центр: символ X (протокол x402, кросс-взаимодействие) -->
+  <path d="M5.5 5.5 L10.5 10.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <path d="M10.5 5.5 L5.5 10.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Периметр: 4 дефиса/тире (платежи в движении) -->
+  <!-- Расстояние от края = 3 единицы -->
+  <rect x="6.5" y="1.5" width="3" height="2" fill="white" rx="0.5"/> <!-- Верх -->
+  <rect x="6.5" y="12.5" width="3" height="2" fill="white" rx="0.5"/> <!-- Низ -->
+  <rect x="1.5" y="6.5" width="2" height="3" fill="white" rx="0.5"/> <!-- Лево -->
+  <rect x="12.5" y="6.5" width="2" height="3" fill="white" rx="0.5"/> <!-- Право -->
 </svg>

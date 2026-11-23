@@ -22,7 +22,7 @@ import { base58 } from '@scure/base';
 import { SolanaWalletAdapter } from './adapter.js';
 import type { SolanaNetwork } from './networks.js';
 import { SOLANA_RPC_ENDPOINTS, solanaChain } from './networks.js';
-import { pay } from './pay.js';
+import { pay, solToLamports } from './pay.js';
 import {
   RpcClient,
   type ParsedTransactionResponse,
@@ -264,6 +264,22 @@ class SolanaPaymentVerifier {
       );
     }
 
+    // В-8: amount check — the request amount must be a canonical decimal
+    // SOL string (the exact `solToLamports` grammar, BL-55). Malformed
+    // input (`'NaN'`, `'1e999'`, `'0x10'`) fails loudly HERE: a float
+    // conversion would either throw RangeError mid-check-order or,
+    // worse, collapse `'0x10'` to a zero threshold (UNDERPAID passes
+    // trivially). The exact bigint threshold is computed once and
+    // handed to `#verifyAmount`.
+    let amountLamports: bigint;
+    try {
+      amountLamports = solToLamports(request.amount);
+    } catch {
+      throw new TypeError(
+        'verifyPayment: request.amount must be a canonical decimal string in whole SOL units with ≤9 fractional digits'
+      );
+    }
+
     // Step 1: NOT_FOUND
     const tx = await this.#getTransaction(txRef);
     if (tx === null) {
@@ -305,7 +321,7 @@ class SolanaPaymentVerifier {
     }
 
     // Step 6: UNDERPAID
-    if (!this.#verifyAmount(tx, request.amount, request.payTo)) {
+    if (!this.#verifyAmount(tx, amountLamports, request.payTo)) {
       return { status: 'failure', reason: 'UNDERPAID', observedAt: now };
     }
 
@@ -438,17 +454,18 @@ class SolanaPaymentVerifier {
 
   /**
    * Check that the total lamports sent via `system.transfer` to
-   * `payTo` meets or exceeds `amount` (whole units → lamports).
+   * `payTo` meets or exceeds the requested amount.
    *
-   * Ф4 is SOL-only: `amount * 1e9` = lamports.
+   * Ф4 is SOL-only. `amountLamports` arrives pre-converted by
+   * `solToLamports` at the `verifyPayment` entry (В-8) — exact bigint,
+   * never through float; this method performs no amount parsing.
    * SPL check is done as step 6a (WRONG_ASSET) before this method.
    */
   #verifyAmount(
     tx: ParsedTransactionWithInstructions,
-    amount: string,
+    amountLamports: bigint,
     payTo: string
   ): boolean {
-    const amountLamports = BigInt(Math.round(parseFloat(amount) * 1e9));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsedInstructions = (tx.transaction.message as any).instructions;

@@ -21,7 +21,7 @@ import { ed } from './crypto/init.js';
 import { hkdf } from './crypto/hkdf.js';
 import { deriveSubHandleKey } from './crypto/derivation.js';
 import { rawX25519SharedSecret } from './crypto/ecdh.js';
-import { normalizeName, normalizeContext } from './canonical-name.js';
+import { normalizeName, normalizeContext, normalizeResourceType, normalizeResourceId } from './canonical-name.js';
 import { DERIVATION_PATHS } from './crypto/derivation-paths.js';
 import { Attestation, type AttestationGrant } from './attestation.js';
 import { DisposedError } from './disposed-error.js';
@@ -103,6 +103,37 @@ export interface DeriveChannelKeyOptions {
   revision?: number;
 }
 
+/**
+ * Options for {@link Handle.deriveResourceKey}.
+ *
+ * All fields are optional. Both integers are canonical by construction —
+ * they have no Unicode representation, so no normalization is needed or
+ * performed on them.
+ *
+ * @category Types
+ */
+export interface DeriveResourceKeyOptions {
+  /**
+   * Non-negative integer in `[0, 2^53 − 1]`; the period/epoch of the
+   * resource context (default `1`).
+   *
+   * A monotonic anchor over time: a day index (`20261105`), a block
+   * height, a subscription period. Explicit `1` is byte-identical to
+   * omission (the frozen base info path).
+   */
+  epoch?: number;
+  /**
+   * Non-negative integer in `[0, 2^53 − 1]`; the access state of the
+   * resource (default `1`).
+   *
+   * Unlike `derivePassword`/`deriveChannelKey`, **`0` is a valid state
+   * here** — the locked/revoked one (encrypt the blur/stub with it);
+   * `1` is the unlocked state; `N ≥ 2` is a re-granted period or a
+   * rotation after a key cache leaked.
+   */
+  revision?: number;
+}
+
 /** Default {@link Handle.derivePassword} output length (bytes). */
 const DEFAULT_PASSWORD_BYTES = 16;
 
@@ -126,6 +157,35 @@ function assertRevision(revision: number | undefined): void {
       'MALFORMED',
       'FORMAT',
       `revision must be a positive integer, got: ${String(revision)}`
+    );
+  }
+}
+
+/** Upper bound for `epoch`/`revision`: the largest canonical integer. */
+const MAX_STATE_INTEGER = Number.MAX_SAFE_INTEGER;
+
+/**
+ * State-integer guard for {@link Handle.deriveResourceKey} (`epoch` and
+ * `revision` share the same numeric constraints; their semantics differ
+ * and are documented on the options type). An omitted value is the
+ * default (`1`); anything that is not an integer in `[0, 2^53 − 1]` is
+ * rejected as `MALFORMED`/`FORMAT`.
+ *
+ * Deliberately differs from {@link assertRevision}: `revision: 0` is a
+ * valid — the *locked* — resource state, not a rotation index.
+ */
+function assertStateInteger(value: number | undefined, name: string): void {
+  if (
+    value !== undefined &&
+    (typeof value !== 'number' ||
+      !Number.isInteger(value) ||
+      value < 0 ||
+      value > MAX_STATE_INTEGER)
+  ) {
+    throw new AttestationError(
+      'MALFORMED',
+      'FORMAT',
+      `${name} must be a non-negative integer in [0, ${MAX_STATE_INTEGER}], got: ${String(value)}`
     );
   }
 }
@@ -478,6 +538,106 @@ export class Handle implements Signer {
   }
 
   /**
+   * Derives a 32-byte symmetric key for a specific **access state** of a
+   * resource — the protocol primitive behind owner-controlled unlock,
+   * revocation and re-grant without a trusted server (rc.9, states ТЗ §3;
+   * specs/v1.0.md §3, domain `me2em/resource/`).
+   *
+   * The caller controls two independent integer dimensions:
+   *
+   * - **`epoch`** — *which period of the context* (a day index, a block
+   *   height, a subscription period). Default `1`; explicit `1` equals
+   *   omission.
+   * - **`revision`** — *the access state within that context*: `0` =
+   *   locked (encrypt a blur/stub), `1` = unlocked (default), `N ≥ 2` =
+   *   a re-granted period or rotation. Every value yields a
+   *   cryptographically independent key.
+   *
+   * **Differences from `derivePassword` / `deriveChannelKey`:**
+   *
+   * | | password / channel | resource |
+   * |---|---|---|
+   * | arguments | one `context` string | structured `resourceType` + `resourceId` |
+   * | `revision: 0` | rejected (`revision ≥ 1`) | valid — the locked state |
+   * | temporal dimension | none | `epoch` |
+   * | output | base64url string / 32 bytes | always 32 bytes |
+   *
+   * Each component is canonicalized NFKC → lowercase → trim and must then
+   * match its charset pattern (`'Ｃhat-Msg '`, `'Chat-Msg'` and
+   * `'chat-msg'` yield the same key). The patterns exclude `/` and `:`,
+   * so the salt join `me2em/resource/{type}/{id}` is injective — different
+   * (type, id) pairs can never collide, and an id that embeds a separator
+   * (a URI, a path) is rejected: pass a content hash, a UUID or a slug.
+   *
+   * The private key **never leaves this class**.
+   *
+   * @param resourceType - Domain of the resource, e.g. `'chat-msg'`,
+   *   `'file'`, `'stream'`.
+   * @param resourceId - Unique id within the domain, e.g. the sha256 hex
+   *   of the content, `'msg-105'`.
+   * @param options - `epoch` (default `1`) and `revision` (default `1`,
+   *   `0` = locked).
+   * @returns A 32-byte Uint8Array suitable for AES-256-GCM encryption.
+   *   AES-GCM and cache invalidation are application-side; the protocol
+   *   provides only the key.
+   * @throws {TypeError} If `resourceType` or `resourceId` is not a string.
+   * @throws AttestationError `MALFORMED`/`FORMAT` if a component is empty
+   *   after canonicalization or fails its charset/length pattern, or
+   *   `epoch`/`revision` is not an integer in `[0, 2^53 − 1]`.
+   *
+   * @example
+   * ```ts
+   * // Static content, binary lock (Approach A): the image content hash
+   * // IS the resource id — a new message is a new id, so a cached
+   * // revision-1 key only ever unlocks content its holder already saw.
+   * const hash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+   *
+   * // 1. Unlocked (paid / active): encrypt the original.
+   * const original = handle.deriveResourceKey('chat-msg', hash);
+   *
+   * // 2. Locked / revoked: a cryptographically independent key — encrypt
+   * //    the blur preview or the 'Access restricted' stub with it.
+   * const blur = handle.deriveResourceKey('chat-msg', hash, { revision: 0 });
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Dynamic data, incremental states (Approach B): a subscription to a
+   * // live stream. Each period gets its own key; a subscriber who cached
+   * // the period-1 key (or blocked IndexedDB updates) decrypts nothing
+   * // from period 2 onward.
+   * const month1 = handle.deriveResourceKey('stream', 'ch-42', { revision: 1 });
+   * const month2 = handle.deriveResourceKey('stream', 'ch-42', { revision: 2 });
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Epoch contexts: same code, new key each day — the day index is the
+   * // monotonic anchor; combine with a revision for a per-day lock.
+   * const daily = handle.deriveResourceKey('chat-msg', hash, { epoch: 20261105 });
+   * const dailyLocked = handle.deriveResourceKey('chat-msg', hash, {
+   *   epoch: 20261105, revision: 0,
+   * });
+   * ```
+   */
+  deriveResourceKey(
+    resourceType: string,
+    resourceId: string,
+    options: DeriveResourceKeyOptions = {}
+  ): Uint8Array {
+    this.#assertNotDisposed();
+    assertStateInteger(options.epoch, 'epoch');
+    assertStateInteger(options.revision, 'revision');
+    const type = normalizeResourceType(resourceType);
+    const id = normalizeResourceId(resourceId);
+    const salt = new TextEncoder().encode(`me2em/resource/${type}/${id}`);
+    const info = new TextEncoder().encode(
+      DERIVATION_PATHS.resource(options.epoch ?? 1, options.revision ?? 1)
+    );
+    return hkdf(this.#privateKey, salt, info, 32);
+  }
+
+  /**
    * Derives a shared secret using ECDH (X25519) for P2P key exchange.
    *
    * Converts the Ed25519 keypair to X25519 for Diffie-Hellman key agreement,
@@ -534,7 +694,8 @@ export class Handle implements Signer {
    * The private key bytes are zeroized; afterwards every capability method
    * ({@link sign}, {@link deriveSubHandle}, {@link attestSubHandle},
    * {@link derivePassword}, {@link deriveChannelKey},
-   * {@link deriveSharedSecret}) throws a {@link DisposedError}.
+   * {@link deriveResourceKey}, {@link deriveSharedSecret}) throws a
+   * {@link DisposedError}.
    * Informational getters ({@link getName}, {@link getId},
    * {@link getPublicKey}, {@link getMetadata}) keep working — they never
    * touch key material.

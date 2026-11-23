@@ -305,6 +305,12 @@ development, not part of the shipped API contract.
   NOT clone `Channel` via `structuredClone`; it MUST hold the channel
   as an opaque reference (object identity) or re-derive from the
   shared secret at the consumer boundary.
+  **Name note (rc.9):** `deriveStateKey` stays reserved for THIS task
+  (the session-bound react-persistence key). The resource access-state
+  key shipped in core rc.9 as **`Handle.deriveResourceKey`** instead
+  (epoch/revision model, salt `me2em/resource/`, `revision: 0` =
+  locked state) — see `specs/tz-core-rc9-states.md`; the two must not
+  be confused or merged.
 - **BL-54 · open · `parseLutAddresses` — explicit minimal-length
   check.**
   `packages/solana/src/lut.ts` currently fails closed on a short
@@ -449,6 +455,19 @@ development, not part of the shipped API contract.
   Deferred until a real enterprise pilot exists (YAGNI). Merges the
   EV-station and drone-fleet patterns. Splitting later is easy; merging
   two separate packages later is expensive.
+- **BL-58 · open · Pacts — horizontal trust primitive.** Signed agreements
+  between independent Identities without merging trust roots: deterministic
+  Pact Keys (HKDF `me2em/pact/v1/{pid}/{ch}/g{gen}`), append-only Pact
+  Journal (11 event types, evHash chaining), anchors Identity/Handle/
+  SubHandle as lifetime policy, 2-party co-sign profile first, N-party
+  constitution/quotas second. Implementable spec: `specs/tz-pact.md`
+  (ТЗ v1.0, rev. 2); base design PACTS.md (D1–D47) lands in `docs/`
+  separately. Implementer: separate package @me2em/pact, peer
+  @me2em/core >=1.0.0-rc.9 (JCS + isRevokedAt, P0.8 — `specs/
+  tz-core-rc9-jcs-revocation.md`); transport via injected Channel,
+  optional @me2em/crypto peer. Depends on: BL-15 (namespace
+  convention); amplified by BL-12. Target: pact 1.0.0-rc.1
+  (M1.0–M1.7, ~6–7 нед.).
 
 ## P4 — Cosmetics
 

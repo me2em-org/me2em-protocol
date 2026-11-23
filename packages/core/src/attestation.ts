@@ -106,10 +106,15 @@ function parseToken(token: string): ParseResult {
     const jsonString = new TextDecoder().decode(payloadBytes);
     payload = safeJsonParse(jsonString) as AttestationPayload;
   } catch (e) {
+    // No interpolation of `e.message`: native JSON.parse errors echo
+    // snippets of the input, so attacker bytes could reach the message.
+    // The only SyntaxError meant to carry the `__proto__` marker is our
+    // own fixed `safeJsonParse` message (util.ts) — reflected below as
+    // a constant string, never as parser output.
     throwFormat(
       'MALFORMED',
       e instanceof SyntaxError && e.message.includes('__proto__')
-        ? `Payload is not valid JSON — ${e.message}`
+        ? 'Payload is not valid JSON — payload contains the forbidden key "__proto__"'
         : 'Payload is not valid JSON'
     );
   }
@@ -282,7 +287,8 @@ export class Attestation {
    * @throws {AttestationError} `MALFORMED`/`FORMAT` on any structural
    *   problem: wrong shape, invalid Base64URL, size over
    *   {@link ATTESTATION_MAX_PAYLOAD}, non-JSON payload, wrong `typ`,
-   *   missing/ill-typed fields, or a non-positive/NaN `maxSessionTtl`.
+   *   missing/ill-typed fields, a `subjectId` that is not Base64URL of
+   *   a 32-byte public key, or a non-positive/NaN `maxSessionTtl`.
    */
   static decode(token: string): AttestationPayload {
     const { payload } = parseToken(token);
@@ -296,6 +302,20 @@ export class Attestation {
     }
     if (typeof payload.subjectId !== 'string') {
       throwFormat('MALFORMED', 'Missing required field: subjectId');
+    }
+    // subjectId is base64url(32-byte Ed25519 public key) — the same
+    // structural invariant class as `typ`/finite `iat`: garbage fails at
+    // the FORMAT gate here instead of drifting into SUBJECT_MISMATCH
+    // comparisons downstream (all core consumers compare subjectId, so
+    // this is defense in depth, not a security fix).
+    let subjectIdBytes: Uint8Array | null = null;
+    try {
+      subjectIdBytes = base64urlDecode(payload.subjectId);
+    } catch {
+      subjectIdBytes = null;
+    }
+    if (subjectIdBytes === null || subjectIdBytes.length !== 32) {
+      throwFormat('MALFORMED', 'Invalid field: subjectId — must be Base64URL of a 32-byte public key');
     }
 
     if (

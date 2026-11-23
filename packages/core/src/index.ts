@@ -1,5 +1,5 @@
 export { Identity } from './identity.js';
-export { Handle, type HandleMetadata, type DerivePasswordOptions, type DeriveChannelKeyOptions } from './handle.js';
+export { Handle, type HandleMetadata, type DerivePasswordOptions, type DeriveChannelKeyOptions, type DeriveResourceKeyOptions } from './handle.js';
 export { SubHandle, type SubHandleMetadata } from './subhandle.js';
 export { DisposedError } from './disposed-error.js';
 export type { Signer } from './types.js';
@@ -43,6 +43,12 @@ export {
   type RegulatoryProfile,
 } from './payment-x402.js';
 export { verifyWalletBinding, type WalletBindingOptions } from './wallet-binding.js';
+export {
+  canonicalize,
+  canonicalizeToString,
+  CanonicalizationError,
+  type JsonValue,
+} from './crypto/jcs.js';
 export * as crypto from './crypto/index.js';
 
 /**

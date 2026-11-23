@@ -1,0 +1,53 @@
+{
+  "name": "@me2em/pact",
+  "version": "1.0.0-rc.1",
+  "description": "Horizontal trust primitive for Me2eM: deterministic Pact Keys, append-only Pact Journal, Tier 1+2+3 verification (PACTS BL-58)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "pnpm run build",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@me2em/core": ">=1.0.0-rc.9 <2.0.0-0",
+    "@me2em/crypto": ">=1.1.0-rc.2 <2.0.0-0"
+  },
+  "peerDependenciesMeta": {
+    "@me2em/crypto": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@me2em/core": "workspace:^",
+    "@me2em/crypto": "workspace:^",
+    "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "^4.1.12",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.8",
+    "vitest": "^4.1.12"
+  }
+}

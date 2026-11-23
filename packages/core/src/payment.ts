@@ -277,8 +277,8 @@ function getRegistry(): Map<string, WalletAdapter> {
  *   disposer is idempotent and removes nothing if a later registration
  *   has already replaced the record (it never removes someone else's
  *   adapter).
- * @throws {TypeError} If `adapter` is not an object with a non-empty
- *   string `chain` and callable `resolveWallet`/`isValidAddress`.
+ * @throws {TypeError} If `adapter` is not an object with a non-empty,
+ *   CAIP-2-valid string `chain` and callable `resolveWallet`/`isValidAddress`.
  */
 export function registerWalletAdapter(adapter: WalletAdapter): () => void {
   if (adapter === null || typeof adapter !== 'object') {
@@ -286,6 +286,11 @@ export function registerWalletAdapter(adapter: WalletAdapter): () => void {
   }
   if (typeof adapter.chain !== 'string' || adapter.chain.length === 0) {
     throw new TypeError('registerWalletAdapter: adapter.chain must be a non-empty string');
+  }
+  if (!isValidChain(adapter.chain)) {
+    throw new TypeError(
+      'registerWalletAdapter: adapter.chain must be a valid CAIP-2 chain id (e.g. "solana:mainnet-beta")'
+    );
   }
   if (typeof adapter.resolveWallet !== 'function' || typeof adapter.isValidAddress !== 'function') {
     throw new TypeError('registerWalletAdapter: adapter must implement resolveWallet and isValidAddress');
@@ -325,8 +330,8 @@ const boundWallets = new WeakMap<object, Map<string, WalletDescriptor>>();
  * in-memory and non-persistent: after a restart the binding is gone and
  * the application re-binds (React: effect/context).
  *
- * @throws {TypeError} If `descriptor` is not an object with non-empty
- *   string `chain` and `address`.
+ * @throws {TypeError} If `descriptor` is not an object with a non-empty,
+ *   CAIP-2-valid string `chain` and a non-empty string `address`.
  */
 export function bindEntityWallet(entity: object, descriptor: WalletDescriptor): void {
   if (descriptor === null || typeof descriptor !== 'object') {
@@ -334,6 +339,11 @@ export function bindEntityWallet(entity: object, descriptor: WalletDescriptor): 
   }
   if (typeof descriptor.chain !== 'string' || descriptor.chain.length === 0) {
     throw new TypeError('bindWallet: descriptor.chain must be a non-empty string');
+  }
+  if (!isValidChain(descriptor.chain)) {
+    throw new TypeError(
+      'bindWallet: descriptor.chain must be a valid CAIP-2 chain id (e.g. "solana:mainnet-beta")'
+    );
   }
   if (typeof descriptor.address !== 'string' || descriptor.address.length === 0) {
     throw new TypeError('bindWallet: descriptor.address must be a non-empty string');
@@ -352,7 +362,10 @@ export function bindEntityWallet(entity: object, descriptor: WalletDescriptor): 
  * adapter registry is NOT consulted here — this reads the binding only
  * (adapters matter at derivation time, not at binding-read time).
  * Entities hold no seed and cannot derive — they read what was bound.
+ * The returned descriptor is a DEFENSIVE COPY: mutating it does not
+ * affect the stored binding (mirrors `Handle.getMetadata`).
  */
 export function getEntityWallet(entity: object, chain: string): WalletDescriptor | null {
-  return boundWallets.get(entity)?.get(chain) ?? null;
+  const stored = boundWallets.get(entity)?.get(chain);
+  return stored === undefined ? null : { ...stored };
 }
