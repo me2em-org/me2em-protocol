@@ -429,6 +429,42 @@ describe('SolanaPaymentVerifier — 7 steps', () => {
     });
   });
 
+  describe('amount grammar (В-8)', () => {
+    it('throws TypeError on non-canonical amounts before any RPC call', async () => {
+      const mockFetch = makeMockFetch({
+        getTransaction: () => Promise.resolve({ result: null }),
+      });
+      const adapter = new SolanaPaymentAdapter({
+        network: 'devnet',
+        endpoint: 'http://localhost:8899',
+        fetch: mockFetch,
+      });
+      // Pre-В-8 behavior being guarded against: `'NaN'`/`'1e999'`
+      // crashed with a bare RangeError mid-check-order, and `'0x10'`
+      // collapsed to a zero threshold (UNDERPAID passed trivially).
+      for (const bad of ['NaN', '1e999', '0x10', '0', '', ' 1.0', '1,000']) {
+        await expect(
+          adapter.verifyPayment('sig123', makeRequest({ amount: bad }))
+        ).rejects.toThrow(TypeError);
+      }
+    });
+
+    it('accepts the canonical grammar — 9 fractional digits convert exactly', async () => {
+      const tx = makeTransferTx({ reference: 'refPubkey123', payTo: 'payTo123', lamports: 1e9 });
+      const mockFetch = makeMockFetch({
+        getTransaction: () => Promise.resolve({ result: tx }),
+        getSignaturesForAddress: () => Promise.resolve({ result: { signatures: [] } }),
+      });
+      const adapter = new SolanaPaymentAdapter({
+        network: 'devnet',
+        endpoint: 'http://localhost:8899',
+        fetch: mockFetch,
+      });
+      const result = await adapter.verifyPayment('sig123', makeRequest({ amount: '1.000000000' }));
+      expect(result.status).toBe('success');
+    });
+  });
+
   describe('v0 vs v1 transactions', () => {
     it('handles v0 transactions (version "0")', async () => {
       const tx = makeTransferTx({ reference: 'refPubkey123', payTo: 'payTo123', lamports: 1e9, version: '0' });

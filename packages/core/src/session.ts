@@ -347,11 +347,14 @@ export class Session {
       const jsonString = new TextDecoder().decode(payloadBytes);
       payload = safeJsonParse(jsonString) as SessionPayload;
     } catch (e) {
+      // No interpolation of `e.message` (see attestation.ts parseToken):
+      // native JSON.parse errors echo input snippets — attacker bytes
+      // must never reach the error message.
       throw new AttestationError(
         'MALFORMED',
         'FORMAT',
         e instanceof SyntaxError && e.message.includes('__proto__')
-          ? `Invalid token format: payload is not valid JSON — ${e.message}`
+          ? 'Invalid token format: payload is not valid JSON — payload contains the forbidden key "__proto__"'
           : 'Invalid token format: payload is not valid JSON'
       );
     }

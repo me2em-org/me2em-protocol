@@ -123,8 +123,17 @@ describe('adapter registry', () => {
     expect(() =>
       registerWalletAdapter({ isValidAddress: () => true } as unknown as WalletAdapter)
     ).toThrow(TypeError);
+    // chain must pass CAIP-2 grammar (isValidChain), not just be non-empty:
     expect(() =>
-      registerWalletAdapter({ chain: 'x', resolveWallet: 1 } as unknown as WalletAdapter)
+      registerWalletAdapter({
+        chain: 'x',
+        resolveWallet: () => Promise.resolve({ chain: 'x', address: 'A' }),
+        isValidAddress: () => true,
+      } as unknown as WalletAdapter)
+    ).toThrow(TypeError);
+    // valid grammar, but the methods must still be callable:
+    expect(() =>
+      registerWalletAdapter({ chain: 'acme:x', resolveWallet: 1 } as unknown as WalletAdapter)
     ).toThrow(TypeError);
   });
 });
@@ -157,6 +166,14 @@ describe('bindWallet / getWallet (WeakMap storage)', () => {
     expect(handle.getWallet('solana:mainnet-beta')).toBeNull();
   });
 
+  it('getWallet returns a copy — mutating the result does not corrupt the binding', async () => {
+    const { handle } = await createTestHandle('walletly');
+    handle.bindWallet(desc('solana:devnet', 'Original'));
+    const got = handle.getWallet('solana:devnet') as { address: string };
+    got.address = 'Mutated';
+    expect(handle.getWallet('solana:devnet')?.address).toBe('Original');
+  });
+
   it('per-entity isolation: two handles on one identity do not share bindings', async () => {
     const identity = await Identity.fromSeed(TEST_SEED);
     const h1 = await identity.deriveHandle('wallet-one');
@@ -177,6 +194,8 @@ describe('bindWallet / getWallet (WeakMap storage)', () => {
     const { handle } = await createTestHandle('walletly');
     expect(() => handle.bindWallet({ chain: '', address: 'A' })).toThrow(TypeError);
     expect(() => handle.bindWallet({ chain: 'solana:devnet', address: '' })).toThrow(TypeError);
+    // chain must pass CAIP-2 grammar, not just be non-empty:
+    expect(() => handle.bindWallet({ chain: 'Solana:devnet', address: 'A' })).toThrow(TypeError);
     expect(() => handle.bindWallet(null as unknown as WalletDescriptor)).toThrow(TypeError);
   });
 

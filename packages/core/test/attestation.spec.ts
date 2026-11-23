@@ -147,7 +147,7 @@ describe('Attestation: decode rejects malformed', () => {
     const bigPayload = JSON.stringify({
       typ: ATTESTATION_TYPE,
       subjectName: 'test',
-      subjectId: 'dGVzdA',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       grant: { scopes: ['read'], maxSessionTtl: 3600 },
       iat: 1700000000,
       exp: 1700003600,
@@ -175,7 +175,7 @@ describe('Attestation: decode rejects malformed', () => {
     const payload = JSON.stringify({
       typ: ATTESTATION_TYPE,
       subjectName: 'test',
-      subjectId: 'dGVzdA',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       grant: { scopes: ['read'], maxSessionTtl: 3600 },
       iat: 1700000000,
       exp: 1700003600,
@@ -192,7 +192,7 @@ describe('Attestation: decode rejects malformed', () => {
     const payload = JSON.stringify({
       typ: 'wrong/type',
       subjectName: 'test',
-      subjectId: 'dGVzdA',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       grant: { scopes: ['read'], maxSessionTtl: 3600 },
       iat: 1700000000,
       exp: 1700003600,
@@ -210,7 +210,7 @@ describe('Attestation: decode rejects malformed', () => {
     const payload = JSON.stringify({
       typ: ATTESTATION_TYPE,
       subjectName: 'test',
-      subjectId: 'dGVzdA',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       grant: { scopes: ['read'], maxSessionTtl: 0 },
       iat: 1700000000,
       exp: 1700003600,
@@ -228,7 +228,7 @@ describe('Attestation: decode rejects malformed', () => {
     const payload = JSON.stringify({
       typ: ATTESTATION_TYPE,
       subjectName: 'test',
-      subjectId: 'dGVzdA',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       grant: { scopes: ['read'], maxSessionTtl: -5 },
       iat: 1700000000,
       exp: 1700003600,
@@ -246,7 +246,7 @@ describe('Attestation: decode rejects malformed', () => {
     const payload = JSON.stringify({
       typ: ATTESTATION_TYPE,
       subjectName: 'test',
-      subjectId: 'dGVzdA',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       grant: { scopes: ['read'], maxSessionTtl: NaN },
       iat: 1700000000,
       exp: 1700003600,
@@ -441,7 +441,7 @@ describe('Attestation: decode does not check time', () => {
     const payload = JSON.stringify({
       typ: ATTESTATION_TYPE,
       subjectName: 'test',
-      subjectId: 'dGVzdA',
+      subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       grant: { scopes: ['read'], maxSessionTtl: 3600 },
       iat: 1000000000,
       exp: 1000003600,
@@ -460,7 +460,7 @@ describe('Attestation: decode rejects non-finite iat/exp and exp <= iat', () => 
   const basePayload = {
     typ: ATTESTATION_TYPE,
     subjectName: 'test',
-    subjectId: 'dGVzdA',
+    subjectId: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
     grant: { scopes: ['read'], maxSessionTtl: 3600 },
     iat: 1000000000,
     exp: 1000003600,
