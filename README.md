@@ -300,7 +300,7 @@ const settle = readSettlement(res);
 
 | Package | Status | Description |
 |---------|--------|-------------|
-| [`@me2em/core`](./packages/core) | 🔐 **rc (v1.0.0-rc.7)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` + payment-layer contracts (`PaymentRequest`, adapters, CAIP-2 registry, x402 v2 wire types) |
+| [`@me2em/core`](./packages/core) | 🔐 **rc (v1.0.0-rc.9)** | Core primitives: `Identity`, `Handle`, `SubHandle`, `Session`, `Attestation` + payment-layer contracts (`PaymentRequest`, adapters, CAIP-2 registry, x402 v2 wire types) |
 | [`@me2em/crypto`](./packages/crypto) | 🔐 **rc (v1.1.0-rc.2)** | Protocol crypto: canonical X3DH, E2EE channels with epoch rotation, envelopes, Argon2id, SLIP-0010 ed25519 derivation |
 | [`@me2em/react`](./packages/react) | 🔐 **rc (v1.0.0-rc.4)** | React bindings: identity lifecycle hooks, seed phrase UX components, session management, encrypted context cache |
 | [`@me2em/x402`](./packages/x402) | 🔐 **rc (v1.0.0-rc.1)** | x402 v2 payment transport: base64 header codec, payment-aware `fetch` client, server helpers, `extra.me2em`, facilitator contract |
@@ -322,6 +322,7 @@ const settle = readSettlement(res);
 | `RevocationChecker` | ✅ | Optional interface — covers session **and** attestation `jti` |
 | `derivePassword` | ✅ | Deterministic password derivation |
 | `deriveChannelKey` | ✅ | Symmetric key for encrypted channels |
+| `deriveResourceKey` | ✅ | Access-state key per resource — unlock/revocation/re-grant (epoch × revision, `revision: 0` = locked, since rc.9) |
 | `deriveSharedSecret` | ✅ | X25519 ECDH with peer-key binding (UKS-safe, `p2p-channel/v2`) |
 | BIP39 utilities | ✅ | 12/24-word mnemonic + passphrase ("25th word") support |
 | **Payment contracts** | ✅ | `PaymentRequest`/`PaymentResult` (12 failure reasons, fail-closed), `WalletDescriptor`, `Me2emExtra` |

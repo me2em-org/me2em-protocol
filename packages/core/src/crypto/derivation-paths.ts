@@ -88,4 +88,29 @@ export const DERIVATION_PATHS = {
    */
   channel: (revision: number = 1): string =>
     revision === 1 ? 'me2em/channel/v1' : `me2em/channel/v1/r${revision}`,
+
+  /**
+   * Builds the info string for resource-state key derivation
+   * (rc.9, states ТЗ §3.4 — `Handle.deriveResourceKey`).
+   *
+   * Two independent integer dimensions, epoch preceding revision; a
+   * segment is omitted when the value equals the default `1`, so the
+   * base path `"me2em/resource/v1"` stays frozen. `revision: 0` (the
+   * locked/revoked access state) yields `"me2em/resource/v1/r0"` — a
+   * valid, cryptographically independent key, unlike password/channel
+   * paths where the revision must be ≥ 1.
+   *
+   * @param epoch - Non-negative integer period/epoch index (day number,
+   *   block height, subscription period); default `1`.
+   * @param revision - Non-negative integer access state; `0` = locked,
+   *   `1` = unlocked, `N ≥ 2` = re-granted period / rotation; default `1`.
+   * @returns The info string, e.g. `"me2em/resource/v1"`,
+   *   `"me2em/resource/v1/r0"`, `"me2em/resource/v1/e20261105/r0"`.
+   *
+   * @since 1.0.0-rc.9
+   */
+  resource: (epoch: number = 1, revision: number = 1): string =>
+    'me2em/resource/v1' +
+    (epoch !== 1 ? `/e${epoch}` : '') +
+    (revision !== 1 ? `/r${revision}` : ''),
 } as const;

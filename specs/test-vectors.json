@@ -1,25 +1,26 @@
 {
   "spec": "Me2eM core protocol",
   "spec_version": "1.0",
-  "vector_file_version": 2,
+  "vector_file_version": 3,
   "algorithm": "BIP39 (seed) + HKDF-SHA256 (RFC 5869, derivation) + Ed25519 (RFC 8032, signatures) + X25519 (RFC 7748, ECDH)",
   "notes": [
     "All derived keys are 32 bytes and used directly as Ed25519 seeds (RFC 8032).",
-    "Base64URL is unpadded (RFC 4648 §5); ids are base64url of the 32-byte public key.",
+    "Base64URL is unpadded (RFC 4648 \u00a75); ids are base64url of the 32-byte public key.",
     "Attestation tokens are byte-deterministic given (grant, ttlSeconds, jti, now).",
     "Session tokens: iat/exp come from the issuer clock at creation time; vectors pin the payload bytes and reproduce the signature via Ed25519 over those bytes.",
-    "Fixed clock NOW = 1767225600 = 2026-01-01T00:00:00Z."
+    "Fixed clock NOW = 1767225600 = 2026-01-01T00:00:00Z.",
+    "Group derive_resource_key (rc.9): Handle.deriveResourceKey \u2014 HKDF-SHA256(handlePriv, salt=\"me2em/resource/{resourceType}/{resourceId}\", info=\"me2em/resource/v1[/e{epoch}][/r{revision}]\", L=32). Components are canonicalized NFKC \u2192 lowercase \u2192 trim and charset-validated; revision 0 is the valid locked state (unlike derivePassword/deriveChannelKey, where revision must be \u2265 1). Vector 6 (raw type '\uff23hat-Msg ') must equal vector 1 after canonicalization."
   ],
   "vectors": {
     "seed": [
       {
-        "description": "BIP39 official vector: 12 words, empty passphrase → 64-byte seed",
+        "description": "BIP39 official vector: 12 words, empty passphrase \u2192 64-byte seed",
         "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
         "passphrase": "",
         "expected_seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4"
       },
       {
-        "description": "BIP39 vector: 24 words, empty passphrase → 64-byte seed (same length as 12 words)",
+        "description": "BIP39 vector: 24 words, empty passphrase \u2192 64-byte seed (same length as 12 words)",
         "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
         "passphrase": "",
         "expected_seed_hex": "408b285c123836004f4b8842c89324c1f01382450c0d439af345ba7fc49acf705489c6fc77dbd4e3dc1dd8cc6bc9f043db8ada1e243c4a0eafb290d399480840"
@@ -41,7 +42,7 @@
         "expected_id_b64url": "HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M"
       },
       {
-        "description": "Different name → unrelated key (same identity)",
+        "description": "Different name \u2192 unrelated key (same identity)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "personal",
         "expected_public_key_hex": "9fb7846aff2a1c9a0fabd5977742b636882e91c3ca26040019c2448fe53da9f6",
@@ -60,7 +61,7 @@
     ],
     "derive_password": [
       {
-        "description": "Default length 16: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1\", L=16) → base64url",
+        "description": "Default length 16: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1\", L=16) \u2192 base64url",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "github",
@@ -76,7 +77,7 @@
         "expected_b64url": "f9QVxZqJV-e5ChmLp_x5V0KdGKwjHLrHMfHqQpspC9o"
       },
       {
-        "description": "Context canonicalization: NFKC + lowercase + trim → identical to \"github\"",
+        "description": "Context canonicalization: NFKC + lowercase + trim \u2192 identical to \"github\"",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "  GitHub ",
@@ -84,15 +85,15 @@
         "expected_b64url": "f9QVxZqJV-e5ChmLp_x5Vw"
       },
       {
-        "description": "NFKC: fullwidth ＧitHub (U+FF27) canonicalizes to \"github\" — identical secret",
+        "description": "NFKC: fullwidth \uff27itHub (U+FF27) canonicalizes to \"github\" \u2014 identical secret",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
-        "context": "ＧitHub",
+        "context": "\uff27itHub",
         "length": 16,
         "expected_b64url": "f9QVxZqJV-e5ChmLp_x5Vw"
       },
       {
-        "description": "Revision 2: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1/r2\", L=16) — independent of revision 1",
+        "description": "Revision 2: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1/r2\", L=16) \u2014 independent of revision 1",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "github",
@@ -109,7 +110,7 @@
         "expected_key_hex": "110b968a39b961615ac8e27b3511be3720981448da05822bce5af146305a3311"
       },
       {
-        "description": "Channel key revision 2: info=\"me2em/channel/v1/r2\" — independent of revision 1",
+        "description": "Channel key revision 2: info=\"me2em/channel/v1/r2\" \u2014 independent of revision 1",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "telemetry-v1",
@@ -119,7 +120,7 @@
     ],
     "derive_shared_secret": [
       {
-        "description": "X25519 (Ed25519→Montgomery) + HKDF-SHA256(ikm=rawECDH, salt=sorted(64B both public keys), info=\"me2em/p2p-channel/v2\", L=32)",
+        "description": "X25519 (Ed25519\u2192Montgomery) + HKDF-SHA256(ikm=rawECDH, salt=sorted(64B both public keys), info=\"me2em/p2p-channel/v2\", L=32)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name_a": "work",
         "handle_name_b": "personal",
@@ -128,7 +129,7 @@
     ],
     "attestation_handle": [
       {
-        "description": "Root→Handle attestation; byte-deterministic given (grant, ttlSeconds, jti, now)",
+        "description": "Root\u2192Handle attestation; byte-deterministic given (grant, ttlSeconds, jti, now)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "subject_handle_name": "work",
         "grant": {
@@ -153,7 +154,7 @@
     ],
     "attestation_subhandle": [
       {
-        "description": "Handle→SubHandle attestation signed by the Handle key (chain level 2)",
+        "description": "Handle\u2192SubHandle attestation signed by the Handle key (chain level 2)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "subject_handle_name": "work",
         "subject_sub_name": "connector-1",
@@ -175,7 +176,7 @@
     ],
     "attestation_wallet": [
       {
-        "description": "v1 optional extensions (§5.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath — real path→address derivation is pinned by @me2em/solana tests (Phantom cross-check)",
+        "description": "v1 optional extensions (\u00a75.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath \u2014 real path\u2192address derivation is pinned by @me2em/solana tests (Phantom cross-check)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "subject_handle_name": "work",
         "grant": {
@@ -233,32 +234,103 @@
         "expected_payload_json": "{\"hId\":\"IDPFLxBkwKhiALdyWnmKYxa-bueojoFK9R1B6lfTvpg\",\"hNm\":\"connector-1\",\"aud\":\"ev-app.com\",\"scp\":[\"charge:start\"],\"exp\":1767227400,\"iat\":1767225600,\"jti\":\"vector-session-subhandle-0001\",\"hPath\":[\"work\",\"connector-1\"]}",
         "expected_token": "eyJoSWQiOiJJRFBGTHhCa3dLaGlBTGR5V25tS1l4YS1idWVvam9GSzlSMUI2bGZUdnBnIiwiaE5tIjoiY29ubmVjdG9yLTEiLCJhdWQiOiJldi1hcHAuY29tIiwic2NwIjpbImNoYXJnZTpzdGFydCJdLCJleHAiOjE3NjcyMjc0MDAsImlhdCI6MTc2NzIyNTYwMCwianRpIjoidmVjdG9yLXNlc3Npb24tc3ViaGFuZGxlLTAwMDEiLCJoUGF0aCI6WyJ3b3JrIiwiY29ubmVjdG9yLTEiXX0.ZULFAFrH3MvBZ6exkOFcijPlvODlEM_E-UxYzwPJaqfG7ML8USb755zmkdPe1l47A_d3DsRRiaULg9mmMrRRCQ"
       }
+    ],
+    "derive_resource_key": [
+      {
+        "description": "Resource key, unlocked static state: salt=\"me2em/resource/chat-msg/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\", info=\"me2em/resource/v1\" (epoch=1 omitted, revision=1 omitted)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
+      },
+      {
+        "description": "Resource key, locked state revision=0: info=\"me2em/resource/v1/r0\" \u2014 independent of revision 1 (blur/stub key)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "revision": 0,
+        "expected_key_hex": "f98e2ff6cd5b5c9df4ba06aa199c2e4502cf8c57b8130e36fd51e7753926da7e"
+      },
+      {
+        "description": "Resource key, incremental subscription revision=2: info=\"me2em/resource/v1/r2\" \u2014 independent of revisions 0/1",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "stream",
+        "resource_id": "ch-42",
+        "revision": 2,
+        "expected_key_hex": "b5e71d16ee077e2c038c07fcc80603331903587b2160e6869afa2fb6e2931522"
+      },
+      {
+        "description": "Resource key, day epoch: info=\"me2em/resource/v1/e20261105\" \u2014 temporal anchor as monotonic integer",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "epoch": 20261105,
+        "expected_key_hex": "cf3da5dc836f559761d289a060274650f21f4508c49e3f9f7f5ab5a5f3190ca9"
+      },
+      {
+        "description": "Resource key, epoch+lock combo: info=\"me2em/resource/v1/e20261105/r0\" \u2014 epoch precedes revision in the info path",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "epoch": 20261105,
+        "revision": 0,
+        "expected_key_hex": "348c38f53837ae576912431a8aba3e17d625a042097bbfb1f29d5df08e3889f9"
+      },
+      {
+        "description": "Canonicalization: raw inputs \"\uff23hat-Msg \" (U+FF2C fullwidth C, uppercase M, trailing space) and \"e3b0\u2026\" \u2192 NFKC\u2192lowercase\u2192trim \u2192 same key as vector #1",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "\uff23hat-Msg ",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
+      },
+      {
+        "description": "Domain separation: same resource_id, different resource_type (\"file\") \u2192 different key",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "file",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_key_hex": "81ef293ad96856d4e31c27585b89b16ee6c6a3d320a1334f330920b96796a170"
+      },
+      {
+        "description": "Domain separation: same resource_type, different resource_id (\"msg-105\") \u2192 different key",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "msg-105",
+        "expected_key_hex": "69678806810556e7018f9f7814e11fb4a0c9f4cb86aaf6af25da37697a9fe311"
+      }
     ]
   },
   "jcs": {
     "spec": "JSON Canonicalization Scheme (RFC 8785)",
     "spec_version": "1.0",
     "vector_file_version": 1,
-    "algorithm": "JCS (RFC 8785 §3.2): UTF-16 code-unit property sorting + ECMAScript Number::toString + JSON string escaping + UTF-8",
+    "algorithm": "JCS (RFC 8785 \u00a73.2): UTF-16 code-unit property sorting + ECMAScript Number::toString + JSON string escaping + UTF-8",
     "notes": [
-      "Transcribed byte-exact from the RFC text: §3.2.2 input sample, §3.2.3 canonical output, §3.2.4 canonical UTF-8 bytes, Appendix B Table 1.",
-      "I-JSON (RFC 7493) number-range constraints apply at the JSON-text parsing boundary (RFC 8785 §3.3); serialization accepts any finite double — Appendix B pins 1e+30, 2^53 and ~2^68 beyond the safe range.",
-      "NaN / ±Infinity and every other input outside the JSON domain (BigInt, undefined, functions, symbols, lone surrogates, sparse arrays, non-plain objects, cycles) terminate with CanonicalizationError (MALFORMED @ JCS).",
-      "Executed by packages/core/test/jcs.spec.ts (471-test core suite, Node 24, 2026-11-22); the section is a shared fixture for @me2em/pact M1.2 (specs/tz-pact.md §6)."
+      "Transcribed byte-exact from the RFC text: \u00a73.2.2 input sample, \u00a73.2.3 canonical output, \u00a73.2.4 canonical UTF-8 bytes, Appendix B Table 1.",
+      "I-JSON (RFC 7493) number-range constraints apply at the JSON-text parsing boundary (RFC 8785 \u00a73.3); serialization accepts any finite double \u2014 Appendix B pins 1e+30, 2^53 and ~2^68 beyond the safe range.",
+      "NaN / \u00b1Infinity and every other input outside the JSON domain (BigInt, undefined, functions, symbols, lone surrogates, sparse arrays, non-plain objects, cycles) terminate with CanonicalizationError (MALFORMED @ JCS).",
+      "Executed by packages/core/test/jcs.spec.ts (471-test core suite, Node 24, 2026-11-22); the section is a shared fixture for @me2em/pact M1.2 (specs/tz-pact.md \u00a76)."
     ],
     "vectors": [
       {
         "id": "jcs-main-sample",
-        "source": "RFC 8785 §3.2.2 → §3.2.3 → §3.2.4",
+        "source": "RFC 8785 \u00a73.2.2 \u2192 \u00a73.2.3 \u2192 \u00a73.2.4",
         "input_text": "{\"numbers\":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],\"string\":\"\\u20ac$\\u000F\\u000aA'\\u0042\\u0022\\u005c\\\\\\\"\\/\",\"literals\":[null,true,false]}",
-        "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+        "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"\u20ac$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
         "canonical_hex": "7b226c69746572616c73223a5b6e756c6c2c747275652c66616c73655d2c226e756d62657273223a5b3333333333333333332e333333333333332c31652b33302c342e352c302e3030322c31652d32375d2c22737472696e67223a22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f227d"
       },
       {
         "id": "jcs-sorting-sample",
-        "source": "RFC 8785 §3.2.3",
+        "source": "RFC 8785 \u00a73.2.3",
         "input_text": "{\"\\u20ac\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"\\ufb33\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"\\ud83d\\ude00\":\"Emoji: Grinning Face\",\"\\u0080\":\"Control\",\"\\u00f6\":\"Latin Small Letter O With Diaeresis\"}",
-        "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
+        "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\u0080\":\"Control\",\"\u00f6\":\"Latin Small Letter O With Diaeresis\",\"\u20ac\":\"Euro Sign\",\"\ud83d\ude00\":\"Emoji: Grinning Face\",\"\ufb33\":\"Hebrew Letter Dalet With Dagesh\"}"
       },
       {
         "id": "jcs-numbers-appendix-b",
@@ -356,7 +428,7 @@
       },
       {
         "id": "jcs-numbers-invalid",
-        "source": "RFC 8785 Appendix B (3) + §3.2.2.3 Note",
+        "source": "RFC 8785 Appendix B (3) + \u00a73.2.2.3 Note",
         "cases": [
           {
             "bits": "7fffffffffffffff",
@@ -381,9 +453,9 @@
     "algorithm": "HKDF-SHA256 (pact keys, PACTS D3/D38: me2em/pact/v1/{pid}/{ch}/g{gen}, salt \"\") + Ed25519 (RFC 8032, signatures) + JCS RFC 8785 (canonicalization)",
     "notes": [
       "Derived keys cross-checked against node:crypto hkdfSync (independent HKDF implementation); JCS vectors live in the \"jcs\" section (P0.8).",
-      "A swapped ch (context hash) yields a different key — fail-closed D4; pid and anchor material are equally load-bearing.",
-      "gen=0 on joining, +1 on ROTATE_KEY (B-4: AMEND never touches keys); pactPub = Ed25519 public key of the pact key (Р1).",
-      "Extended in M1.7 with envelope/replay/export groups (ТЗ §6.3–6.5, §6.10); lifecycle built entirely by the 2-party assemblers; export vector byte-exact incl. sig[] (B-8)."
+      "A swapped ch (context hash) yields a different key \u2014 fail-closed D4; pid and anchor material are equally load-bearing.",
+      "gen=0 on joining, +1 on ROTATE_KEY (B-4: AMEND never touches keys); pactPub = Ed25519 public key of the pact key (\u04201).",
+      "Extended in M1.7 with envelope/replay/export groups (\u0422\u0417 \u00a76.3\u20136.5, \u00a76.10); lifecycle built entirely by the 2-party assemblers; export vector byte-exact incl. sig[] (B-8)."
     ],
     "vectors": [
       {
@@ -425,11 +497,11 @@
             "pactPub_hex": "1c1e2ea2715b497a880090ada75da36ab7e59f4712e8762161e2e38ce69ae4b8"
           }
         ],
-        "note": "different ch ⇒ different key (fail-closed, D4)"
+        "note": "different ch \u21d2 different key (fail-closed, D4)"
       },
       {
         "id": "pact-envelope-genesis",
-        "source": "PACTS §7.1–§7.2 (D32)",
+        "source": "PACTS \u00a77.1\u2013\u00a77.2 (D32)",
         "input": {
           "pid": "ISEhISEhISEhISEhISEhIQ",
           "ch": "VXPUVEVtaQRaKnhjvDYWVBGC9yn1k4nRTa88JG38P6U",
@@ -463,7 +535,7 @@
       },
       {
         "id": "pact-replay-lifecycle-2p",
-        "source": "ТЗ §6.4 — GENESIS→INVITE→ENROLL→ACT→REVERSE_ACT→AMEND→ROTATE→EXIT→DISSOLVE",
+        "source": "\u0422\u0417 \u00a76.4 \u2014 GENESIS\u2192INVITE\u2192ENROLL\u2192ACT\u2192REVERSE_ACT\u2192AMEND\u2192ROTATE\u2192EXIT\u2192DISSOLVE",
         "members": {
           "a_seed_hex": "01",
           "b_seed_hex": "02",
@@ -571,7 +643,7 @@
       },
       {
         "id": "pact-export-bytes",
-        "source": "ТЗ §6.10 / §3.5 — NL-canonical JCS with sig[], byte-exact (B-8/D47)",
+        "source": "\u0422\u0417 \u00a76.10 / \u00a73.5 \u2014 NL-canonical JCS with sig[], byte-exact (B-8/D47)",
         "journal_hex": "7b22696174223a313730303030303030302c227068223a2241414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226368223a225658505556455674615152614b6e686a764459575642474339796e316b346e52546138384a473338503655222c22636e223a7b22696d223a2270696e6e6564222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d2c226378223a226a6f696e74206368617267696e672061677265656d656e74222c226674223a5b7b22616e223a226964656e74697479222c2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c227070223a2267546c3344716839463139576f31526d7730782d7a4d754e69704730376a65695866595057345f4a733551227d2c7b22616e223a226964656e74697479222c2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c227070223a22696f6a6a3358514a385a583955747374504c70646373706e436238646c4249623833534941625150623177227d5d7d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a22677755374677375a7277764f77456f4c2d7474583062694b72534559634969784234665175474a49497a566b68386a447a39524b7053432d445237317245343166327277744332464d38597768513474416745524367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22315a67456e3345427a6b6563303753424c373158624553765a54495a755677416c6f785a505154704367527879634d4c565358344d37654a3172495737494f30446665516d72534a4c3563584c674d5f5f69426a4351227d5d2c227371223a302c227479223a2247454e45534953222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a22525561587339735f417238334a35426e4f356573446d4d67614f5855374e55513231662d717050497a6167222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22616e223a226964656e74697479227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a224b624134796175786d5965464635513572496d547850444d566770574d56565a37593659786d3562707064744937514576343342595f583976426b593035712d7956786c414e5732527a57515948734d516e70444451227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a225563433048784577534c434a78702d5a50766847744e36474b4441755a713249316672436c7a5351335432303655766b61747345614e4c6848703430414362764557694b6a7156654643744c6846503439506c434477227d5d2c227371223a312c227479223a22494e56495445222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a225a4d557564725f4c78747937526274486e4243726269696465476a4f4475656a71796b6a6c57394e4f7455222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22646e223a226361726f6c222c22726566223a225a4d557564725f4c78747937526274486e4243726269696465476a4f4475656a71796b6a6c57394e4f7455227d2c22736967223a5b7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a224967305562556e5f587350777756507931314633775049467750765f6a6e466f4862724e6364634d6e544e395447664130584a75572d52394e5277656e6f62487a36575934642d6b2d387145386e7377794350434277227d5d2c227371223a322c227479223a22454e524f4c4c222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a2272545951334b523038577a3974436976706b6139745833384853574353796b356672664b3453435f4d6534222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226e6f223a2273657373696f6e2d31227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a22307577512d72376171596754565379634b5562336f4e6e72335845616d676978694442546a53316562485865525532534f6c61763861427774756e454356665f43456743565956584e3344715451714842386e6b4367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a226661616c7348457a7375717576506568374c44666c53324339634c6d4969415372346d716e5375397647755967345058344a642d374d534b586d466f76446d7a596c7a4e32456f4650426f6f6a4b4a497770364e4367227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a2244625f6d37456c376a6c4a49347a4270757a347a5667617335355856795336626f796b786b7861462d4c7968486e6638634d72724b6a58654768615f414658517a68636442733754424958426e744b486b3845734367227d5d2c227371223a332c227479223a22414354222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a225371666e7949516e6b6873644f716c372d446859516e2d796f31794a786d654333325f673947697a677a38222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226b223a22737570657273656465222c22726566223a225371666e7949516e6b6873644f716c372d446859516e2d796f31794a786d654333325f673947697a677a38222c227273223a2277726f6e6720746172696666227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a2231534973346b4c774f6c7750465634304e4f6e36476a55626b3147534773793451614c415373444337365458626e70522d4955755551626770396c7844697078694839766576616952555553794162686d6f56434367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22427a5763624d625a314f4559784876685930354d64797150486e37377a6a30684e475267316547695766636b4747456753527549484c455f4e6a686f4867325552594871547a54703737516d3836754b2d4d4e544267227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a22794f68696350443668553359777034456a6353595973454e646f4e6450784a3677573552327041356849584f30337173447a30586e4f456773344864784f35756d56713037493974326265632d4d4243353539774351227d5d2c227371223a342c227479223a22524556455253455f414354222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a2245386876765436415641754a3052516547754c52766c6a69505f54683836317a52566361325a71674b7638222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22636e223a7b22696d223a22626561726572222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d7d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a223058644a6a507470692d4358476b75646d444e4953643754444e52675f6461726f4e565158356235756e58485f497259775643577a6a7a714c43416c6f55734243634643464a55506538436d78523262323858414367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22732d57764954796b6f334e4f44584a6e2d4537344e6f63793150534d764d4f63364b59676e79306258354b5f53684f70513861765154584b415f5273386b4a435a634e797a627a7a346832434541516f535963474177227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a226a6a6876364933564253474a6c577a536f3569374a38517268677556636f48524c447a434a435675484576327770527246666c794634304f36617057754f6f55435377504b475146437952575738332d643956324241227d5d2c227371223a352c227479223a22414d454e44222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a224f4a747148536b5533583676744235697567596a723353734a4c5836574e436944414e4b65713964657a4d222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226e70223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77227d2c22736967223a5b7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a2253504552666e4c76673549526d30744b484536535f4566705478677446436c58646b496a707a636c73324a6e7833746178486e5a57352d505f6552634c636b5371795f4d397967436149706933707951746743694341227d2c7b2270223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77222c2273223a22424b42464430326b4e45454645556d7a69675067427633374f66476f5a4e335253584a5064447779524a733049547a782d763572514b383344494d35365f2d4b49466e6437614e586b5a427071444a7247436b684177227d5d2c227371223a362c227479223a22524f544154455f4b4559222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a22454d42726e654978383167674553766a4868365873724867536e5a504b574b514f43634642634e32304355222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b227273223a226c656176696e67227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a227a67766275786f6d7638586e4a33574b2d326b705a6641724c32306c7767535f437975325838344e4d6f666d51324b44467a734b774f754b6c48796c374b5666716d6f704a74445150344177744e435f7a666d704467227d5d2c227371223a372c227479223a2245584954222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a2230786a6a7a6b6279464a494875786f4e6c457844593179486e50486d4f726335724b44684f38366c4b2d4d222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b227273223a22646f6e65227d2c22736967223a5b7b2270223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77222c2273223a222d6f55326754787a6e506f52534e496e4d676d71704c4a5946376c6f72315351735356454e754870346d45414f7070615332525172766b446f335a3251744d424135314e6f334744644835575a656973534f59304367227d5d2c227371223a382c227479223a22444953534f4c5645222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a",
         "idempotent": true,
         "reimport_verifies": true

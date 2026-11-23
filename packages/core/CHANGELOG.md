@@ -27,6 +27,29 @@ P0.8 (decisions B1 + A4): the two additive core changes the pact ТЗ
   only: which public derivation functions hand the raw node keys to
   `@me2em/pact` (`deriveRootKey` / `deriveHandleKey` /
   `deriveSubHandleKey`; ТЗ §5).
+- **`Handle.deriveResourceKey(resourceType, resourceId, {epoch?, revision?})`**
+  (states ТЗ, Фаза 3) — the third derivation domain: a 32-byte
+  **access-state key** per resource, the primitive behind
+  owner-controlled unlock, revocation and re-grant without a trusted
+  server. Salt `me2em/resource/{resourceType}/{resourceId}` — both
+  components canonicalized (NFKC → lowercase → trim) and
+  charset-validated (no `/` / `:` / whitespace; type ≤ 63, id ≤ 128
+  characters), making the salt join injective (`'Ｃhat-Msg '`,
+  `'Chat-Msg'`, `'chat-msg'` → one key); URIs/paths rejected — hash,
+  UUID or slug instead. `epoch` is the monotonic temporal anchor
+  (day index, block height, subscription period); `revision` is the
+  access state with **`revision: 0` valid here — the locked state**
+  (unlike `derivePassword`/`deriveChannelKey`, which keep
+  `revision ≥ 1`; both keep doing so — guard separation is pinned by
+  tests). Sync, `Uint8Array(32)`, `SubHandle` inherits, errors
+  `MALFORMED`/`FORMAT` + `TypeError` for non-strings. Info builder
+  `DERIVATION_PATHS.resource(epoch?, revision?)` — epoch segment
+  precedes revision, a segment is omitted when the value equals `1`
+  (base path frozen). Golden vectors: new `derive_resource_key` group
+  (8 rows — unlocked/locked/rotation/epoch/epoch+lock/NFKC/domain
+  separation), `specs/test-vectors.json` moves to version 3; all rc.8
+  vector groups unchanged. TSDoc is the single source of documentation
+  (usage examples included).
 
 ### Notes
 - Strictly additive — consumers of rc.8 compile and behave identically

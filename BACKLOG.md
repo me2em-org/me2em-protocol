@@ -305,6 +305,12 @@ development, not part of the shipped API contract.
   NOT clone `Channel` via `structuredClone`; it MUST hold the channel
   as an opaque reference (object identity) or re-derive from the
   shared secret at the consumer boundary.
+  **Name note (rc.9):** `deriveStateKey` stays reserved for THIS task
+  (the session-bound react-persistence key). The resource access-state
+  key shipped in core rc.9 as **`Handle.deriveResourceKey`** instead
+  (epoch/revision model, salt `me2em/resource/`, `revision: 0` =
+  locked state) — see `specs/tz-core-rc9-states.md`; the two must not
+  be confused or merged.
 - **BL-54 · open · `parseLutAddresses` — explicit minimal-length
   check.**
   `packages/solana/src/lut.ts` currently fails closed on a short

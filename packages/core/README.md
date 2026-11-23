@@ -317,6 +317,8 @@ class Handle {
   static verify(sig: Uint8Array, data: Uint8Array, pub: Uint8Array): Promise<boolean>;
   derivePassword(context: string, options?: { revision?: number; byteLength?: number }): string;   // base64url secret
   deriveChannelKey(context: string, options?: { revision?: number }): Uint8Array;             // 32-byte AES key
+  deriveResourceKey(resourceType: string, resourceId: string,
+                    options?: { epoch?: number; revision?: number }): Uint8Array;  // 32-byte access-state key (rc.9)
   deriveSharedSecret(otherPublicKey: Uint8Array): Promise<Uint8Array>; // X25519 + HKDF
   deriveSubHandle(name: string, metadata?: SubHandleMetadata): Promise<SubHandle>;
   attestSubHandle(subName: string, grant: AttestationGrant,
@@ -560,6 +562,35 @@ the label across implementations without storing the mapping. The
 label↔revision mapping (where one exists) is public metadata: keep it
 next to the credentials it describes (e.g. in the password manager's
 notes) — the secret itself is protected by the seed alone.
+
+### Resource-state keys (`deriveResourceKey`, since rc.9)
+
+The third derivation domain (`me2em/resource/`): a 32-byte key for a
+specific **access state** of a resource — the primitive behind
+owner-controlled unlock, revocation and re-grant without a trusted
+server. Two independent integer dimensions: `epoch` (which period of
+the context — a day index, a block height, a subscription period) and
+`revision` (the access state: `0` = locked — **valid here**, unlike
+password/channel, where revision must be ≥ 1 — `1` = unlocked, `N ≥ 2`
+= re-granted period or rotation). Components are canonicalized
+(NFKC → lowercase → trim) and charset-validated (no `/`, `:`,
+whitespace; type ≤ 63, id ≤ 128 characters — pass a content hash, a
+UUID or a slug, not a URI), so the salt join
+`me2em/resource/{type}/{id}` is injective. The normative contract and
+usage examples live in the TSDoc of `Handle.deriveResourceKey` — the
+single source of documentation.
+
+```typescript
+const hash = 'e3b0c442…'; // sha256 hex of the content = resource id
+const original = handle.deriveResourceKey('chat-msg', hash);                  // unlocked
+const blur     = handle.deriveResourceKey('chat-msg', hash, { revision: 0 }); // locked
+const month2   = handle.deriveResourceKey('stream', 'ch-42', { revision: 2 }); // new period
+const daily    = handle.deriveResourceKey('chat-msg', hash, { epoch: 20261105 });
+```
+
+Info strings: `me2em/resource/v1` → `…/e{epoch}` → `…/r{revision}`
+(epoch precedes revision; a segment is omitted when the value equals
+`1`), centralized in `DERIVATION_PATHS.resource(epoch?, revision?)`.
 
 ## 🎯 Core Use Cases
 
