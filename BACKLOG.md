@@ -659,6 +659,13 @@ baseline normalized, `pnpm vectors` made explicit/idempotent).
   pass 2, where the first run caught a real type error). Mirror the
   pact fix: `tsconfig.scripts.json` (`noEmit`,
   `include: ["scripts/**/*"]`) chained into `typecheck`.
+- **Workspace · tests are not typechecked · open · P3.**
+  No package typechecks `test/**/*` (every tsconfig includes `src`
+  only — core, crypto, pact, react, solana, x402; vitest transpiles
+  without typechecking), so types in tests can silently drift from
+  src (rc.3 review pass 2 audit, Н1). Mirror the scripts pattern:
+  per-package `tsconfig.test.json` (`noEmit`, include `src` + `test`)
+  chained into `typecheck`.
 - **Pact · roster fingerprint for transparency (BL-12/F8) · open · P3.**
   `pactRoot` is evHash(GENESIS) per PACTS §2 — the deterministic pact
   name, not a roster digest (audit Б3 claimed otherwise and was

@@ -115,15 +115,34 @@ plan: `specs/plan-pact-rc3.md`.
   addressed by id, so adding vectors must not require editing the
   suite; only catastrophic shrinkage fails.
 
+### Fixed (review pass 2 audit)
+- **Н2** — a no-orphan-rows test: every `§pact` row id must have a
+  consumer — a literal `rowOf('<id>')` call site or the
+  generically-consumed `pact-chain-liveness-` prefix — so the
+  growth-friendly count pins cannot admit an unconsumed (uncovered)
+  row; a new generically-consumed group must declare its exemption.
+- **applySuffix atomicity** — a test pins that a suffix failing
+  mid-way (tampered event 5) leaves the committed state exactly at the
+  honest prefix (full-state `_debugState` compare against a reference
+  verifier) and the honest journal completes from there — a suffix is
+  a sequence of atomic applies.
+- **Н1 (recorded)** — BACKLOG gains the workspace-wide item: no
+  package typechecks `test/**/*` (vitest transpiles without
+  typechecking); the proposed fix mirrors the scripts pattern
+  (`tsconfig.test.json` chained into `typecheck`). Н3 (`@internal` as
+  TSDoc convention — sufficient at this scale) and Н4 (`structuredClone`
+  covers the whole `JournalState`) were reviewed and accepted as-is.
+
 ### Tests
-- 125 tests (was 108): incremental/batch equivalence including error
+- 127 tests (was 108): incremental/batch equivalence including error
   codes, the RC3-D2/D3 attack vector (re-chained middle tamper ⇒
   `FORK_DETECTED` on the committed state), the Б-rc3-1 atomicity
-  probes (the full-state `_debugState` pin and the failed-first-apply
-  no-pid-latch case), skew parity, a 40-event assembly lifecycle with
-  tampered prefixes, the Б-rc3-2 cache-isolation interleave, and the
-  golden-vector suite; tsc (src + scripts)/eslint clean, coverage
-  thresholds (≥ 90%) kept.
+  probes (the full-state `_debugState` pin, the failed-first-apply
+  no-pid-latch case, the mid-failing-applySuffix state), skew parity,
+  a 40-event assembly lifecycle with tampered prefixes, the Б-rc3-2
+  cache-isolation interleave, and the golden-vector suite (including
+  the no-orphan-rows check); tsc (src + scripts)/eslint clean,
+  coverage thresholds (≥ 90%) kept.
 
 ## [1.0.0-rc.2] — 2026-11-24
 

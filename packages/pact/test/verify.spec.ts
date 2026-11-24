@@ -972,4 +972,28 @@ describe('JournalVerifier — incremental replay (rc.3, F-rc3-1)', () => {
     expect(v.height).toBe(j.events.length);
     expect(v.head).toBe(j.hash(j.events[j.events.length - 1]));
   });
+
+  it('atomicity (review pass 2): a failing applySuffix leaves the verifier exactly at the last good event', () => {
+    const events = lifecycle();
+    const tampered = events.map((e) => ({ ...e, sig: e.sig.map((s) => ({ ...s })) }));
+    tampered[4] = { ...tampered[4], sig: [{ ...tampered[4].sig[0], s: tampered[4].sig[0].s.slice(0, -4) + 'AAAA' }] };
+    const v = createJournalVerifier(clockAt(T0));
+    try {
+      v.applySuffix(tampered);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PactError);
+      expect((e as PactError).code).toBe('SIGNATURE_INVALID');
+    }
+    // A suffix is a sequence of atomic applies: the failure at index 4
+    // leaves the committed state exactly at the honest prefix (0..3) —
+    // full-state compare via _debugState, not just height/head:
+    const prefix = createJournalVerifier(clockAt(T0));
+    prefix.applySuffix(events.slice(0, 4));
+    expect(v._debugState()).toEqual(prefix._debugState());
+    // The honest journal still completes from where it stopped:
+    v.applySuffix(events);
+    expect(v.height).toBe(events.length);
+    expect(v.head).toBe(evHash(events[events.length - 1]));
+  });
 });

@@ -155,6 +155,20 @@ describe('golden vectors — specs/test-vectors.json §pact (rc.3, F-rc3-5)', ()
     expect(file.pact.vectors.length).toBeGreaterThanOrEqual(11);
   });
 
+  it('no orphan rows: every vector id has a consumer in this suite (review pass 2, Н2)', () => {
+    // The growth-friendly count pins accept new rows, but a row without
+    // a consumer would silently lose golden coverage. Literal
+    // `rowOf('<id>')` call sites are the contract; liveness rows are
+    // consumed generically via the `pact-chain-liveness-` prefix filter
+    // (each row re-verified against its stored expected outcome) — a new
+    // generically-consumed group must add its own exemption here.
+    const source = readFileSync(fileURLToPath(new URL('./vectors.spec.ts', import.meta.url)), 'utf8');
+    for (const v of file.pact.vectors) {
+      if (v.id.startsWith('pact-chain-liveness-')) continue;
+      expect(source.includes(`'${v.id}'`), `vector ${v.id} has no consumer in vectors.spec.ts`).toBe(true);
+    }
+  });
+
   it('pact-derive / pact-derive-negative-ch: HKDF pact keys (D2/D4)', () => {
     for (const id of ['pact-derive', 'pact-derive-negative-ch']) {
       const row = rowOf<DeriveRow>(id);
