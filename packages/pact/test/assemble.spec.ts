@@ -201,6 +201,24 @@ describe('2-party assembly (M1.4)', () => {
     expect(verifyJournal([...events, act], clockAt(T0)).error!.code).toBe('SKEW');
   });
 
+  it('З2: assembleInvite.ep under a pinned constitution — enforced at both layers', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const c = new Member(3);
+    const cnP: Constitution = { th: { DISSOLVE: { m: 'any' } }, im: 'pinned', w: false };
+    const genesis = assembleGenesis({ pid: PID, ch: CH, cn: cnP, ft: founderEntries([a, b], cnP), founderKeys: [a.key, b.key], clock: clockAt(T0) });
+    // A pinned invite carrying ep assembles, and the joiner's ENROLL
+    // (signed by the committed key) verifies clean (D13):
+    const invite = assembleInvite([genesis], { an: 'identity', ep: c.pub }, [a.key, b.key], clockAt(T0));
+    const events = [genesis, invite, assembleEnroll([genesis, invite], { ref: evHash(invite) }, [c.key], clockAt(T0))];
+    expect(verifyJournal(events, clockAt(T0)).ok).toBe(true);
+    // B-7 fail-closed: an ep-less pinned invite never leaves the
+    // builder either — finalize re-verifies the extended journal and
+    // refuses the D13 violation at assembly time (verify would reject
+    // the same journal on replay):
+    expectPactThrow(() => assembleInvite([genesis], { an: 'identity' }, [a.key, b.key], clockAt(T0)), 'MALFORMED');
+  });
+
   it('early signer-key checks: rotate ≠ 2, exit/enroll ≠ 1, dissolve = 0 → MALFORMED', () => {
     const a = new Member(1);
     const b = new Member(2);

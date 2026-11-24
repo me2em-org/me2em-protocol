@@ -736,6 +736,21 @@ describe('defensive branches (coverage)', () => {
     expect(result.tier3).toBe('supported');
   });
 
+  it('§5.4 chain expiring exactly at act.iat (exp = act.iat) → IDP_UNRESOLVABLE (strict < exp)', async () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    // iat = T0 − 3600, exp = T0 = act.iat — the chain dies AT the act's
+    // moment: aliveness requires act.iat < exp (no closed right bound —
+    // pins the implementation against `≤ exp` regressions).
+    const { chain, vc } = await a.voucherChain('identity', ['jti-dies-at-act'], { now: T0 - 3600, ttlSeconds: 3600 });
+    const vcs = new Map([[a, vc]]);
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([a, b], CN2, vcs) }, [a, b]);
+    const act = j.push('ACT', { no: 'act-1' }, [a, b]);
+    const result = await verifyAct(j.events, j.hash(act), new DatedChecker(), new Map([[j.hash(j.events[0]), chain]]), clockAt(T0));
+    expectCode(result, 'IDP_UNRESOLVABLE');
+  });
+
   it('handle-anchored founder: real root→handle chain binds to pp (D2/D12)', async () => {
     const ha = Member.handle(1);
     const b = new Member(2);

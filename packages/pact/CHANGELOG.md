@@ -57,6 +57,15 @@ for the full verdict table.
   clock parameters, Tier-3 liveness step, assembly complexity note (Б2).
 - README: Limitations (v0.1) section; BACKLOG: rc.2 follow-ups.
 
+### Tests (post-review follow-up, З2/З3)
+- Assembler-level pinned-`ep` test: `assembleInvite` with `ep`
+  verifies clean, and an `ep`-less pinned invite is refused **at the
+  builder too** (B-7: `finalize` re-verifies the extended journal, so
+  D13 violations fail closed at assembly, not only on replay).
+- Liveness edge-case pin: a chain expiring exactly at `act.iat`
+  (`exp = act.iat`) rejects — aliveness is strict `act.iat < exp`,
+  not `≤ exp`.
+
 ## [1.0.0-rc.1] — 2026-11-22
 
 First release candidate of the horizontal trust primitive (BL-58,
