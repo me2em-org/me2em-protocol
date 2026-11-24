@@ -615,7 +615,7 @@ quotes in this entry are intentional).
 | 0 — primitives | `@me2em/core` | ✅ rc (1.0.0-rc.1) — published as npm `latest` (DR-6) |
 | 1 — react bindings | `@me2em/react` | ✅ alpha (0.1.0-alpha.2) |
 | 2 — protocol mechanisms | `@me2em/crypto` | ✅ rc (1.0.0-rc.1) — published as npm `latest` |
-| 2 — protocol mechanisms | `@me2em/pact` | ✅ rc (1.0.0-rc.2) — BL-58, audit-hardening pass |
+| 2 — protocol mechanisms | `@me2em/pact` | ✅ rc (1.0.0-rc.3) — BL-58: incremental verification (Б2 closed), golden vectors |
 | 3 — verticals | `@me2em/messenger` | planned (BL-29, pilot: BeSafeChat) |
 | 3 — verticals | `@me2em/iot` | deferred (BL-30) |
 | — | `@me2em/server` | planned (reference NestJS, with BL-22) |
@@ -624,26 +624,38 @@ Dependency rule: strictly upward (verticals → crypto → core); verticals
 never depend on each other. Every vertical keeps UI logic in
 `src/react/`, domain logic in `src/headless/`.
 
-## Pact (BL-58) — rc.2 follow-ups
+## Pact (BL-58) — follow-ups
 
 Audit verdicts and the fix rationale: `specs/plan-pact-rc2.md`;
-closed findings: `packages/pact/CHANGELOG.md` `[1.0.0-rc.2]`.
+closed findings: `packages/pact/CHANGELOG.md` `[1.0.0-rc.2]` /
+`[1.0.0-rc.3]`.
 
-- **Pact · incremental `verifyPrefix` · open · P2 (rc.3).** Assembly
-  re-verifies the whole prefix per event — O(N) each, O(N²) over a full
-  lifecycle (audit Б2). Fine for 2-party v0.1 journals; We2eM/AS with
-  thousands of events needs an incremental replay (hash-committed
-  intermediate state).
+- **Pact · incremental `verifyPrefix` · done (rc.3).** Landed as
+  `JournalVerifier` + the `finalize` fast path (audit Б2): a
+  hash-committed intermediate state, a fail-closed integrity pass over
+  the caller's array on every call, `FORK_DETECTED` on divergence.
+  Design `specs/tz-pact-rc3-incremental.md` (RC3-D1…D8); tests
+  `packages/pact/test/verify.spec.ts` + `assemble.spec.ts`; bench
+  `packages/pact/bench/journal.bench.ts` (integrity pass ~9 µs/event
+  vs ~2.9 ms/event full replay).
+- **Pact · pinned-`ep` golden vectors · done (rc.3).**
+  `specs/test-vectors.json` §pact regenerated (v4): pinned-`ep`
+  accept/reject (D13) + chain-liveness (expired/future/alive,
+  exp = act.iat — strict `act.iat < exp`); golden consumer
+  `packages/pact/test/vectors.spec.ts`; generator
+  `packages/pact/scripts/generate-vectors.ts`.
+- **Pact · Clock in `MemoryStore.append` · done, re-scoped (rc.3).**
+  The store contract is time-free (ТЗ §3.5; skew is verify's job, C3),
+  so the literal clock parameter was declined as dead API; the
+  substance of the finding — the hidden O(N) per append — landed as
+  the incremental head cache in `MemoryStore`. Rationale:
+  `specs/tz-pact-rc3-incremental.md` §5.
 - **Pact · roster fingerprint for transparency (BL-12/F8) · open · P3.**
   `pactRoot` is evHash(GENESIS) per PACTS §2 — the deterministic pact
   name, not a roster digest (audit Б3 claimed otherwise and was
   rejected). If the transparency feed needs a roster fingerprint, ship
   a separate field (`rosterDigest = SHA-256(JCS(roster))`) — never a
   redefinition of `pactRoot`.
-- **Pact · pinned-`ep` golden vectors · open · P3.** `specs/test-vectors.json`
-  section `pact` predates rc.2; add pinned `ep` (accept/reject) and
-  chain-liveness (expired/future/alive) vectors alongside the existing
-  groups.
 - **Pact · zeroize helper for derived keys · declined.** JS gives no
   reliable zeroization (GC copies, string interning); best-effort
   wiping is security theater — the derivation module documents the

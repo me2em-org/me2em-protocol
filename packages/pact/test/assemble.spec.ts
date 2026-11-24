@@ -219,6 +219,37 @@ describe('2-party assembly (M1.4)', () => {
     expectPactThrow(() => assembleInvite([genesis], { an: 'identity' }, [a.key, b.key], clockAt(T0)), 'MALFORMED');
   });
 
+  it('F-rc3-1: a 40-event lifecycle assembles through the cached verifier; tampered prefixes never pass', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const genesis = assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([a, b], CN2), founderKeys: [a.key, b.key], clock: clockAt(T0) });
+    let events = [genesis];
+    for (let i = 0; i < 40; i++) {
+      // Every assemble hits the single-slot cache (the tail object is
+      // the previous event) — the prefix costs a hash-integrity pass,
+      // only the new event is fully verified (RC3-D7):
+      events = [...events, assembleAct(events, { no: `act-${i}` }, [a.key, b.key], clockAt(T0))];
+    }
+    expect(events.length).toBe(41);
+    expect(verifyJournal(events, clockAt(T0)).ok).toBe(true);
+    // Cold path (fresh array objects): from-scratch replay names the
+    // precise cause — the forged ACT signature:
+    const forgedCold = events.map((e) => ({ ...e, sig: e.sig.map((s) => ({ ...s })) }));
+    forgedCold[5] = { ...forgedCold[5], pl: { no: 'forged' } };
+    for (let i = 6; i < forgedCold.length; i++) {
+      forgedCold[i] = { ...forgedCold[i], ph: evHash(forgedCold[i - 1]) };
+    }
+    expectPactThrow(() => assembleAct(forgedCold, { no: 'act-x' }, [a.key, b.key], clockAt(T0)), 'SIGNATURE_INVALID');
+    // Warm path (the original tail object kept — cache hit): the
+    // integrity pass refuses the divergence without recomputing (RC3-D2/D3):
+    const forgedWarm = forgedCold.slice(0, -1);
+    forgedWarm.push(events[events.length - 1]);
+    expectPactThrow(() => assembleAct(forgedWarm, { no: 'act-y' }, [a.key, b.key], clockAt(T0)), 'FORK_DETECTED');
+    // The cache survived the failed assembles — the honest prefix still works:
+    const ok = assembleAct(events, { no: 'act-40' }, [a.key, b.key], clockAt(T0));
+    expect(verifyJournal([...events, ok], clockAt(T0)).ok).toBe(true);
+  });
+
   it('early signer-key checks: rotate ≠ 2, exit/enroll ≠ 1, dissolve = 0 → MALFORMED', () => {
     const a = new Member(1);
     const b = new Member(2);

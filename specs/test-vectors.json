@@ -1,26 +1,27 @@
 {
   "spec": "Me2eM core protocol",
   "spec_version": "1.0",
-  "vector_file_version": 3,
+  "vector_file_version": 4,
   "algorithm": "BIP39 (seed) + HKDF-SHA256 (RFC 5869, derivation) + Ed25519 (RFC 8032, signatures) + X25519 (RFC 7748, ECDH)",
   "notes": [
     "All derived keys are 32 bytes and used directly as Ed25519 seeds (RFC 8032).",
-    "Base64URL is unpadded (RFC 4648 \u00a75); ids are base64url of the 32-byte public key.",
+    "Base64URL is unpadded (RFC 4648 §5); ids are base64url of the 32-byte public key.",
     "Attestation tokens are byte-deterministic given (grant, ttlSeconds, jti, now).",
     "Session tokens: iat/exp come from the issuer clock at creation time; vectors pin the payload bytes and reproduce the signature via Ed25519 over those bytes.",
     "Fixed clock NOW = 1767225600 = 2026-01-01T00:00:00Z.",
-    "Group derive_resource_key (rc.9): Handle.deriveResourceKey \u2014 HKDF-SHA256(handlePriv, salt=\"me2em/resource/{resourceType}/{resourceId}\", info=\"me2em/resource/v1[/e{epoch}][/r{revision}]\", L=32). Components are canonicalized NFKC \u2192 lowercase \u2192 trim and charset-validated; revision 0 is the valid locked state (unlike derivePassword/deriveChannelKey, where revision must be \u2265 1). Vector 6 (raw type '\uff23hat-Msg ') must equal vector 1 after canonicalization."
+    "Group derive_resource_key (rc.9): Handle.deriveResourceKey — HKDF-SHA256(handlePriv, salt=\"me2em/resource/{resourceType}/{resourceId}\", info=\"me2em/resource/v1[/e{epoch}][/r{revision}]\", L=32). Components are canonicalized NFKC → lowercase → trim and charset-validated; revision 0 is the valid locked state (unlike derivePassword/deriveChannelKey, where revision must be ≥ 1). Vector 6 (raw type 'Ｃhat-Msg ') must equal vector 1 after canonicalization.",
+    "Group pact (rc.3, F-rc3-5): pinned-ep accept/reject (D13) and chain-liveness (strict act.iat < exp) vectors; the pact section is a golden snapshot of @me2em/pact 1.0.0-rc.3, re-verified by packages/pact/test/vectors.spec.ts."
   ],
   "vectors": {
     "seed": [
       {
-        "description": "BIP39 official vector: 12 words, empty passphrase \u2192 64-byte seed",
+        "description": "BIP39 official vector: 12 words, empty passphrase → 64-byte seed",
         "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
         "passphrase": "",
         "expected_seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4"
       },
       {
-        "description": "BIP39 vector: 24 words, empty passphrase \u2192 64-byte seed (same length as 12 words)",
+        "description": "BIP39 vector: 24 words, empty passphrase → 64-byte seed (same length as 12 words)",
         "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
         "passphrase": "",
         "expected_seed_hex": "408b285c123836004f4b8842c89324c1f01382450c0d439af345ba7fc49acf705489c6fc77dbd4e3dc1dd8cc6bc9f043db8ada1e243c4a0eafb290d399480840"
@@ -42,7 +43,7 @@
         "expected_id_b64url": "HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M"
       },
       {
-        "description": "Different name \u2192 unrelated key (same identity)",
+        "description": "Different name → unrelated key (same identity)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "personal",
         "expected_public_key_hex": "9fb7846aff2a1c9a0fabd5977742b636882e91c3ca26040019c2448fe53da9f6",
@@ -61,7 +62,7 @@
     ],
     "derive_password": [
       {
-        "description": "Default length 16: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1\", L=16) \u2192 base64url",
+        "description": "Default length 16: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1\", L=16) → base64url",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "github",
@@ -77,7 +78,7 @@
         "expected_b64url": "f9QVxZqJV-e5ChmLp_x5V0KdGKwjHLrHMfHqQpspC9o"
       },
       {
-        "description": "Context canonicalization: NFKC + lowercase + trim \u2192 identical to \"github\"",
+        "description": "Context canonicalization: NFKC + lowercase + trim → identical to \"github\"",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "  GitHub ",
@@ -85,15 +86,15 @@
         "expected_b64url": "f9QVxZqJV-e5ChmLp_x5Vw"
       },
       {
-        "description": "NFKC: fullwidth \uff27itHub (U+FF27) canonicalizes to \"github\" \u2014 identical secret",
+        "description": "NFKC: fullwidth ＧitHub (U+FF27) canonicalizes to \"github\" — identical secret",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
-        "context": "\uff27itHub",
+        "context": "ＧitHub",
         "length": 16,
         "expected_b64url": "f9QVxZqJV-e5ChmLp_x5Vw"
       },
       {
-        "description": "Revision 2: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1/r2\", L=16) \u2014 independent of revision 1",
+        "description": "Revision 2: HKDF-SHA256(ikm=handlePriv, salt=\"me2em/secret/github\", info=\"me2em/secret/v1/r2\", L=16) — independent of revision 1",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "github",
@@ -110,7 +111,7 @@
         "expected_key_hex": "110b968a39b961615ac8e27b3511be3720981448da05822bce5af146305a3311"
       },
       {
-        "description": "Channel key revision 2: info=\"me2em/channel/v1/r2\" \u2014 independent of revision 1",
+        "description": "Channel key revision 2: info=\"me2em/channel/v1/r2\" — independent of revision 1",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "context": "telemetry-v1",
@@ -120,7 +121,7 @@
     ],
     "derive_shared_secret": [
       {
-        "description": "X25519 (Ed25519\u2192Montgomery) + HKDF-SHA256(ikm=rawECDH, salt=sorted(64B both public keys), info=\"me2em/p2p-channel/v2\", L=32)",
+        "description": "X25519 (Ed25519→Montgomery) + HKDF-SHA256(ikm=rawECDH, salt=sorted(64B both public keys), info=\"me2em/p2p-channel/v2\", L=32)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name_a": "work",
         "handle_name_b": "personal",
@@ -129,7 +130,7 @@
     ],
     "attestation_handle": [
       {
-        "description": "Root\u2192Handle attestation; byte-deterministic given (grant, ttlSeconds, jti, now)",
+        "description": "Root→Handle attestation; byte-deterministic given (grant, ttlSeconds, jti, now)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "subject_handle_name": "work",
         "grant": {
@@ -154,7 +155,7 @@
     ],
     "attestation_subhandle": [
       {
-        "description": "Handle\u2192SubHandle attestation signed by the Handle key (chain level 2)",
+        "description": "Handle→SubHandle attestation signed by the Handle key (chain level 2)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "subject_handle_name": "work",
         "subject_sub_name": "connector-1",
@@ -176,7 +177,7 @@
     ],
     "attestation_wallet": [
       {
-        "description": "v1 optional extensions (\u00a75.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath \u2014 real path\u2192address derivation is pinned by @me2em/solana tests (Phantom cross-check)",
+        "description": "v1 optional extensions (§5.1): wallet fields in canonical order; address is an illustrative valid-format address (base58 of the subject Handle's public key), not a wallet derived from subjectWalletPath — real path→address derivation is pinned by @me2em/solana tests (Phantom cross-check)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "subject_handle_name": "work",
         "grant": {
@@ -245,7 +246,7 @@
         "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
       },
       {
-        "description": "Resource key, locked state revision=0: info=\"me2em/resource/v1/r0\" \u2014 independent of revision 1 (blur/stub key)",
+        "description": "Resource key, locked state revision=0: info=\"me2em/resource/v1/r0\" — independent of revision 1 (blur/stub key)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "resource_type": "chat-msg",
@@ -254,7 +255,7 @@
         "expected_key_hex": "f98e2ff6cd5b5c9df4ba06aa199c2e4502cf8c57b8130e36fd51e7753926da7e"
       },
       {
-        "description": "Resource key, incremental subscription revision=2: info=\"me2em/resource/v1/r2\" \u2014 independent of revisions 0/1",
+        "description": "Resource key, incremental subscription revision=2: info=\"me2em/resource/v1/r2\" — independent of revisions 0/1",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "resource_type": "stream",
@@ -263,7 +264,7 @@
         "expected_key_hex": "b5e71d16ee077e2c038c07fcc80603331903587b2160e6869afa2fb6e2931522"
       },
       {
-        "description": "Resource key, day epoch: info=\"me2em/resource/v1/e20261105\" \u2014 temporal anchor as monotonic integer",
+        "description": "Resource key, day epoch: info=\"me2em/resource/v1/e20261105\" — temporal anchor as monotonic integer",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "resource_type": "chat-msg",
@@ -272,7 +273,7 @@
         "expected_key_hex": "cf3da5dc836f559761d289a060274650f21f4508c49e3f9f7f5ab5a5f3190ca9"
       },
       {
-        "description": "Resource key, epoch+lock combo: info=\"me2em/resource/v1/e20261105/r0\" \u2014 epoch precedes revision in the info path",
+        "description": "Resource key, epoch+lock combo: info=\"me2em/resource/v1/e20261105/r0\" — epoch precedes revision in the info path",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "resource_type": "chat-msg",
@@ -282,15 +283,15 @@
         "expected_key_hex": "348c38f53837ae576912431a8aba3e17d625a042097bbfb1f29d5df08e3889f9"
       },
       {
-        "description": "Canonicalization: raw inputs \"\uff23hat-Msg \" (U+FF2C fullwidth C, uppercase M, trailing space) and \"e3b0\u2026\" \u2192 NFKC\u2192lowercase\u2192trim \u2192 same key as vector #1",
+        "description": "Canonicalization: raw inputs \"Ｃhat-Msg \" (U+FF2C fullwidth C, uppercase M, trailing space) and \"e3b0…\" → NFKC→lowercase→trim → same key as vector #1",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
-        "resource_type": "\uff23hat-Msg ",
+        "resource_type": "Ｃhat-Msg ",
         "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
       },
       {
-        "description": "Domain separation: same resource_id, different resource_type (\"file\") \u2192 different key",
+        "description": "Domain separation: same resource_id, different resource_type (\"file\") → different key",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "resource_type": "file",
@@ -298,7 +299,7 @@
         "expected_key_hex": "81ef293ad96856d4e31c27585b89b16ee6c6a3d320a1334f330920b96796a170"
       },
       {
-        "description": "Domain separation: same resource_type, different resource_id (\"msg-105\") \u2192 different key",
+        "description": "Domain separation: same resource_type, different resource_id (\"msg-105\") → different key",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "resource_type": "chat-msg",
@@ -311,26 +312,26 @@
     "spec": "JSON Canonicalization Scheme (RFC 8785)",
     "spec_version": "1.0",
     "vector_file_version": 1,
-    "algorithm": "JCS (RFC 8785 \u00a73.2): UTF-16 code-unit property sorting + ECMAScript Number::toString + JSON string escaping + UTF-8",
+    "algorithm": "JCS (RFC 8785 §3.2): UTF-16 code-unit property sorting + ECMAScript Number::toString + JSON string escaping + UTF-8",
     "notes": [
-      "Transcribed byte-exact from the RFC text: \u00a73.2.2 input sample, \u00a73.2.3 canonical output, \u00a73.2.4 canonical UTF-8 bytes, Appendix B Table 1.",
-      "I-JSON (RFC 7493) number-range constraints apply at the JSON-text parsing boundary (RFC 8785 \u00a73.3); serialization accepts any finite double \u2014 Appendix B pins 1e+30, 2^53 and ~2^68 beyond the safe range.",
-      "NaN / \u00b1Infinity and every other input outside the JSON domain (BigInt, undefined, functions, symbols, lone surrogates, sparse arrays, non-plain objects, cycles) terminate with CanonicalizationError (MALFORMED @ JCS).",
-      "Executed by packages/core/test/jcs.spec.ts (471-test core suite, Node 24, 2026-11-22); the section is a shared fixture for @me2em/pact M1.2 (specs/tz-pact.md \u00a76)."
+      "Transcribed byte-exact from the RFC text: §3.2.2 input sample, §3.2.3 canonical output, §3.2.4 canonical UTF-8 bytes, Appendix B Table 1.",
+      "I-JSON (RFC 7493) number-range constraints apply at the JSON-text parsing boundary (RFC 8785 §3.3); serialization accepts any finite double — Appendix B pins 1e+30, 2^53 and ~2^68 beyond the safe range.",
+      "NaN / ±Infinity and every other input outside the JSON domain (BigInt, undefined, functions, symbols, lone surrogates, sparse arrays, non-plain objects, cycles) terminate with CanonicalizationError (MALFORMED @ JCS).",
+      "Executed by packages/core/test/jcs.spec.ts (471-test core suite, Node 24, 2026-11-22); the section is a shared fixture for @me2em/pact M1.2 (specs/tz-pact.md §6)."
     ],
     "vectors": [
       {
         "id": "jcs-main-sample",
-        "source": "RFC 8785 \u00a73.2.2 \u2192 \u00a73.2.3 \u2192 \u00a73.2.4",
+        "source": "RFC 8785 §3.2.2 → §3.2.3 → §3.2.4",
         "input_text": "{\"numbers\":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],\"string\":\"\\u20ac$\\u000F\\u000aA'\\u0042\\u0022\\u005c\\\\\\\"\\/\",\"literals\":[null,true,false]}",
-        "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"\u20ac$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+        "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
         "canonical_hex": "7b226c69746572616c73223a5b6e756c6c2c747275652c66616c73655d2c226e756d62657273223a5b3333333333333333332e333333333333332c31652b33302c342e352c302e3030322c31652d32375d2c22737472696e67223a22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f227d"
       },
       {
         "id": "jcs-sorting-sample",
-        "source": "RFC 8785 \u00a73.2.3",
+        "source": "RFC 8785 §3.2.3",
         "input_text": "{\"\\u20ac\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"\\ufb33\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"\\ud83d\\ude00\":\"Emoji: Grinning Face\",\"\\u0080\":\"Control\",\"\\u00f6\":\"Latin Small Letter O With Diaeresis\"}",
-        "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\u0080\":\"Control\",\"\u00f6\":\"Latin Small Letter O With Diaeresis\",\"\u20ac\":\"Euro Sign\",\"\ud83d\ude00\":\"Emoji: Grinning Face\",\"\ufb33\":\"Hebrew Letter Dalet With Dagesh\"}"
+        "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
       },
       {
         "id": "jcs-numbers-appendix-b",
@@ -428,7 +429,7 @@
       },
       {
         "id": "jcs-numbers-invalid",
-        "source": "RFC 8785 Appendix B (3) + \u00a73.2.2.3 Note",
+        "source": "RFC 8785 Appendix B (3) + §3.2.2.3 Note",
         "cases": [
           {
             "bits": "7fffffffffffffff",
@@ -447,61 +448,62 @@
     ]
   },
   "pact": {
-    "spec": "@me2em/pact",
+    "spec": "Me2eM Pact Journal",
     "spec_version": "1.0",
     "vector_file_version": 2,
-    "algorithm": "HKDF-SHA256 (pact keys, PACTS D3/D38: me2em/pact/v1/{pid}/{ch}/g{gen}, salt \"\") + Ed25519 (RFC 8032, signatures) + JCS RFC 8785 (canonicalization)",
+    "algorithm": "Ed25519 (RFC 8032) + JCS (RFC 8785) + SHA-256 + HKDF-SHA256 (pact key derivation, D2)",
     "notes": [
-      "Derived keys cross-checked against node:crypto hkdfSync (independent HKDF implementation); JCS vectors live in the \"jcs\" section (P0.8).",
-      "A swapped ch (context hash) yields a different key \u2014 fail-closed D4; pid and anchor material are equally load-bearing.",
-      "gen=0 on joining, +1 on ROTATE_KEY (B-4: AMEND never touches keys); pactPub = Ed25519 public key of the pact key (\u04201).",
-      "Extended in M1.7 with envelope/replay/export groups (\u0422\u0417 \u00a76.3\u20136.5, \u00a76.10); lifecycle built entirely by the 2-party assemblers; export vector byte-exact incl. sig[] (B-8)."
+      "Anchor seeds, PID and CH are the fixed testing fixtures (src/testing/fixtures.ts): root key = bytes(32, seed), pact key = derivePactKey(anchorKey, PID, CH, gen).",
+      "Envelope/replay/export vectors are byte-exact; Attestation chains in the liveness vectors are byte-deterministic given (grant, jti, now, ttlSeconds) and are rebuilt by the golden test, not stored.",
+      "rc.3 (F-rc3-5): pinned-ep accept/reject vectors (D13) and chain-liveness vectors (expired / future / exp = act.iat — the strict `< exp` bound) added alongside the M1.7 groups."
     ],
     "vectors": [
       {
         "id": "pact-derive",
+        "source": "PACTS §4 (D2/D3)",
         "input": {
           "anchorSecretKey_hex": "4242424242424242424242424242424242424242424242424242424242424242",
-          "pid": "BwcHBwcHBwcHBwcHBwcHBw",
-          "ch": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+          "pid": "ISEhISEhISEhISEhISEhIQ",
+          "ch": "VXPUVEVtaQRaKnhjvDYWVBGC9yn1k4nRTa88JG38P6U"
         },
         "outputs": [
           {
             "gen": 0,
-            "pactKey_hex": "840f7648efa03c2c4abbc05415dff080c0317147b4c7d3d876f926284a2dc2e3",
-            "pactPub_hex": "4ccee59a019eb0fcc0c2ecea9af99538cdc054196235746857e6b37f0044fa23"
+            "pactKey_hex": "79a581033d85c6efb2855a822e2f7194dc084c360d3a83410e52d4e1c2e119d8",
+            "pactPub_hex": "fc4ed4745336a3398ff1c5de4b37d25c5fe8de6a05bae40e396d05d83ab27e70"
           },
           {
             "gen": 1,
-            "pactKey_hex": "fad70faab710a2949d90724875470a44745695cc1313e0887674ec3bd427cfb8",
-            "pactPub_hex": "736558189ab147d868f6ad037255412b2f69a99705d328e3c6ac5a70bc23775f"
+            "pactKey_hex": "10c41e60440664a0c85fc17467195029d78ca882624b08678ee1178d15caed36",
+            "pactPub_hex": "e4818836a5666584004fe0004b2030cca735031a73e7c5a55211be4a0a1f1cb2"
           },
           {
             "gen": 2,
-            "pactKey_hex": "c964759bbbef0f6f5e26744c9632bfa1be32ff39b07ca9d95dba9596a55bfcf4",
-            "pactPub_hex": "11d154cc763c69d80c3a45784ae4f26e932eca8305a49dc69fce4ca602a78bc2"
+            "pactKey_hex": "43b0b76dbb5482163997d955270b2f89c693d94a09ed410394358f723fb0d09e",
+            "pactPub_hex": "2dd81869a3c5b57280fdd7568d0973f798a04e5c64bc9e57264482ff43c7ce1f"
           }
         ]
       },
       {
         "id": "pact-derive-negative-ch",
+        "source": "PACTS §4 (D4)",
         "input": {
           "anchorSecretKey_hex": "4242424242424242424242424242424242424242424242424242424242424242",
-          "pid": "BwcHBwcHBwcHBwcHBwcHBw",
+          "pid": "ISEhISEhISEhISEhISEhIQ",
           "ch": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo"
         },
         "outputs": [
           {
             "gen": 0,
-            "pactKey_hex": "921e8bbec9f6b6fa4d383a19a99babbee36c8a0baf1074fc00030ecc8279f586",
-            "pactPub_hex": "1c1e2ea2715b497a880090ada75da36ab7e59f4712e8762161e2e38ce69ae4b8"
+            "pactKey_hex": "c1cc5ad9e7ea2acba2f1b43ea60c9f3c503837d60a78e6ffcc37b78460389231",
+            "pactPub_hex": "90adb5688dc499ba289732cc001687e03024b27e842517edb96ab112fef4c077"
           }
         ],
-        "note": "different ch \u21d2 different key (fail-closed, D4)"
+        "note": "different ch ⇒ different key (fail-closed, D4)"
       },
       {
         "id": "pact-envelope-genesis",
-        "source": "PACTS \u00a77.1\u2013\u00a77.2 (D32)",
+        "source": "PACTS §7.1–§7.2 (D32)",
         "input": {
           "pid": "ISEhISEhISEhISEhISEhIQ",
           "ch": "VXPUVEVtaQRaKnhjvDYWVBGC9yn1k4nRTa88JG38P6U",
@@ -527,7 +529,10 @@
               "an": "identity"
             }
           ],
-          "iat": 1700000000
+          "member_seeds_hex": [
+            "01",
+            "02"
+          ]
         },
         "canonical_hex": "7b22696174223a313730303030303030302c227068223a2241414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226368223a225658505556455674615152614b6e686a764459575642474339796e316b346e52546138384a473338503655222c22636e223a7b22696d223a2270696e6e6564222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d2c226378223a226a6f696e74206368617267696e672061677265656d656e74222c226674223a5b7b22616e223a226964656e74697479222c2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c227070223a2267546c3344716839463139576f31526d7730782d7a4d754e69704730376a65695866595057345f4a733551227d2c7b22616e223a226964656e74697479222c2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c227070223a22696f6a6a3358514a385a583955747374504c70646373706e436238646c4249623833534941625150623177227d5d7d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a22677755374677375a7277764f77456f4c2d7474583062694b72534559634969784234665175474a49497a566b68386a447a39524b7053432d445237317245343166327277744332464d38597768513474416745524367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22315a67456e3345427a6b6563303753424c373158624553765a54495a755677416c6f785a505154704367527879634d4c565358344d37654a3172495737494f30446665516d72534a4c3563584c674d5f5f69426a4351227d5d2c227371223a302c227479223a2247454e45534953222c22747970223a226d6532656d2f706163742d6576656e742f7631227d",
         "tbs_hex": "7b22696174223a313730303030303030302c227068223a2241414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226368223a225658505556455674615152614b6e686a764459575642474339796e316b346e52546138384a473338503655222c22636e223a7b22696d223a2270696e6e6564222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d2c226378223a226a6f696e74206368617267696e672061677265656d656e74222c226674223a5b7b22616e223a226964656e74697479222c2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c227070223a2267546c3344716839463139576f31526d7730782d7a4d754e69704730376a65695866595057345f4a733551227d2c7b22616e223a226964656e74697479222c2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c227070223a22696f6a6a3358514a385a583955747374504c70646373706e436238646c4249623833534941625150623177227d5d7d2c227371223a302c227479223a2247454e45534953222c22747970223a226d6532656d2f706163742d6576656e742f7631227d",
@@ -535,7 +540,7 @@
       },
       {
         "id": "pact-replay-lifecycle-2p",
-        "source": "\u0422\u0417 \u00a76.4 \u2014 GENESIS\u2192INVITE\u2192ENROLL\u2192ACT\u2192REVERSE_ACT\u2192AMEND\u2192ROTATE\u2192EXIT\u2192DISSOLVE",
+        "source": "ТЗ §6.4 — GENESIS→INVITE→ENROLL→ACT→REVERSE_ACT→AMEND→ROTATE→EXIT→DISSOLVE",
         "members": {
           "a_seed_hex": "01",
           "b_seed_hex": "02",
@@ -546,7 +551,7 @@
           {
             "ty": "GENESIS",
             "sq": 0,
-            "evHash": "RUaXs9s_Ar83J5BnO5esDmMgaOXU7NUQ21f-qpPIzag",
+            "evHash": "EKxUjrgN7UQprqoYaPEbgQKUizKC1pw6rJsyyh8uPaI",
             "signers": [
               "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
               "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w"
@@ -555,7 +560,7 @@
           {
             "ty": "INVITE",
             "sq": 1,
-            "evHash": "ZMUudr_Lxty7RbtHnBCrbiideGjODuejqykjlW9NOtU",
+            "evHash": "DJtpfVzyyReVHCNg6xMFAPxylLAM4egMGuNj5dtxbLw",
             "signers": [
               "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
               "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w"
@@ -564,7 +569,7 @@
           {
             "ty": "ENROLL",
             "sq": 2,
-            "evHash": "rTYQ3KR08Wz9tCivpka9tX38HSWCSyk5frfK4SC_Me4",
+            "evHash": "K8F_q6FQ6PAzMEyHCzyIAY96aH63OM4KUj-WfvlhAEo",
             "signers": [
               "1YKU1DBGG4ozdSXVeA7oqsQhWzbansYZ_doy8ASaqUg"
             ]
@@ -572,7 +577,7 @@
           {
             "ty": "ACT",
             "sq": 3,
-            "evHash": "SqfnyIQnkhsdOql7-DhYQn-yo1yJxmeC32_g9Gizgz8",
+            "evHash": "8AO2a_4qDXlUdcj0Y5Nqx-0k69LXio49m_p7nsg6fIg",
             "signers": [
               "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
               "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w",
@@ -582,7 +587,7 @@
           {
             "ty": "REVERSE_ACT",
             "sq": 4,
-            "evHash": "E8hvvT6AVAuJ0RQeGuLRvljiP_Th861zRVca2ZqgKv8",
+            "evHash": "nLrl2GBTD1UNNxcJxWb8hv_8lhaidhselqTZSF7Di6Y",
             "signers": [
               "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
               "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w",
@@ -592,7 +597,7 @@
           {
             "ty": "AMEND",
             "sq": 5,
-            "evHash": "OJtqHSkU3X6vtB5iugYjr3SsJLX6WNCiDANKeq9dezM",
+            "evHash": "MwGHIyT61Y4ekovBy_qiVBHQBk_PKGas604hYU9yjCg",
             "signers": [
               "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
               "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w",
@@ -602,24 +607,34 @@
           {
             "ty": "ROTATE_KEY",
             "sq": 6,
-            "evHash": "EMBrneIx81ggESvjHh6XsrHgSnZPKWKQOCcFBcN20CU",
+            "evHash": "iXIHvt0F7bxyUheoXKveElTJDAPRzGHzURVgFyX6GsM",
             "signers": [
               "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w",
               "V1hDrO09Apb3meMDfGoC-rl0UFhUYEGOmuhiRpNJkMw"
             ]
           },
           {
-            "ty": "EXIT",
+            "ty": "ACT",
             "sq": 7,
-            "evHash": "0xjjzkbyFJIHuxoNlExDY1yHnPHmOrc5rKDhO86lK-M",
+            "evHash": "VJPzl6KxjChYl_ziUQIo1zQ-v0_WcHChKeJ4Eazuwhs",
+            "signers": [
+              "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
+              "V1hDrO09Apb3meMDfGoC-rl0UFhUYEGOmuhiRpNJkMw",
+              "1YKU1DBGG4ozdSXVeA7oqsQhWzbansYZ_doy8ASaqUg"
+            ]
+          },
+          {
+            "ty": "EXIT",
+            "sq": 8,
+            "evHash": "o3j6MBRJE3fYHW81le8Hekg0wRgUIgSZbP74xp8eRZ8",
             "signers": [
               "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY"
             ]
           },
           {
             "ty": "DISSOLVE",
-            "sq": 8,
-            "evHash": "NrJmczaD8SNJQ_aLkFwuh4OR1lfaaXknhY4szPWQhFY",
+            "sq": 9,
+            "evHash": "LgKHcrEAr9K0_SYrlwgHLK7SAe4UGVj3oXA1KrOG57g",
             "signers": [
               "V1hDrO09Apb3meMDfGoC-rl0UFhUYEGOmuhiRpNJkMw"
             ]
@@ -629,22 +644,200 @@
           {
             "p": "1YKU1DBGG4ozdSXVeA7oqsQhWzbansYZ_doy8ASaqUg",
             "w": 1,
-            "e": "rTYQ3KR08Wz9tCivpka9tX38HSWCSyk5frfK4SC_Me4"
+            "e": "K8F_q6FQ6PAzMEyHCzyIAY96aH63OM4KUj-WfvlhAEo"
           },
           {
             "p": "V1hDrO09Apb3meMDfGoC-rl0UFhUYEGOmuhiRpNJkMw",
             "w": 1,
-            "e": "RUaXs9s_Ar83J5BnO5esDmMgaOXU7NUQ21f-qpPIzag"
+            "e": "EKxUjrgN7UQprqoYaPEbgQKUizKC1pw6rJsyyh8uPaI"
           }
         ],
-        "pactRoot": "RUaXs9s_Ar83J5BnO5esDmMgaOXU7NUQ21f-qpPIzag",
-        "journalHead": "NrJmczaD8SNJQ_aLkFwuh4OR1lfaaXknhY4szPWQhFY",
-        "seq": 8
+        "pactRoot": "EKxUjrgN7UQprqoYaPEbgQKUizKC1pw6rJsyyh8uPaI",
+        "journalHead": "LgKHcrEAr9K0_SYrlwgHLK7SAe4UGVj3oXA1KrOG57g",
+        "seq": 9
+      },
+      {
+        "id": "pact-replay-pinned-ep",
+        "source": "PACTS §5 / §7.3 / D13 (rc.2, F-rc3-5) — a pinned invite commits the invitee; ENROLL by the committed key",
+        "members": {
+          "a_seed_hex": "01",
+          "b_seed_hex": "02",
+          "c_seed_hex": "03"
+        },
+        "events": [
+          {
+            "ty": "GENESIS",
+            "sq": 0,
+            "evHash": "wpagrCGCymaQKWiMu93qosgGfN5CNHqB0Zhjh7jvN54",
+            "signers": [
+              "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
+              "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w"
+            ]
+          },
+          {
+            "ty": "INVITE",
+            "sq": 1,
+            "evHash": "ip_kBzREDI_3uqThJdOWsO51lILO7csFEigPlTNclyY",
+            "signers": [
+              "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
+              "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w"
+            ],
+            "ep": "1YKU1DBGG4ozdSXVeA7oqsQhWzbansYZ_doy8ASaqUg"
+          },
+          {
+            "ty": "ENROLL",
+            "sq": 2,
+            "evHash": "9saGIIBWnbTTJYyjUPXJGRHS0oGu5s2cYVTqWE-pxIA",
+            "signers": [
+              "1YKU1DBGG4ozdSXVeA7oqsQhWzbansYZ_doy8ASaqUg"
+            ]
+          }
+        ],
+        "roster_final": [
+          {
+            "p": "1YKU1DBGG4ozdSXVeA7oqsQhWzbansYZ_doy8ASaqUg",
+            "w": 1,
+            "e": "9saGIIBWnbTTJYyjUPXJGRHS0oGu5s2cYVTqWE-pxIA"
+          },
+          {
+            "p": "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w",
+            "w": 1,
+            "e": "wpagrCGCymaQKWiMu93qosgGfN5CNHqB0Zhjh7jvN54"
+          },
+          {
+            "p": "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
+            "w": 1,
+            "e": "wpagrCGCymaQKWiMu93qosgGfN5CNHqB0Zhjh7jvN54"
+          }
+        ],
+        "pactRoot": "wpagrCGCymaQKWiMu93qosgGfN5CNHqB0Zhjh7jvN54",
+        "journalHead": "9saGIIBWnbTTJYyjUPXJGRHS0oGu5s2cYVTqWE-pxIA",
+        "seq": 2
+      },
+      {
+        "id": "pact-replay-pinned-ep-reject",
+        "source": "PACTS §5 / D13 (rc.2, F-rc3-5) — an ep-less INVITE under a pinned constitution rejects",
+        "members": {
+          "a_seed_hex": "01",
+          "b_seed_hex": "02"
+        },
+        "events": [
+          {
+            "ty": "GENESIS",
+            "sq": 0,
+            "evHash": "wpagrCGCymaQKWiMu93qosgGfN5CNHqB0Zhjh7jvN54",
+            "signers": [
+              "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
+              "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w"
+            ]
+          },
+          {
+            "ty": "INVITE",
+            "sq": 1,
+            "evHash": "LKA7Wraoi26XqI-o0EQJ5I3wA6RSlgYznFJ5y7aC5cU",
+            "signers": [
+              "toAFI14xo0cxxlm3nfWFAF3g1NAIz7ylGhYbGh9gQCY",
+              "HNBy2DGNvdQRyVB3xGp1aGB5bd5N8mFhEagXckmj67w"
+            ]
+          }
+        ],
+        "expected": {
+          "ok": false,
+          "code": "MALFORMED"
+        }
+      },
+      {
+        "id": "pact-chain-liveness-alive-at-act-iat",
+        "source": "PACTS §5.4 (rc.2 Б6) — iat ≤ act.iat < exp for every attestation",
+        "members": {
+          "a_seed_hex": "01",
+          "b_seed_hex": "02"
+        },
+        "input": {
+          "jtis": [
+            "vec-live-1"
+          ],
+          "timing": {
+            "now": 1700000000,
+            "ttlSeconds": 1
+          },
+          "anchor": "identity"
+        },
+        "expected": {
+          "ok": true,
+          "tier3": "supported"
+        }
+      },
+      {
+        "id": "pact-chain-liveness-expired-before-act-iat",
+        "source": "PACTS §5.4 (rc.2 Б6) — iat ≤ act.iat < exp for every attestation",
+        "members": {
+          "a_seed_hex": "01",
+          "b_seed_hex": "02"
+        },
+        "input": {
+          "jtis": [
+            "vec-exp-1"
+          ],
+          "timing": {
+            "now": 1699996400,
+            "ttlSeconds": 1800
+          },
+          "anchor": "identity"
+        },
+        "expected": {
+          "ok": false,
+          "code": "IDP_UNRESOLVABLE"
+        }
+      },
+      {
+        "id": "pact-chain-liveness-future-after-act-iat",
+        "source": "PACTS §5.4 (rc.2 Б6) — iat ≤ act.iat < exp for every attestation",
+        "members": {
+          "a_seed_hex": "01",
+          "b_seed_hex": "02"
+        },
+        "input": {
+          "jtis": [
+            "vec-fut-1"
+          ],
+          "timing": {
+            "now": 1700003600,
+            "ttlSeconds": 3600
+          },
+          "anchor": "identity"
+        },
+        "expected": {
+          "ok": false,
+          "code": "IDP_UNRESOLVABLE"
+        }
+      },
+      {
+        "id": "pact-chain-liveness-exp-equals-act-iat",
+        "source": "PACTS §5.4 (rc.2 Б6) — iat ≤ act.iat < exp for every attestation",
+        "members": {
+          "a_seed_hex": "01",
+          "b_seed_hex": "02"
+        },
+        "input": {
+          "jtis": [
+            "vec-bnd-1"
+          ],
+          "timing": {
+            "now": 1699996400,
+            "ttlSeconds": 3600
+          },
+          "anchor": "identity"
+        },
+        "expected": {
+          "ok": false,
+          "code": "IDP_UNRESOLVABLE"
+        }
       },
       {
         "id": "pact-export-bytes",
-        "source": "\u0422\u0417 \u00a76.10 / \u00a73.5 \u2014 NL-canonical JCS with sig[], byte-exact (B-8/D47)",
-        "journal_hex": "7b22696174223a313730303030303030302c227068223a2241414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226368223a225658505556455674615152614b6e686a764459575642474339796e316b346e52546138384a473338503655222c22636e223a7b22696d223a2270696e6e6564222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d2c226378223a226a6f696e74206368617267696e672061677265656d656e74222c226674223a5b7b22616e223a226964656e74697479222c2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c227070223a2267546c3344716839463139576f31526d7730782d7a4d754e69704730376a65695866595057345f4a733551227d2c7b22616e223a226964656e74697479222c2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c227070223a22696f6a6a3358514a385a583955747374504c70646373706e436238646c4249623833534941625150623177227d5d7d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a22677755374677375a7277764f77456f4c2d7474583062694b72534559634969784234665175474a49497a566b68386a447a39524b7053432d445237317245343166327277744332464d38597768513474416745524367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22315a67456e3345427a6b6563303753424c373158624553765a54495a755677416c6f785a505154704367527879634d4c565358344d37654a3172495737494f30446665516d72534a4c3563584c674d5f5f69426a4351227d5d2c227371223a302c227479223a2247454e45534953222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a22525561587339735f417238334a35426e4f356573446d4d67614f5855374e55513231662d717050497a6167222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22616e223a226964656e74697479227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a224b624134796175786d5965464635513572496d547850444d566770574d56565a37593659786d3562707064744937514576343342595f583976426b593035712d7956786c414e5732527a57515948734d516e70444451227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a225563433048784577534c434a78702d5a50766847744e36474b4441755a713249316672436c7a5351335432303655766b61747345614e4c6848703430414362764557694b6a7156654643744c6846503439506c434477227d5d2c227371223a312c227479223a22494e56495445222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a225a4d557564725f4c78747937526274486e4243726269696465476a4f4475656a71796b6a6c57394e4f7455222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22646e223a226361726f6c222c22726566223a225a4d557564725f4c78747937526274486e4243726269696465476a4f4475656a71796b6a6c57394e4f7455227d2c22736967223a5b7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a224967305562556e5f587350777756507931314633775049467750765f6a6e466f4862724e6364634d6e544e395447664130584a75572d52394e5277656e6f62487a36575934642d6b2d387145386e7377794350434277227d5d2c227371223a322c227479223a22454e524f4c4c222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a2272545951334b523038577a3974436976706b6139745833384853574353796b356672664b3453435f4d6534222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226e6f223a2273657373696f6e2d31227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a22307577512d72376171596754565379634b5562336f4e6e72335845616d676978694442546a53316562485865525532534f6c61763861427774756e454356665f43456743565956584e3344715451714842386e6b4367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a226661616c7348457a7375717576506568374c44666c53324339634c6d4969415372346d716e5375397647755967345058344a642d374d534b586d466f76446d7a596c7a4e32456f4650426f6f6a4b4a497770364e4367227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a2244625f6d37456c376a6c4a49347a4270757a347a5667617335355856795336626f796b786b7861462d4c7968486e6638634d72724b6a58654768615f414658517a68636442733754424958426e744b486b3845734367227d5d2c227371223a332c227479223a22414354222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a225371666e7949516e6b6873644f716c372d446859516e2d796f31794a786d654333325f673947697a677a38222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226b223a22737570657273656465222c22726566223a225371666e7949516e6b6873644f716c372d446859516e2d796f31794a786d654333325f673947697a677a38222c227273223a2277726f6e6720746172696666227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a2231534973346b4c774f6c7750465634304e4f6e36476a55626b3147534773793451614c415373444337365458626e70522d4955755551626770396c7844697078694839766576616952555553794162686d6f56434367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22427a5763624d625a314f4559784876685930354d64797150486e37377a6a30684e475267316547695766636b4747456753527549484c455f4e6a686f4867325552594871547a54703737516d3836754b2d4d4e544267227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a22794f68696350443668553359777034456a6353595973454e646f4e6450784a3677573552327041356849584f30337173447a30586e4f456773344864784f35756d56713037493974326265632d4d4243353539774351227d5d2c227371223a342c227479223a22524556455253455f414354222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a2245386876765436415641754a3052516547754c52766c6a69505f54683836317a52566361325a71674b7638222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22636e223a7b22696d223a22626561726572222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d7d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a223058644a6a507470692d4358476b75646d444e4953643754444e52675f6461726f4e565158356235756e58485f497259775643577a6a7a714c43416c6f55734243634643464a55506538436d78523262323858414367227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22732d57764954796b6f334e4f44584a6e2d4537344e6f63793150534d764d4f63364b59676e79306258354b5f53684f70513861765154584b415f5273386b4a435a634e797a627a7a346832434541516f535963474177227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a226a6a6876364933564253474a6c577a536f3569374a38517268677556636f48524c447a434a435675484576327770527246666c794634304f36617057754f6f55435377504b475146437952575738332d643956324241227d5d2c227371223a352c227479223a22414d454e44222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a224f4a747148536b5533583676744235697567596a723353734a4c5836574e436944414e4b65713964657a4d222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226e70223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77227d2c22736967223a5b7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a2253504552666e4c76673549526d30744b484536535f4566705478677446436c58646b496a707a636c73324a6e7833746178486e5a57352d505f6552634c636b5371795f4d397967436149706933707951746743694341227d2c7b2270223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77222c2273223a22424b42464430326b4e45454645556d7a69675067427633374f66476f5a4e335253584a5064447779524a733049547a782d763572514b383344494d35365f2d4b49466e6437614e586b5a427071444a7247436b684177227d5d2c227371223a362c227479223a22524f544154455f4b4559222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a22454d42726e654978383167674553766a4868365873724867536e5a504b574b514f43634642634e32304355222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b227273223a226c656176696e67227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a227a67766275786f6d7638586e4a33574b2d326b705a6641724c32306c7767535f437975325838344e4d6f666d51324b44467a734b774f754b6c48796c374b5666716d6f704a74445150344177744e435f7a666d704467227d5d2c227371223a372c227479223a2245584954222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a2230786a6a7a6b6279464a494875786f4e6c457844593179486e50486d4f726335724b44684f38366c4b2d4d222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b227273223a22646f6e65227d2c22736967223a5b7b2270223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77222c2273223a222d6f55326754787a6e506f52534e496e4d676d71704c4a5946376c6f72315351735356454e754870346d45414f7070615332525172766b446f335a3251744d424135314e6f334744644835575a656973534f59304367227d5d2c227371223a382c227479223a22444953534f4c5645222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a",
+        "source": "ТЗ §6.10 / §3.5 — NL-canonical JCS with sig[], byte-exact (B-8/D47)",
+        "journal_hex": "7b22696174223a313730303030303030302c227068223a2241414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226368223a225658505556455674615152614b6e686a764459575642474339796e316b346e52546138384a473338503655222c22636e223a7b22696d223a22626561726572222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d2c226378223a226a6f696e74206368617267696e672061677265656d656e74222c226674223a5b7b22616e223a226964656e74697479222c2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c227070223a2267546c3344716839463139576f31526d7730782d7a4d754e69704730376a65695866595057345f4a733551227d2c7b22616e223a226964656e74697479222c2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c227070223a22696f6a6a3358514a385a583955747374504c70646373706e436238646c4249623833534941625150623177227d5d7d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a225633505a395a754c50436d4f706769325942395a347243506834324b782d544e7672435a663375334b34443471527753483635447241696e773676514144544372576a38464f31414552684e74495247394e47534351227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a2275536e51534a354f34456a6b554952586b6832476d6d664a31324b5272335a5a2d3849303346494445634a576a573577644d364b675742534e543646415637336b2d37474c394e636861367043415178665258334377227d5d2c227371223a302c227479223a2247454e45534953222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a22454b78556a72674e3755517072716f596150456267514b55697a4b4331707736724a737979683875506149222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22616e223a226964656e74697479227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a22536969616f504a4972377a6c6f3173396b493379336b586950395945657a723349635165526c5f5136787058526676623567424e7746655f6861327955326e44454b624b6d6135494f7836417a6b7242576c79304351227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22332d37502d4f6f4c30617445794e7955326242714c707a3161704d37346e724d327432476e5173664a485552734d307779364c5a626f30714a3944474c4d7857765630696e59673677695856434e30432d6a4e324377227d5d2c227371223a312c227479223a22494e56495445222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a22444a747066567a797952655648434e6736784d46415078796c4c414d3465674d47754e6a35647478624c77222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22726566223a22444a747066567a797952655648434e6736784d46415078796c4c414d3465674d47754e6a35647478624c77227d2c22736967223a5b7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a22345054443333754d4b6158373267467836416c34353852725f7956616f6b777961393542762d34555439725733504652776a486d34667a4838626c69766e43706c656b626e3152335f70443675304255717271454177227d5d2c227371223a322c227479223a22454e524f4c4c222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a224b38465f713646513650417a4d457948437a794941593936614836334f4d344b556a2d5766766c6841456f222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226e6f223a2273657373696f6e2d31227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a2238746a34634175414d562d484c3976346b66546573747339486d3943773331592d4e4f3773462d6f33396e356e4532454a584235523737324b555763597553342d693156352d6e526351504d754e5f776a6a2d594341227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a227348313557733768445a387a664f7673677351614a7a48686f4d6679437875506f5a75613143326563463551335f6453676a54754f47794f796f394254433771715571647841446a50474357612d566d454d416d4467227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a2249567245424b6d436d557745696158366261594a30757275575171396673366f4d35365534363375443435346157325a534333546f6355364d476c4f4a565f786c785f41496d463551636d38505355584a4179784241227d5d2c227371223a332c227479223a22414354222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a2238414f32615f347144586c5564636a3059354e71782d306b36394c58696f34396d5f70376e736736664967222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226b223a22737570657273656465222c22726566223a2238414f32615f347144586c5564636a3059354e71782d306b36394c58696f34396d5f70376e736736664967222c227273223a2277726f6e6720746172696666227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a2276715f467a5574786659477732536b6430663156323851336b6f344432643278624b44774e41636b4d5950654d5849384c326b6768724b617355575870733979683536466f6a514f4263536a6679583467466e654351227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a224d5976336e322d7677345f375835377130376e447037324d687567454975626730785f55727036785a63744e65367253596f484c4a6269526734487247567478532d6d4f6368697432583861336d496e6f6e45454477227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a224779343164413930313954694c54415439773431587a32434578357a426e6851635a7061377956624941676b55374f334d724c32396d336a6e61515041625f61532d2d55484e5569674c344333733976573951384351227d5d2c227371223a342c227479223a22524556455253455f414354222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a226e4c726c324742544431554e4e78634a7857623868765f386c686169646873656c71545a53463744693659222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b22636e223a7b22696d223a22626561726572222c227468223a7b22444953534f4c5645223a7b226d223a22616e79227d7d2c2277223a66616c73657d7d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a226c584c6864534f65456330346a766571317132486c4e504765766b6a4641666d65333571395a6b494b6e79395a474e4b485872717138724e5f4d456158533139347161792d3977333474473934775a37414645634477227d2c7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a2256477a74626e5f733377704356334e52486b39754d623171316e506d4938373231354c6f704d4e7a43636e634259593531557078594667624d736857564930436e694a7155784e694c5f335769437a5f7a4637324267227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a224f41785a6764753550745568714f494845733365474d666f554a556d6454377a494942484e6e594c384e5a6f656a5834684a55326c725f593146645952786f436c67764772494b3532513632444a4b4a48675a374277227d5d2c227371223a352c227479223a22414d454e44222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a224d77474849795436315934656b6f7642795f716956424851426b5f504b47617336303468595539796a4367222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226e70223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77227d2c22736967223a5b7b2270223a22484e42793244474e766451527956423378477031614742356264354e386d466845616758636b6d6a363777222c2273223a22696638655065636b714d7a536d3847522d7037584c6941375765344478764e775162616c442d59663275495f7a37527343465354535a7873707165464f397038413142756c4e724676326866435a6f4772564c774177227d2c7b2270223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77222c2273223a22633057444b33616146544c6d723263396a3662543054715a7444632d6e4c36466c6a6631526e766159756957414d3472487334674f4954414771653561537165793549773075395870734b3245707767462d78704377227d5d2c227371223a362c227479223a22524f544154455f4b4559222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a226958494876743046376278795568656f584b7665456c544a444150527a47487a555256674679583647734d222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b226e6f223a2273657373696f6e2d32227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a226d6c317a506e41436b57525163444259364c50482d3761392d68776871637765314d4748525a2d4c3441555933624f30364f592d46685a79377856704f5a42653071447a4f7666556b53777170547a30614944524477227d2c7b2270223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77222c2273223a22623861345632796b30476c6d4867306669396354684e3244693253786e585237745072723331636f7443304f634f6878636e335a4e6d586e434d504b6269675a6230706e5149376e45595f7168583879327046524151227d2c7b2270223a2231594b553144424747346f7a645358566541376f71735168577a62616e73595a5f646f7938415361715567222c2273223a225a506f513946634566686e324f744942435046356c4b493959596a4139676e6775326e2d756359675576674f663454714172394e69335a65353758577637416e58696638644f54477374745a55753631723771744377227d5d2c227371223a372c227479223a22414354222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a22564a507a6c364b786a4368596c5f7a695551496f317a512d76305f57634843684b654a3445617a75776873222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b227273223a226c656176696e67227d2c22736967223a5b7b2270223a22746f4146493134786f306378786c6d336e66574641463367314e41497a37796c4768596247683967514359222c2273223a22786a4e7a4232736b687041737a56483275634b4172463556545078756c573730734e62317a796f443639514f5337353078364549556f5370544a305946433072364e724a76383679614b7438326b7a4b2d526f6e4251227d5d2c227371223a382c227479223a2245584954222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a7b22696174223a313730303030303030302c227068223a226f336a364d42524a45336659485738316c653848656b6730775267554967535a6250373478703865525a38222c22706964223a2249534568495345684953456849534568495345684951222c22706c223a7b227273223a22646f6e65227d2c22736967223a5b7b2270223a2256316844724f3039417062336d654d4466476f432d726c30554668555945474f6d75686952704e4a6b4d77222c2273223a2258334b3336554a6b7639314c5564754634687a6b6753722d556f67453246325a317a4e6a4273573172302d7654754e644a414a41774b74654f6d6d3833764454435a6d575577396b694a6c2d4e65473566642d6d4141227d5d2c227371223a392c227479223a22444953534f4c5645222c22747970223a226d6532656d2f706163742d6576656e742f7631227d0a",
         "idempotent": true,
         "reimport_verifies": true
       }

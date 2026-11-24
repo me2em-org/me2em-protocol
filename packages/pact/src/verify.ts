@@ -27,7 +27,7 @@
 import { Attestation, crypto, canonicalize, type RevocationChecker } from '@me2em/core';
 import type { JsonValue } from '@me2em/core';
 import { PactError } from './errors.js';
-import { b64urlDecode, b64urlEncode, evHash, tbsBytes, validateEvent, ZERO32 } from './codec.js';
+import { b64urlDecode, b64urlEncode, tbsBytes, validateEvent, ZERO32 } from './codec.js';
 import {
   type Anchor,
   type Clock,
@@ -402,8 +402,10 @@ function applyEvent(state: JournalState, event: Event, hash: string): void {
   }
 }
 
-function replay(events: Event[], clock: Clock, skewCheck: 'all' | 'none' = 'all'): JournalState {
-  const state: JournalState = {
+const states = new WeakMap<JournalVerifier, JournalState>();
+
+function emptyState(): JournalState {
+  return {
     pid: undefined,
     head: ZERO32,
     hashes: [],
@@ -417,8 +419,74 @@ function replay(events: Event[], clock: Clock, skewCheck: 'all' | 'none' = 'all'
     acts: new Set(),
     rotatedKeys: new Map(),
   };
-  const now = clock.now();
-  for (const event of events) {
+}
+
+function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+// ---------------------------------------------------------------------------
+// Incremental verifier (rc.3, F-rc3-1 — specs/tz-pact-rc3-incremental.md)
+// ---------------------------------------------------------------------------
+
+/**
+ * Incremental journal verifier (RC3-D4): the streaming face of the same
+ * replay {@link verifyJournal} runs — there is no second, "fast"
+ * verification path; the only skip is the re-check of an already
+ * committed prefix (RC3-D2). Each `apply` runs the full PACTS §7.7
+ * order on its event (chain → envelope/skew/signatures →
+ * semantics/quorum); the committed prefix is protected by a
+ * hash-commitment (RC3-D1) that `applySuffix` re-derives from the
+ * caller's actual array on every call — a diverged journal rejects
+ * with `FORK_DETECTED` (RC3-D3, fail-closed, no silent recompute; run
+ * {@link verifyJournal} for a from-scratch diagnosis of the exact
+ * cause).
+ *
+ * The state is opaque and in-memory only (RC3-D6): it is not a wire
+ * format and never crosses `JournalStore`/`Channel`; suffix
+ * verification against a foreign head is {@link verifyPrefix}'s
+ * contract. Failed `apply*` calls leave the state unchanged — every
+ * check precedes every mutation (PACTS §7.7 order).
+ *
+ * Skew (RC3-D5): the Clock is read per applied event; pin the clock
+ * (or set `skewCheck: 'none'`) for era-consistent streaming replays.
+ */
+export class JournalVerifier {
+  private readonly clock: Clock;
+  private readonly skewCheck: 'all' | 'none';
+  /** RC3-D1: hash-commitment of the applied prefix. */
+  private commitment: Uint8Array;
+
+  constructor(clock?: Clock, opts?: VerifyOptions) {
+    this.clock = clock ?? systemClock();
+    this.skewCheck = opts?.skewCheck ?? 'all';
+    this.commitment = new Uint8Array(32);
+    states.set(this, emptyState());
+  }
+
+  /** Number of applied events. */
+  get height(): number {
+    return states.get(this)!.events.length;
+  }
+
+  /** evHash of the last applied event; ZERO32 when empty. */
+  get head(): string {
+    return states.get(this)!.head;
+  }
+
+  /**
+   * Full verification + application of one event. Throws `PactError`
+   * on the first violation — the state is left unchanged.
+   */
+  apply(event: Event): void {
+    const state = states.get(this)!;
     // (1) chain (PACTS §7.7 step 1)
     if (state.pid === undefined) state.pid = event.pid;
     else if (state.pid !== event.pid) {
@@ -432,8 +500,11 @@ function replay(events: Event[], clock: Clock, skewCheck: 'all' | 'none' = 'all'
     }
     // (2) envelope + skew + signatures (PACTS §7.7 step 2)
     validateEvent(event, 'verify');
-    if (skewCheck === 'all' && Math.abs(event.iat - now) > SKEW_SECONDS) {
-      throw new PactError('SKEW', 'verify', `iat ${event.iat} is outside ±${SKEW_SECONDS}s of the clock`);
+    if (this.skewCheck === 'all') {
+      const now = this.clock.now();
+      if (Math.abs(event.iat - now) > SKEW_SECONDS) {
+        throw new PactError('SKEW', 'verify', `iat ${event.iat} is outside ±${SKEW_SECONDS}s of the clock`);
+      }
     }
     const tbs = tbsBytes(event);
     for (const s of event.sig) {
@@ -444,13 +515,80 @@ function replay(events: Event[], clock: Clock, skewCheck: 'all' | 'none' = 'all'
       }
     }
     // (3) type semantics + quorum (PACTS §7.7 step 3)
-    const hash = evHash(event);
+    const hBytes = crypto.sha256(tbs);
+    const hash = b64urlEncode(hBytes);
     applyEvent(state, event, hash);
     state.head = hash;
     state.events.push(event);
     state.hashes.push(hash);
+    // RC3-D1: extend the prefix commitment.
+    this.commitment = crypto.sha256(concatBytes(this.commitment, hBytes));
   }
-  return state;
+
+  /**
+   * RC3-D2: the cheap integrity pass over the caller's array
+   * `[0..height)` — pid/sq/ph chain plus the hash-commitment
+   * re-derived from the actual content (JCS + SHA-256, no signatures,
+   * no state machine) — then the full check of `[height..len)`.
+   * A no-op suffix applies nothing and still re-checks the prefix.
+   */
+  applySuffix(events: Event[]): void {
+    const height = states.get(this)!.events.length;
+    if (events.length < height) {
+      throw new PactError('FORK_DETECTED', 'verify', `journal shorter than the committed prefix (${events.length} < ${height})`);
+    }
+    if (height > 0) this.integrityPass(events, height);
+    for (let i = height; i < events.length; i++) {
+      this.apply(events[i]);
+    }
+  }
+
+  private integrityPass(events: Event[], height: number): void {
+    let prevH: Uint8Array | undefined;
+    let pid: string | undefined;
+    let c: Uint8Array = new Uint8Array(32);
+    for (let i = 0; i < height; i++) {
+      const e = events[i];
+      if (pid === undefined) pid = e.pid;
+      else if (pid !== e.pid) {
+        throw new PactError('FORK_DETECTED', 'verify', 'integrity pass: pid changed mid-journal');
+      }
+      if (e.sq !== i) {
+        throw new PactError('FORK_DETECTED', 'verify', `integrity pass: sq ${e.sq} does not continue the chain (expected ${i})`);
+      }
+      const hBytes = crypto.sha256(tbsBytes(e));
+      if (e.ph !== (prevH === undefined ? ZERO32 : b64urlEncode(prevH))) {
+        throw new PactError('FORK_DETECTED', 'verify', 'integrity pass: ph does not match the previous event hash');
+      }
+      c = crypto.sha256(concatBytes(c, hBytes));
+      prevH = hBytes;
+    }
+    if (prevH === undefined) {
+      /* v8 ignore next: height > 0 guarantees at least one iteration —
+       * defensive only. */
+      throw new PactError('FORK_DETECTED', 'verify', 'integrity pass: empty prefix');
+    }
+    const headOk = b64urlEncode(prevH) === states.get(this)!.head;
+    if (!headOk || !bytesEqual(c, this.commitment)) {
+      throw new PactError('FORK_DETECTED', 'verify', 'journal prefix diverges from the committed verifier state (F-rc3-1) — run verifyJournal for a from-scratch diagnosis');
+    }
+  }
+
+  /** Success view of the committed state (same fields as a clean verifyJournal). */
+  snapshot(): VerifyResult {
+    return successResult(states.get(this)!);
+  }
+}
+
+/** Factory of {@link JournalVerifier} (RC3-D4). */
+export function createJournalVerifier(clock?: Clock, opts?: VerifyOptions): JournalVerifier {
+  return new JournalVerifier(clock, opts);
+}
+
+function replay(events: Event[], clock: Clock, skewCheck: 'all' | 'none' = 'all'): JournalState {
+  const verifier = new JournalVerifier(clock, { skewCheck });
+  verifier.applySuffix(events);
+  return states.get(verifier)!;
 }
 
 // ---------------------------------------------------------------------------

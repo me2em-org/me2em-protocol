@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { b64urlEncode, ZERO32 } from '../src/codec.js';
 import { evHash } from '../src/codec.js';
-import { verifyAct, verifyJournal, verifyPrefix, SKEW_SECONDS } from '../src/verify.js';
+import { verifyAct, verifyJournal, verifyPrefix, SKEW_SECONDS, createJournalVerifier } from '../src/verify.js';
 import { PactError } from '../src/errors.js';
 import type { Constitution, Event, VoucherChain } from '../src/types.js';
 import {
@@ -766,4 +766,125 @@ describe('defensive branches (coverage)', () => {
     expect(result.warnings).toEqual([{ code: 'NO_VOUCHER', evHash: j.hash(j.events[0]) }]);
   });
 });
+});
+
+describe('JournalVerifier — incremental replay (rc.3, F-rc3-1)', () => {
+  /** Mixed lifecycle without DISSOLVE (10 events, real keys, real sigs). */
+  function lifecycle(): Event[] {
+    const a = new Member(1);
+    const b = new Member(2);
+    const c = new Member(3);
+    const b2 = new Member(2, 1); // B after ROTATE_KEY (gen 1)
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cx: 'joint charging agreement', cn: CN2, ft: foundersOf([a, b], CN2) }, [a, b]);
+    const invite = j.push('INVITE', { an: 'identity' }, [a, b]);
+    j.push('ENROLL', { ref: j.hash(invite) }, [c]);
+    const act1 = j.push('ACT', { no: 'session-1' }, [a, b, c]);
+    j.push('REVERSE_ACT', { ref: j.hash(act1), k: 'supersede', rs: 'wrong tariff' }, [a, b, c]);
+    j.push('AMEND', { cn: CN2 }, [a, b, c]);
+    j.push('ROTATE_KEY', { np: b2.pub }, [b, b2]);
+    j.push('ACT', { no: 'session-2' }, [a, b2, c]);
+    j.push('EXIT', { rs: 'leaving' }, [a]);
+    j.push('ACT', { no: 'session-3' }, [b2, c]);
+    return j.events;
+  }
+
+  it('incremental apply == verifyJournal (full-lifecycle parity)', () => {
+    const events = lifecycle();
+    const batch = verifyJournal(events, clockAt(T0));
+    expect(batch.ok).toBe(true);
+    const v = createJournalVerifier(clockAt(T0));
+    for (const e of events) v.apply(e);
+    expect(v.height).toBe(events.length);
+    expect(v.head).toBe(batch.journalHead);
+    const snap = v.snapshot();
+    expect(snap.ok).toBe(true);
+    expect(snap.pactRoot).toBe(batch.pactRoot);
+    expect(snap.journalHead).toBe(batch.journalHead);
+    expect(snap.seq).toBe(batch.seq);
+    expect(snap.roster).toEqual(batch.roster);
+    expect(snap.warnings).toEqual([]);
+  });
+
+  it('applySuffix == batch; repeated suffix is an integrity-only no-op; shorter journal ⇒ FORK_DETECTED', () => {
+    const events = lifecycle();
+    const v = createJournalVerifier(clockAt(T0));
+    v.applySuffix(events);
+    const head = v.head;
+    expect(head).toBe(verifyJournal(events, clockAt(T0)).journalHead);
+    v.applySuffix(events); // same array — re-checked, nothing new to apply
+    expect(v.head).toBe(head);
+    expect(v.height).toBe(events.length);
+    try {
+      v.applySuffix(events.slice(0, events.length - 1));
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PactError);
+      expect((e as PactError).code).toBe('FORK_DETECTED');
+    }
+  });
+
+  it('error parity: a tampered signature rejects identically (streaming throws, state untouched)', () => {
+    const events = lifecycle();
+    const tampered = events.map((e) => ({ ...e, sig: e.sig.map((s) => ({ ...s })) }));
+    tampered[4] = { ...tampered[4], sig: [{ ...tampered[4].sig[0], s: tampered[4].sig[0].s.slice(0, -4) + 'AAAA' }] };
+    expectCode(verifyJournal(tampered, clockAt(T0)), 'SIGNATURE_INVALID');
+    const v = createJournalVerifier(clockAt(T0));
+    let thrown: PactError | undefined;
+    try {
+      for (const e of tampered) v.apply(e);
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      thrown = err as PactError;
+    }
+    expect(thrown).toBeInstanceOf(PactError);
+    expect(thrown!.code).toBe('SIGNATURE_INVALID');
+    expect(thrown!.context).toBe('verify');
+    // The failed apply left the verifier at the last good event:
+    expect(v.height).toBe(4);
+    expect(v.head).toBe(evHash(events[3]));
+  });
+
+  it('§3 attack: re-chained middle tamper ⇒ FORK_DETECTED on the committed state (RC3-D2/D3)', () => {
+    const events = lifecycle();
+    const v = createJournalVerifier(clockAt(T0));
+    v.applySuffix(events);
+    // Forge: swap the payload of a middle event and re-chain every
+    // subsequent ph — chain-consistent, no attacker signatures needed
+    // to reach the commitment check.
+    const forged = events.map((e) => ({ ...e, sig: e.sig.map((s) => ({ ...s })) }));
+    forged[2] = { ...forged[2], pl: { ref: bytes32(9) } };
+    for (let i = 3; i < forged.length; i++) {
+      forged[i] = { ...forged[i], ph: evHash(forged[i - 1]) };
+    }
+    // From-scratch verification names the precise cause:
+    expectCode(verifyJournal(forged, clockAt(T0)), 'SIGNATURE_INVALID');
+    // The committed verifier refuses the divergence without recomputing:
+    try {
+      v.applySuffix(forged);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PactError);
+      expect((e as PactError).code).toBe('FORK_DETECTED');
+    }
+    // The committed state is intact — the honest array still applies:
+    v.applySuffix(events);
+    expect(v.head).toBe(evHash(events[events.length - 1]));
+  });
+
+  it('skew parity (RC3-D5): pinned stale clock rejects like the batch; skewCheck none streams through', () => {
+    const events = lifecycle();
+    const stale = createJournalVerifier(clockAt(T0 - 3600));
+    try {
+      stale.apply(events[0]);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PactError);
+      expect((e as PactError).code).toBe('SKEW');
+    }
+    const none = createJournalVerifier(clockAt(T0 - 3600), { skewCheck: 'none' });
+    for (const e of events) none.apply(e);
+    expect(none.height).toBe(events.length);
+    expect(none.head).toBe(evHash(events[events.length - 1]));
+  });
 });

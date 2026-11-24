@@ -12,7 +12,7 @@
 import { crypto } from '@me2em/core';
 import { b64urlEncode, evHash, tbsBytes, validateEvent, ZERO32 } from '../codec.js';
 import { PactError } from '../errors.js';
-import { verifyJournal } from '../verify.js';
+import { JournalVerifier } from '../verify.js';
 import type { Clock, Event, EventType, Signature } from '../types.js';
 
 export const EVENT_TYPE = 'me2em/pact-event/v1' as const;
@@ -39,6 +39,18 @@ export function signaturesFor(raw: Omit<Event, 'sig'>, keys: Uint8Array[]): Sign
 }
 
 /**
+ * Single-slot fast-path cache (F-rc3-1, RC3-D7): the verifier of the
+ * last finalized prefix. A sequential lifecycle extends its own tail,
+ * so one slot covers it; interleaved journals alternate misses — the
+ * rc.2 full-replay behavior, no regression. The cache never bypasses
+ * checks: on a hit, `applySuffix` re-derives the chain and the
+ * hash-commitment from the caller's actual array (RC3-D2), and the
+ * cached verifier runs with `skewCheck: 'none'` (Б1), so the per-call
+ * clock is immaterial.
+ */
+let finalizedPrefix: { tail: Event; height: number; verifier: JournalVerifier } | undefined;
+
+/**
  * Fail-closed assembly (B-7): the extended journal must verify. Any
  * verification failure (chain, signatures, quorum, semantics) throws
  * the underlying {@link PactError} — the caller receives a usable
@@ -47,13 +59,28 @@ export function signaturesFor(raw: Omit<Event, 'sig'>, keys: Uint8Array[]): Sign
  * does not defend against skew — verify does, C3): the assembly clock
  * may legitimately be far from the prefix's era (a fresh event
  * appended to history).
+ *
+ * Cost (rc.3): a cache hit verifies only the new event in full — the
+ * prefix costs a cheap hash-integrity pass (RC3-D2) instead of the
+ * rc.2 full replay; a miss replays from scratch (rc.2 behavior).
  */
 export function finalize(events: Event[], event: Event, clock: Clock): Event {
   validateEvent(event, 'assemble');
-  const result = verifyJournal([...events, event], clock, { skewCheck: 'none' });
-  if (!result.ok) {
-    throw result.error ?? new PactError('MALFORMED', 'assemble', 'verification failed without an error');
+  const tail = events.length > 0 ? events[events.length - 1] : undefined;
+  let verifier: JournalVerifier;
+  if (
+    finalizedPrefix !== undefined &&
+    tail !== undefined &&
+    finalizedPrefix.tail === tail &&
+    finalizedPrefix.height === events.length
+  ) {
+    verifier = finalizedPrefix.verifier;
+  } else {
+    verifier = new JournalVerifier(clock, { skewCheck: 'none' });
   }
+  verifier.applySuffix(events);
+  verifier.apply(event);
+  finalizedPrefix = { tail: event, height: events.length + 1, verifier };
   return event;
 }
 

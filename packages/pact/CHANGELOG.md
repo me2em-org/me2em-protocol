@@ -1,5 +1,57 @@
 # Changelog
 
+## [1.0.0-rc.3] — 2026-11-24
+
+The scaling release: incremental journal verification (audit Б2 — the
+only P2 follow-up of BL-58) plus golden-vector coverage for the rc.2
+semantics. Design: `specs/tz-pact-rc3-incremental.md` (RC3-D1…D8);
+plan: `specs/plan-pact-rc3.md`.
+
+### Added
+- **F-rc3-1 (Б2)** — incremental journal verification:
+  `createJournalVerifier(clock?, opts?)` → `JournalVerifier` with
+  `apply(event)` / `applySuffix(events)` — the streaming face of the
+  same replay `verifyJournal` runs (one code path; RC3-D8). The state
+  is opaque and bound to the head evHash plus a cumulative
+  hash-commitment (RC3-D1: `C_i = SHA-256(C_{i-1} ‖ SHA-256(TBS_i))`).
+  `applySuffix` re-derives chain and commitment from the caller's
+  actual array on every call — a cheap pass (JCS + SHA-256, no
+  signatures, no state machine; RC3-D2); any divergence rejects with
+  `FORK_DETECTED`, no silent recompute (RC3-D3). Checkpoints are
+  in-memory only — never a wire format (RC3-D6).
+- **Assembly fast path** — `finalize` keeps a single-slot cache of the
+  last verified prefix (RC3-D7): a sequential lifecycle verifies only
+  the new event in full, the prefix costs the integrity pass; cache
+  misses replay from scratch (rc.2 behavior, no regression) and the
+  cache never bypasses checks. Measured (`bench/baseline.json`): the
+  integrity pass is ~9 µs/event against ~2.9 ms/event for a full
+  replay (Ed25519-dominated) — a warm assembly onto a 64-event prefix
+  is ~50× cheaper than the rc.2 full replay; the dominant lifecycle
+  cost (signatures + state machine) is linear.
+- **F-rc3-5** — golden vectors for the pact machine: the `pact`
+  section of `specs/test-vectors.json` regenerated as a snapshot of
+  rc.3 (vector_file_version 4) with new groups — pinned-`ep`
+  accept/reject (D13) and chain-liveness (alive / expired / future /
+  exp = act.iat — the strict `act.iat < exp` bound);
+  `scripts/generate-vectors.ts` writes the section, the new
+  `test/vectors.spec.ts` re-computes every row from the stored inputs.
+
+### Fixed (quality)
+- **F-rc3-2 (re-scoped)** — `MemoryStore` maintains the JournalHead
+  incrementally (O(1) per append instead of re-deriving the tail
+  evHash on every call). The literal "optional Clock in
+  `MemoryStore.append`" was declined: the store contract is time-free
+  by design (ТЗ §3.5; P2/C3 — skew is verify's job) and a clock
+  parameter would be a dead API surface. Rationale:
+  `specs/tz-pact-rc3-incremental.md` §5.
+
+### Tests
+- 122 tests (was 108): incremental/batch equivalence including error
+  codes, the RC3-D2/D3 attack vector (re-chained middle tamper ⇒
+  `FORK_DETECTED` on the committed state), skew parity, a 40-event
+  assembly lifecycle with tampered prefixes, and the golden-vector
+  suite; tsc/eslint clean, coverage thresholds (≥ 90%) kept.
+
 ## [1.0.0-rc.2] — 2026-11-24
 
 Audit-driven hardening pass over rc.1. The external audit claimed 8

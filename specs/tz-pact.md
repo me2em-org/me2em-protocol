@@ -121,6 +121,13 @@ export function verifyJournal(events: Event[], clock?: Clock,
 export function verifyAct(events: Event[], evHash: string, revocations?: RevocationChecker,
                           chains?: Map<string, VoucherChain>, clock?: Clock): Promise<VerifyResult>; // async: Tier 1+2+3
 export function verifyPrefix(events: Event[], head: string, clock?: Clock): VerifyResult;            // sync: Tier 1+2 на префиксе (B-7)
+export class JournalVerifier {                                                                        // rc.3 (F-rc3-1, RC3-D4)
+  constructor(clock?: Clock, opts?: { skewCheck?: 'all' | 'none' });
+  apply(event: Event): void;            // полный чек §7.7 + применение; ошибка — PactError, состояние не меняется
+  applySuffix(events: Event[]): void;   // integrity pass префикса (RC3-D2) + полный чек суффикса
+  get height(): number; get head(): string; snapshot(): VerifyResult;
+}
+export function createJournalVerifier(clock?: Clock, opts?: { skewCheck?: 'all' | 'none' }): JournalVerifier;
 ```
 
 Порядок проверки — нормативный (§7.7 PACTS): (1) цепочка `sq`/`ph`, `ph[0] = ZERO32`; (2) strict parse, skew ±30 с, известный `ty`, лимиты, различность pub, Ed25519 по TBS; (3) кворум по конституции, действующей на seq события; самособытия (ENROLL/EXIT/ROTATE) освобождены от правила ACTIVE-подписантов.
@@ -151,7 +158,7 @@ export function assembleInvite(...): Event;
 export function assembleEvict(...): Event;     // 2-party недостижим ≡ DISSOLVE (D26′)
 ```
 
-Каждый сборщик: строит TBS = JCS(событие без `sig`), собирает подписи, возвращает Event. Время `iat` — из инъектированного `Clock` (Р4): каждый `assemble*` принимает опциональный `clock` (по умолчанию — системный); при выходе за skew сборка не защищает — skew контролирует verify (C3; `finalize` ре-верифицирует префикс в режиме `skewCheck: 'none'`, так что сборка поверх исторического журнала с системным clock работает). Сборщик НЕ пишет в store — запись делает вызывающий через `JournalStore.append` (оптимистичный append, конкурентность = модель FORK_DETECTED, C2). N-party сборка в v0.1 не реализуется; verifier generic — N-party replay тестируется вручную собранными событиями. Сложность сборки — O(N) на событие (полный lifecycle — O(N²)): приемлемо для 2-party v0.1; инкрементальный replay — кандидат rc.3 (Б2).
+Каждый сборщик: строит TBS = JCS(событие без `sig`), собирает подписи, возвращает Event. Время `iat` — из инъектированного `Clock` (Р4): каждый `assemble*` принимает опциональный `clock` (по умолчанию — системный); при выходе за skew сборка не защищает — skew контролирует verify (C3; `finalize` ре-верифицирует префикс в режиме `skewCheck: 'none'`, так что сборка поверх исторического журнала с системным clock работает). Сборщик НЕ пишет в store — запись делает вызывающий через `JournalStore.append` (оптимистичный append, конкурентность = модель FORK_DETECTED, C2). N-party сборка в v0.1 не реализуется; verifier generic — N-party replay тестируется вручную собранными событиями. Сложность сборки (rc.3): последовательный lifecycle верифицирует только новое событие — `finalize` держит коммитнутый инкрементальный replay (`JournalVerifier`; integrity-проход префикса ~9 µs/событие, без подписей и state machine; расхождение переданного массива с коммитнутым состоянием ⇒ `FORK_DETECTED`, RC3-D2/D7), чужой префикс (промах кэша) — полный replay O(N). Доминирующая стоимость lifecycle (Ed25519 + state machine) линейна (Б2 закрыт; дизайн — `specs/tz-pact-rc3-incremental.md`).
 
 ### 3.5. Хранилище и экспорт (C1, D47)
 

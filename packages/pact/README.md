@@ -1,4 +1,4 @@
-# README (rc.2)
+# README (rc.3)
 
 # @me2em/pact
 
@@ -6,7 +6,7 @@ Horizontal trust primitive for the Me2eM authorization protocol: signed
 agreements between independent Identities **without merging trust roots**.
 
 ```
-@me2em/pact 1.0.0-rc.2
+@me2em/pact 1.0.0-rc.3
   peer:         @me2em/core   >=1.0.0-rc.9 <2.0.0-0   // hkdf, sha256, ed25519, jcs.canonicalize, RevocationChecker.isRevokedAt?
   peerOptional: @me2em/crypto >=1.1.0-rc.2 <2.0.0-0   // only for ReferenceX3DH (transport)
 ```
@@ -17,7 +17,7 @@ agreements between independent Identities **without merging trust roots**.
 |---|---|
 | **Deterministic Pact Keys** (D3/D38) | `derivePactKey(anchorSecretKey, pid, ch, gen)` — HKDF `me2em/pact/v1/{pid}/{ch}/g{gen}`; `pactPub = crypto.getPublicKey(pactKey)` (Р1) |
 | **Append-only Pact Journal** | 11 event types (`GENESIS … DISSOLVE`), `evHash = SHA-256(JCS(event without sig))` chaining, strict codec (`encodeEvent`/`decodeEvent`, D35 limits) |
-| **Verification — Tier 1+2** (sync) | `verifyJournal(events, clock?, opts?)` (`skewCheck: 'all' \| 'none'`), `verifyPrefix(events, head, clock?)` — signatures + roster/constitution replay |
+| **Verification — Tier 1+2** (sync) | `verifyJournal(events, clock?, opts?)` (`skewCheck: 'all' \| 'none'`), `verifyPrefix(events, head, clock?)` — signatures + roster/constitution replay; `createJournalVerifier(clock?, opts?)` → `JournalVerifier` (`apply`/`applySuffix`) — incremental replay with a hash-committed state (rc.3, fail-closed) |
 | **Verification — Tier 3** (async) | `verifyAct(events, evHash, revocations?, chains?, clock?)` — dated revocation via core rc.9 `isRevokedAt`, voucher chains (hash-commit D34), compromise windows (D20) |
 | **2-party assembly** (A2) | `assembleGenesis` + 10 follow-up builders; every builder re-verifies the extended journal (B-7, fail-closed) |
 | **Storage** (C1/D41) | `JournalStore` (CAS-append ⇒ `FORK_DETECTED`), `MemoryStore` |
@@ -60,9 +60,13 @@ PAYLOAD_TOO_LARGE · SIGNATURE_INVALID`.
 
 - **2-party assembly** — the verifier is N-party-generic; k-signature
   assembly arrives in v0.2 (PACTS F1).
-- **O(N²) replay in assembly** — `finalize` re-verifies the whole
-  prefix per event (O(N) each); fine for 2-party journals, an
-  incremental `verifyPrefix` is scheduled for rc.3 (audit Б2).
+- **Assembly replay cost** — a sequential lifecycle verifies only the
+  new event (the `JournalVerifier` fast path, rc.3: ~9 µs/event
+  integrity pass vs ~2.9 ms/event full replay); a *foreign* prefix
+  (cache miss) still costs a full O(N) replay, fail-closed by design
+  (Б2 closed; `specs/tz-pact-rc3-incremental.md`). Strict O(1) per
+  assembly would need commitments in the wire format — out of scope
+  before the v1 byte freeze.
 - **`pactRoot` = evHash(GENESIS)** (PACTS §2) — the deterministic pact
   *name*, not a roster fingerprint. A roster digest for the
   transparency feed (BL-12/F8) would be a separate future field —
