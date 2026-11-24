@@ -116,6 +116,47 @@ describe('useSession', () => {
     });
   });
 
+  it('renew keeps the lineage sid (BL-06: wholesale revocation)', async () => {
+    function HookWrapper() {
+      const ctx = useMe2emContext();
+      const handle = useHandle('sid-lineage-handle');
+      const { session, isLoaded, renew } = useSession(handle, {
+        audience: 'sid.test',
+        scopes: ['read'],
+        ttl: 3600,
+      });
+      return { ctx, handle, session, isLoaded, renew };
+    }
+
+    const { result } = renderHook(HookWrapper, {
+      wrapper: ({ children }) => <Me2emProvider>{children}</Me2emProvider>,
+    });
+
+    await act(async () => {
+      const seed = await get64ByteSeedFromMnemonic(MNEMONIC);
+      await result.current.ctx.activateIdentity(seed);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoaded).toBe(true);
+    });
+
+    const firstSid = result.current.session!.sid;
+    const firstJti = result.current.session!.sessionId;
+    expect(firstSid).toBeDefined();
+
+    await act(async () => {
+      result.current.renew();
+    });
+
+    await waitFor(() => {
+      expect(result.current.session!.sessionId).not.toBe(firstJti);
+    });
+
+    // The lineage id survived the renewal; the jti rotated.
+    expect(result.current.session!.sid).toBe(firstSid);
+  });
+
   it('auto-renew ttl:2 → jti changed', async () => {
     function HookWrapper() {
       const ctx = useMe2emContext();

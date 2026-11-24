@@ -81,7 +81,9 @@ describe('SeedPhraseVerify', () => {
     }
 
     for (const idx of wrongIndices) {
-      const btn = container.querySelector(`[data-testid="cell-${idx}"]`);
+      const btn = container.querySelector(
+        `[data-testid="cell-${idx}"]`
+      ) as HTMLButtonElement | null;
       if (btn && !btn.disabled) {
         fireEvent.click(btn);
       }

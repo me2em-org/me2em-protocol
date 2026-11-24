@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- Фон: Круг (как у x402, we2em, solana - обозначает расширение/интеграцию) -->
+  <circle cx="8" cy="8" r="8" fill="#2563EB"/>
+
+  <!-- Ядро (Identity / Core) -->
+  <circle cx="8" cy="8" r="1.5" fill="white"/>
+
+  <!-- Гексагон (Символ React) -->
+  <!-- Точки: Верх, Верх-Право, Низ-Право, Низ, Низ-Лево, Верх-Лево -->
+  <polygon points="8,2.5 12.5,5 12.5,11 8,13.5 3.5,11 3.5,5"
+           fill="none" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0-rc.5] — 2026-11-24
+
+Session lineage threading (BL-06) — pairs with `@me2em/core` 1.0.0-rc.10.
+
+### Changed
+- **`useSession` keeps one revocation lineage across renewals.** Core
+  rc.10 stamps a random lineage `sid` into every session payload; the
+  hook now threads it through `Session.create` on every renewal
+  (manual, half-life timer and the BL-51 visibility path), so the whole
+  lineage is revocable wholesale by the `sid` — revoking the lineage id
+  disables every token of the lineage, revoking a `jti` still disables
+  exactly one. The lineage resets only when the signing `handle`
+  changes (a new principal context) or the handle is cleared. Additive:
+  no option or result shape changed (`renew` semantics are now
+  lineage-preserving, documented).
+
 ## [1.0.0-rc.4] — 2026-11-04
 
 Snapshot promotion of the frozen rc line — no code changes since

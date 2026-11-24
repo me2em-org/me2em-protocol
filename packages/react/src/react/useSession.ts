@@ -32,7 +32,7 @@ export interface UseSessionResult {
   error: string | null;
   /** Whether the current session has expired. */
   isExpired: boolean;
-  /** Manually renew the session (creates a new one with a fresh jti). */
+  /** Manually renew the session (fresh `jti`, same lineage `sid` — BL-06). */
   renew: () => void;
 }
 
@@ -42,8 +42,12 @@ export interface UseSessionResult {
  * When `handle` is provided, creates a Session with the given options.
  * Supports auto-renewal: when `autoRenew` is true (default), a timer
  * fires at half the session TTL to create a fresh session with a new
- * jti (the previous token remains valid until its own expiry, but the
- * lineage identity is preserved through `handle`). Background tabs
+ * jti. Since core rc.10 (BL-06) the renewal lineage is explicit: the
+ * hook threads the session's `sid` across renewals, so the whole
+ * lineage is revocable wholesale via the lineage id (revoking `sid`
+ * disables every token of the lineage; revoking a `jti`, one token).
+ * The lineage resets only when the signing `handle` changes (a new
+ * principal context) or the handle is cleared. Background tabs
  * throttle (clamped wakeups) or fully suspend timers, so on return to
  * visibility the hook additionally renews proactively when the session
  * is already past its half-life point (BL-51) — the overdue timer path
@@ -83,6 +87,11 @@ export function useSession(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef(options);
   const mountedRef = useRef(true);
+  // BL-06 (core rc.10): the revocation lineage id, threaded across
+  // renewals; reset when the signing handle changes (new principal
+  // context) or is cleared.
+  const sidRef = useRef<string | undefined>(undefined);
+  const lineageHandleRef = useRef<Handle | null>(null);
 
   // Mirror the latest options into the ref after every commit —
   // ref writes belong in effects, not during render (react-hooks/refs).
@@ -111,6 +120,8 @@ export function useSession(
     const opts = optionsRef.current;
 
     if (!handle) {
+      lineageHandleRef.current = null;
+      sidRef.current = undefined;
       if (!mountedRef.current) return;
       setSession(null);
       setIsLoaded(true);
@@ -118,15 +129,24 @@ export function useSession(
       return;
     }
 
+    // New signing handle → new revocation lineage (BL-06). A mere
+    // renew() identity change (autoRenew toggle) keeps the lineage.
+    if (lineageHandleRef.current !== handle) {
+      lineageHandleRef.current = handle;
+      sidRef.current = undefined;
+    }
+
     Session.create(handle, {
       audience: opts.audience,
       scopes: opts.scopes,
       ttl: opts.ttl,
+      sid: sidRef.current,
     }).then((s) => {
       if (!mountedRef.current) return;
       setSession(s);
       setIsLoaded(true);
       setError(null);
+      sidRef.current = s.sid ?? sidRef.current;
 
       // Schedule auto-renewal at half-life
       if (autoRenew) {

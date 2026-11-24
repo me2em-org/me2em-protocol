@@ -154,7 +154,7 @@ describe('Me2emProvider — BL-47 dispose parity', () => {
     let calls = 0;
     const spy = vi
       .spyOn(Identity, 'fromSeed')
-      .mockImplementation(async (s: Uint8Array) => {
+      .mockImplementation(async (s: string | Uint8Array) => {
         calls += 1;
         if (calls === 1) return slow;
         return realFromSeed(s);
