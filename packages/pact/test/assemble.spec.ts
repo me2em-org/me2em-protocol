@@ -250,6 +250,26 @@ describe('2-party assembly (M1.4)', () => {
     expect(verifyJournal([...events, ok], clockAt(T0)).ok).toBe(true);
   });
 
+  it('F-rc3-1 review (Б-rc3-2): the finalize cache is isolated by pid and clock', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const x = new Member(4);
+    const y = new Member(5);
+    const genesisA = assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([a, b], CN2), founderKeys: [a.key, b.key], clock: clockAt(T0) });
+    const genesisB = assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([x, y], CN2), founderKeys: [x.key, y.key], clock: clockAt(T0) });
+    let eventsA = [genesisA];
+    let eventsB = [genesisB];
+    // Interleave two journals with diverging clocks: every assemble must
+    // behave as a fresh full replay of its own journal — no cross-talk,
+    // no foreign caller's clock leaking into a verdict (review Б-rc3-2).
+    for (let i = 0; i < 5; i++) {
+      eventsA = [...eventsA, assembleAct(eventsA, { no: `a-${i}` }, [a.key, b.key], clockAt(T0))];
+      eventsB = [...eventsB, assembleAct(eventsB, { no: `b-${i}` }, [x.key, y.key], clockAt(T0 + 1800 * (i + 1)))];
+    }
+    expect(verifyJournal(eventsA, clockAt(T0)).ok).toBe(true);
+    expect(verifyJournal(eventsB, clockAt(T0), { skewCheck: 'none' }).ok).toBe(true);
+  });
+
   it('early signer-key checks: rotate ≠ 2, exit/enroll ≠ 1, dissolve = 0 → MALFORMED', () => {
     const a = new Member(1);
     const b = new Member(2);

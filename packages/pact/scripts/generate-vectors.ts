@@ -290,10 +290,9 @@ const target = fileURLToPath(new URL('../../../specs/test-vectors.json', import.
 const current = JSON.parse(readFileSync(target, 'utf8'));
 const merged = { ...current, pact: pactSection };
 merged.vector_file_version = 4;
-merged.notes = [
-  ...current.notes,
-  'Group pact (rc.3, F-rc3-5): pinned-ep accept/reject (D13) and chain-liveness (strict act.iat < exp) vectors; the pact section is a golden snapshot of @me2em/pact 1.0.0-rc.3, re-verified by packages/pact/test/vectors.spec.ts.',
-];
+const pactNote =
+  'Group pact (rc.3, F-rc3-5): pinned-ep accept/reject (D13) and chain-liveness (strict act.iat < exp) vectors; the pact section is a golden snapshot of @me2em/pact 1.0.0-rc.3, re-verified by packages/pact/test/vectors.spec.ts.';
+merged.notes = [...current.notes.filter((n: string) => n !== pactNote), pactNote]; // idempotent — no duplicate on rerun
 writeFileSync(target, JSON.stringify(merged, null, 2) + '\n');
 console.log(`Wrote ${target}`);
 console.log(`Pact vectors: ${pactSection.vectors.map((v) => v.id).join(', ')}`);

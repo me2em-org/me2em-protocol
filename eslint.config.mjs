@@ -66,7 +66,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['packages/{core,crypto}/scripts/**/*.mjs'],
+    files: ['packages/{core,crypto,pact}/scripts/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node, console: 'readonly' },
     },
