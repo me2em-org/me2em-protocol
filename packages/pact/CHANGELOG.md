@@ -45,12 +45,46 @@ plan: `specs/plan-pact-rc3.md`.
   parameter would be a dead API surface. Rationale:
   `specs/tz-pact-rc3-incremental.md` §5.
 
+### Fixed (review pass)
+- **Б-rc3-1** — the atomicity invariant of `JournalVerifier` ("a
+  failed `apply*` leaves the committed state exactly as it was") is
+  now documented as normative (TSDoc on the class and on
+  `applyEvent`: every semantic check precedes the first `state.*`
+  write of its case) and pinned by a test that simulates a failure
+  *inside* `applyEvent` — AMEND whose quorum passes against the
+  current constitution but whose proposed constitution violates B-5
+  (`k(DISSOLVE) > n_founders` ⇒ `MALFORMED` after `requireQuorum`,
+  before any state write): height, head and snapshot must be
+  untouched. The current `applyEvent` cases already satisfy the order;
+  the test fails any future event type that mutates before it
+  validates.
+- **Б-rc3-2** — the `finalize` single-slot cache is now keyed by
+  `(tail object, height, pid, clock.now())`: interleaved journals,
+  diverging clocks and different pacts always take the full-replay
+  path — caller contexts cannot couple through the cache. (Under the
+  current `skewCheck: 'none'` the cached verifier reads no clock, so
+  no wrong verdict was reachable before; the key makes the isolation
+  structural instead of incidental.) Pinned by an interleave test:
+  two journals, five steps each, diverging clocks per step — both
+  verify clean.
+- **В-rc3-1** — `bench:baseline` runs `scripts/normalize-baseline.mjs`
+  (mirroring core): the committed `bench/baseline.json` now carries a
+  package-relative `filepath` — machine-independent, reproducible.
+- **В-rc3-2** — `pnpm vectors` uses the explicit
+  `node --experimental-strip-types` flag (core convention; guards
+  older Node than 24) and the generator's top-level note append is
+  idempotent — repeated runs leave `specs/test-vectors.json`
+  byte-identical (verified: two consecutive runs, zero diff). The
+  eslint node-globals scope now covers `packages/pact/scripts/`.
+
 ### Tests
-- 122 tests (was 108): incremental/batch equivalence including error
+- 124 tests (was 108): incremental/batch equivalence including error
   codes, the RC3-D2/D3 attack vector (re-chained middle tamper ⇒
-  `FORK_DETECTED` on the committed state), skew parity, a 40-event
-  assembly lifecycle with tampered prefixes, and the golden-vector
-  suite; tsc/eslint clean, coverage thresholds (≥ 90%) kept.
+  `FORK_DETECTED` on the committed state), the Б-rc3-1 atomicity
+  probe, skew parity, a 40-event assembly lifecycle with tampered
+  prefixes, the Б-rc3-2 cache-isolation interleave, and the
+  golden-vector suite; tsc/eslint clean, coverage thresholds (≥ 90%)
+  kept.
 
 ## [1.0.0-rc.2] — 2026-11-24
 

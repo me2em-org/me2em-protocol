@@ -1,7 +1,7 @@
 {
   "files": [
     {
-      "filepath": "/home/z/my-project/me2em-protocol/packages/pact/bench/journal.bench.ts",
+      "filepath": "bench/journal.bench.ts",
       "groups": [
         {
           "fullName": "bench/journal.bench.ts > pact journal (rc.3, F-rc3-1)",

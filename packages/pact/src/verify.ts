@@ -223,6 +223,16 @@ function requireQuorum(state: JournalState, event: Event): void {
 // Replay (sync — Tier 1+2)
 // ---------------------------------------------------------------------------
 
+/**
+ * Applies one structurally-valid event to the replay state (PACTS
+ * §7.7 step 3).
+ *
+ * Atomicity invariant (normative, pinned by test): every semantic
+ * check — quorum, payload grammar, membership — precedes the first
+ * `state.*` write of its case; a failing check must throw before any
+ * mutation. The verifier's "state unchanged on error" guarantee holds
+ * only under this order.
+ */
 function applyEvent(state: JournalState, event: Event, hash: string): void {
   const pl = event.pl as Record<string, never> & Record<string, unknown>;
   const signerPubs = new Set(event.sig.map((s) => s.p));
@@ -452,8 +462,16 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
  * The state is opaque and in-memory only (RC3-D6): it is not a wire
  * format and never crosses `JournalStore`/`Channel`; suffix
  * verification against a foreign head is {@link verifyPrefix}'s
- * contract. Failed `apply*` calls leave the state unchanged — every
- * check precedes every mutation (PACTS §7.7 order).
+ * contract. Failed `apply*` calls leave the state unchanged — this is
+ * the atomicity invariant of the verifier, and it is normative, not
+ * incidental: every check precedes every mutation, both in `apply`
+ * itself (chain → envelope → skew → signatures) and inside
+ * {@link applyEvent} (each event type validates its semantics —
+ * quorum, grammar, membership — before its first `state.*` write;
+ * PACTS §7.7 order). The review test (`test/verify.spec.ts`,
+ * "atomicity") pins this by simulating a failure *inside*
+ * {@link applyEvent} and asserting the untouched committed state —
+ * a future event type that mutates before it validates will fail it.
  *
  * Skew (RC3-D5): the Clock is read per applied event; pin the clock
  * (or set `skewCheck: 'none'`) for era-consistent streaming replays.

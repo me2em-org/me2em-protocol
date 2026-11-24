@@ -887,4 +887,46 @@ describe('JournalVerifier — incremental replay (rc.3, F-rc3-1)', () => {
     expect(none.height).toBe(events.length);
     expect(none.head).toBe(evHash(events[events.length - 1]));
   });
+
+  it('atomicity (review Б-rc3-1): an error inside applyEvent leaves the committed state untouched', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const c = new Member(3);
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([a, b], CN2) }, [a, b]);
+    const invite = j.push('INVITE', { an: 'identity' }, [a, b]);
+    j.push('ENROLL', { ref: j.hash(invite) }, [c]);
+    const act = j.push('ACT', { no: 'session-1' }, [a, b, c]);
+    // Quorum passes against the CURRENT constitution ('all' — a, b, c are
+    // ACTIVE), but the proposed one violates B-5: k(DISSOLVE) = 5 > 2
+    // founders ⇒ validateConstitutionQuorum throws INSIDE applyEvent,
+    // after requireQuorum, before any state write.
+    const badCn: Constitution = { th: { DISSOLVE: { m: 'k', k: 5 } }, im: 'bearer', w: false };
+    const raw: Omit<Event, 'sig'> = {
+      typ: 'me2em/pact-event/v1',
+      pid: j.events[0].pid,
+      sq: j.events.length,
+      ph: j.head,
+      ty: 'AMEND',
+      pl: { cn: badCn },
+      iat: T0,
+    };
+    const amend: Event = { ...raw, sig: [a.signEvent(raw), b.signEvent(raw), c.signEvent(raw)] };
+    // From scratch the failure comes from applyEvent too (not earlier):
+    expectCode(verifyJournal([...j.events, amend], clockAt(T0)), 'MALFORMED');
+    // Streaming: the same throw — and the committed state is untouched:
+    const v = createJournalVerifier(clockAt(T0));
+    v.applySuffix(j.events);
+    const before = v.snapshot();
+    try {
+      v.apply(amend);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PactError);
+      expect((e as PactError).code).toBe('MALFORMED');
+    }
+    expect(v.height).toBe(j.events.length);
+    expect(v.head).toBe(j.hash(act));
+    expect(v.snapshot()).toEqual(before);
+  });
 });

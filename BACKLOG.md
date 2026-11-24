@@ -628,7 +628,9 @@ never depend on each other. Every vertical keeps UI logic in
 
 Audit verdicts and the fix rationale: `specs/plan-pact-rc2.md`;
 closed findings: `packages/pact/CHANGELOG.md` `[1.0.0-rc.2]` /
-`[1.0.0-rc.3]`.
+`[1.0.0-rc.3]` (including the rc.3 review pass — atomicity invariant
+pinned by test, cache keyed by `(tail, height, pid, clock.now())`,
+baseline normalized, `pnpm vectors` made explicit/idempotent).
 
 - **Pact · incremental `verifyPrefix` · done (rc.3).** Landed as
   `JournalVerifier` + the `finalize` fast path (audit Б2): a
