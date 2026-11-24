@@ -119,11 +119,17 @@ export interface GenesisPayload {
   ft: Founder[];
 }
 
-/** INVITE payload: weight is assigned here and repeated verbatim by ENROLL (B-6). */
+/**
+ * INVITE payload: weight is assigned here and repeated verbatim by
+ * ENROLL (B-6); `ep` — the invited member's pactPub (pinned mode,
+ * D13): required under `im: 'pinned'`, optional per-invite pinning
+ * under `bearer`.
+ */
 export interface InvitePayload {
   dn?: string;
   w?: number;
   an: Anchor;
+  ep?: string;
 }
 
 /** REVOKE_INVITE payload: cancels an unused invite by its event hash (D14). */

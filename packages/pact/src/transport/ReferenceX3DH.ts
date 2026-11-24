@@ -10,7 +10,7 @@
 // not installed (B2: pact itself depends only on core).
 
 import { crypto } from '@me2em/core';
-import { b64urlEncode, tbsBytes, ZERO32 } from '../codec.js';
+import { b64urlDecode, b64urlEncode, tbsBytes, ZERO32 } from '../codec.js';
 import { PactError } from '../errors.js';
 import { EVENT_TYPE } from '../assemble/common.js';
 import type { Clock, Event, Signature } from '../types.js';
@@ -118,17 +118,20 @@ export class ReferenceX3DH implements Channel {
     if (g.ph !== ZERO32) {
       throw new PactError('MALFORMED', 'transport', 'genesis(): ph must be ZERO32');
     }
+    // Exactly the authority signs at this point — the initiator co-signs
+    // here, so anything beyond one signature would produce a journal the
+    // verifier rejects (§7.5: GENESIS carries the founders' co-signature).
+    if (g.sig.length !== 1) {
+      throw new PactError('MALFORMED', 'transport', 'genesis(): GENESIS must carry exactly the authority signature before co-signing');
+    }
     // The authority's signature must verify against its pact key.
     const tbs = tbsBytes(g);
     const responderSig = g.sig[0];
-    if (!responderSig) {
-      throw new PactError('MALFORMED', 'transport', 'genesis(): the authority must sign first');
-    }
     const responderPub = crypto.getPublicKey(this.opts.responderPactKey);
     if (responderSig.p !== b64urlEncode(responderPub)) {
       throw new PactError('SIGNATURE_INVALID', 'transport', 'genesis(): first signature is not the authority pact key');
     }
-    if (!crypto.verify(b64urlDecode64(responderSig.s), tbs, responderPub)) {
+    if (!crypto.verify(b64urlDecode(responderSig.s, 'sig.s', 64, 'transport'), tbs, responderPub)) {
       throw new PactError('SIGNATURE_INVALID', 'transport', 'genesis(): authority signature invalid');
     }
     // The initiator co-signs the same TBS.
@@ -138,30 +141,6 @@ export class ReferenceX3DH implements Channel {
     };
     return { ...g, sig: [...g.sig, initiatorSig] };
   }
-}
-
-function b64urlDecode64(value: string): Uint8Array {
-  // Minimal local decode of a 64-byte signature — the strict codec
-  // lives in codec.ts, but this module only needs the raw bytes here.
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  const out = new Uint8Array(64);
-  let acc = 0;
-  let bits = 0;
-  let o = 0;
-  for (let i = 0; i < value.length; i++) {
-    const idx = alphabet.indexOf(value[i]);
-    if (idx === -1) throw new PactError('MALFORMED', 'transport', 'signature is not base64url');
-    acc = ((acc << 6) | idx) & 0xffffff;
-    bits += 6;
-    if (bits >= 8 && o < out.length) {
-      bits -= 8;
-      out[o++] = (acc >> bits) & 0xff;
-    }
-  }
-  if (o !== out.length) {
-    throw new PactError('MALFORMED', 'transport', 'signature must decode to 64 bytes');
-  }
-  return out;
 }
 
 /** Clock passthrough for callers assembling over the channel (Р4). */

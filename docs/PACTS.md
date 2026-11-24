@@ -68,6 +68,7 @@ Threshold { m: 'all' | 'any' | 'k-of-active' | 'founder', k?: number }
 | Правило | Содержание |
 |---|---|
 | **B-6, веса** | вес назначает INVITE; ENROLL повторяет `w` дословно; расхождение ⇒ `WEIGHT_MISMATCH` |
+| **D13, pinned invite** | при `im: 'pinned'` INVITE обязан нести `ep` — pactPub приглашённого (иначе `MALFORMED`); ENROLL подписанта ≠ `ep` ⇒ `INVALID_QUORUM`; `bearer` — предъявитель, `ep` допустим как per-invite ужесточение |
 | **D18a, EXIT** | подпись текущим ключом выходящего; единственная подпись события; ростер уменьшается |
 | **EVICT** | цель — ACTIVE член (`tp`); цель подписи не даёт; при n_active = 2 EVICT недостижим по кворуму `all` ≡ DISSOLVE (D26′) |
 | **D39, ROTATE_KEY** | подписи: старый ключ (ACTIVE на seq) + новый (`np ≠ p`); ростер обновляет `p → np`, `e`/`w` сохраняются |
@@ -78,6 +79,7 @@ Threshold { m: 'all' | 'any' | 'k-of-active' | 'founder', k?: number }
 Voucher-цепочка — out-of-band артефакт `{ chain: string[] }` — сериализованные аттестации core от корня: `[A]` для anchor=identity, `[A, B]` для handle, `[A, B, C]` для subhandle (root first; D12 — длина цепочки обязана соответствовать `an`, иначе `ANCHOR_MISMATCH`).
 
 - Журнал хранит только **hash-commit** (D34): `vc = { rh, rp }`, `rh = b64url(SHA-256(JCS(chain)))`, `rp = b64url(32)` — публичный ключ корневой Identity якоря. Тяжёлый материал (`cx`, `doc`, цепочки) — вне журнала.
+- Цепочка должна быть **жива на момент акта** (rc.2): для каждой аттестации `iat ≤ act.iat < exp`; иначе `IDP_UNRESOLVABLE` («voucher chain not alive at act.iat») — истёкшая или ещё не выпущенная цепочка не даёт проверяемого обещания ответственности.
 - Уровни (D17): **Tier 1** — подписи журнала (вечный офлайн); **Tier 2** — replay ростера (нужен журнал); **Tier 3** — датированные отзывы цепочек (`isRevokedAt`, core rc.9) + проверка цепочек.
 - Dial (проверка цепочки в момент акта) осознанно выключен (D6): подписант **без** `vc` — предупреждение `NO_VOUCHER`, не ошибка (Р7). Подписант **с** `vc` даёт проверяемое обещание ответственности: непроверяемая цепочка — fail-closed (`IDP_UNRESOLVABLE` / `MALFORMED`).
 
@@ -104,7 +106,7 @@ TBS = байты JCS события **без поля `sig`**. Подпись Ed
 | Тип | Поля `pl` |
 |---|---|
 | `GENESIS` | `ch` b64url(32) · `cx?` string ≤2048 (при наличии SHA-256(UTF-8(cx)) == ch) · `cn` Constitution · `ft` Founder[] 1..16, отсортированы по `p`, различны |
-| `INVITE` | `dn?` ≤64 · `w?` целое ≥1 (при `cn.w` обязателен) · `an` Anchor |
+| `INVITE` | `dn?` ≤64 · `w?` целое ≥1 (при `cn.w` обязателен) · `an` Anchor · `ep?` b64url(32) pactPub приглашённого (D13: обязателен при `im: 'pinned'`) |
 | `REVOKE_INVITE` | `ref` b64url(32)=evHash(INVITE) · `rs?` ≤256 |
 | `ENROLL` | `ref` b64url(32)=evHash(INVITE) · `dn?` ≤64 · `w?` (дословно из INVITE, B-6) · `vc?` Voucher (D34) |
 | `EXIT` | `rs?` ≤256 |
@@ -179,7 +181,7 @@ payload события (JCS `pl`) ≤ 4096 B; inline `doc`/`cx` ≤ 2048 B; ≤ 
 | D10 | Двойная личная подпись (вне журнала) — вне v0.1 |
 | D11 | `sq`/`ph`-цепочка: `ph[0] = ZERO32`, строгая монотонность; два события на `sq` ⇒ `FORK_DETECTED` |
 | D12 | Anchor/длина voucher-цепочки: identity↔1, handle↔2, subhandle↔3; противоречие ⇒ `ANCHOR_MISMATCH` (fail-closed) |
-| D13 | `im: 'pinned'` — приглашение привязано к конкретному участнику; `'bearer'` — предъявитель (конституция задаёт режим) |
+| D13 | `im: 'pinned'` — приглашение привязано к конкретному участнику: INVITE несёт `ep` (pactPub приглашённого; обязателен при pinned, иначе `MALFORMED`), ENROLL подписанта ≠ `ep` ⇒ `INVALID_QUORUM`; `bearer` — предъявитель (`ep` — per-invite ужесточение) |
 | D14 | REVOKE_INVITE действует только на неиспользованное приглашение (по `ref`) |
 | D15 | Roster отсортирован по `p`; порядок нормативный (детерминизм) |
 | D16 | `RosterEntry.e` = evHash события членства; сохраняется при ROTATE_KEY |

@@ -20,7 +20,7 @@ import {
   assembleRotate,
 } from '../src/assemble/index.js';
 import { PactError } from '../src/errors.js';
-import { verifyJournal } from '../src/verify.js';
+import { SKEW_SECONDS, verifyJournal } from '../src/verify.js';
 import type { Constitution, Founder } from '../src/types.js';
 import { CH, clockAt, CN2, Member, PID, T0 } from './journal-utils.js';
 
@@ -170,15 +170,60 @@ describe('2-party assembly (M1.4)', () => {
     expect(combined.error!.code).toBe('FORK_DETECTED');
   });
 
-  it('SKEW at assembly: a shifted clock produces a skewed event the builder refuses', () => {
+  it('skew is not defended at assembly (ТЗ §3.4, C3): a shifted clock assembles, verify rejects', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const events = [
+      assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([a, b], CN2), founderKeys: [a.key, b.key], clock: clockAt(T0) }),
+    ];
+    const invite = assembleInvite(events, { an: 'identity' }, [a.key, b.key], clockAt(T0 + SKEW_FAR));
+    expect(invite.iat).toBe(T0 + SKEW_FAR);
+    const result = verifyJournal([...events, invite], clockAt(T0));
+    expect(result.ok).toBe(false);
+    expect(result.error!.code).toBe('SKEW');
+  });
+
+  it('Б1: assembly on a historical journal with the default system clock — ok', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const c = new Member(3);
+    const genesis = assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([a, b], CN2), founderKeys: [a.key, b.key], clock: clockAt(T0) });
+    const invite = assembleInvite([genesis], { an: 'identity' }, [a.key, b.key], clockAt(T0));
+    const events = [genesis, invite, assembleEnroll([genesis, invite], { ref: evHash(invite) }, [c.key], clockAt(T0))];
+    // No clock → the system clock; the prefix is historical (iat = T0).
+    // finalize skips the prefix skew check (ТЗ §3.4) — the builder only
+    // refuses structurally/quorum-broken journals (B-7).
+    const act = assembleAct(events, { no: 'fresh act' }, [a.key, b.key, c.key]);
+    expect(act.iat).toBeGreaterThan(T0 + SKEW_SECONDS); // outside the skew window of the prefix era
+    // Structural verification of the extended journal, skew out of scope:
+    expect(verifyJournal([...events, act], clockAt(act.iat), { skewCheck: 'none' }).ok).toBe(true);
+    // …and the same journal against the old era still refuses on skew (C3 — verify's duty):
+    expect(verifyJournal([...events, act], clockAt(T0)).error!.code).toBe('SKEW');
+  });
+
+  it('early signer-key checks: rotate ≠ 2, exit/enroll ≠ 1, dissolve = 0 → MALFORMED', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const b2 = new Member(2, 1);
+    const events = [
+      assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([a, b], CN2), founderKeys: [a.key, b.key], clock: clockAt(T0) }),
+    ];
+    expectPactThrow(() => assembleRotate(events, { np: b2.pub }, [b.key], clockAt(T0)), 'MALFORMED');
+    expectPactThrow(() => assembleRotate(events, { np: b2.pub }, [a.key, b.key, b2.key], clockAt(T0)), 'MALFORMED');
+    expectPactThrow(() => assembleExit(events, { rs: 'x' }, [a.key, b.key], clockAt(T0)), 'MALFORMED');
+    expectPactThrow(() => assembleEnroll(events, { ref: ZERO32 }, [a.key, b.key], clockAt(T0)), 'MALFORMED');
+    expectPactThrow(() => assembleDissolve(events, { rs: 'x' }, [], clockAt(T0)), 'MALFORMED');
+  });
+
+  it('ACT doc not hashing to dh → MALFORMED (D34)', () => {
     const a = new Member(1);
     const b = new Member(2);
     const events = [
       assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([a, b], CN2), founderKeys: [a.key, b.key], clock: clockAt(T0) }),
     ];
     expectPactThrow(
-      () => assembleInvite(events, { an: 'identity' }, [a.key, b.key], clockAt(T0 + SKEW_FAR)),
-      'SKEW'
+      () => assembleAct(events, { doc: 'x', dh: ctxHash('y') }, [a.key, b.key], clockAt(T0)),
+      'MALFORMED'
     );
   });
 

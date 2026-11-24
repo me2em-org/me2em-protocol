@@ -52,6 +52,20 @@ export interface VerifyResult {
   warnings?: Array<{ code: WarningCode; evHash?: string }>;
 }
 
+/** Options of {@link verifyJournal} (ТЗ §3.3). */
+export interface VerifyOptions {
+  /**
+   * Skew policy (C3): `'all'` (default) — every event's `iat` must lie
+   * within ±30 s of the Clock (inclusive); `'none'` — the skew
+   * comparison is skipped entirely; chain/signature/quorum/semantics
+   * verification still runs in full. Intended for structural
+   * verification of journals whose era lies outside the reference
+   * window — a historical prefix just extended by a fresh assembly
+   * (`finalize`, B-7) or an archive replay.
+   */
+  skewCheck?: 'all' | 'none';
+}
+
 /** Events outside this skew window from the Clock reject (C3, inclusive bounds). */
 export const SKEW_SECONDS = 30;
 
@@ -92,7 +106,7 @@ interface JournalState {
    * voucher; at most one founder voucher per membership event (codec).
    */
   members: Map<string, MemberRecord>;
-  invites: Map<string, { w?: number; an: Anchor; revoked: boolean }>;
+  invites: Map<string, { w?: number; an: Anchor; ep?: string; revoked: boolean }>;
   usedInvites: Set<string>;
   acts: Set<string>;
   /** old pub → rotation record (D20 compromisedAt window + D39 new key). */
@@ -249,7 +263,13 @@ function applyEvent(state: JournalState, event: Event, hash: string): void {
       if (state.constitution!.w && w === undefined) {
         throw new PactError('MALFORMED', 'verify', 'INVITE: weight required when weights are enabled');
       }
-      state.invites.set(hash, { w, an: pl['an'] as unknown as Anchor, revoked: false });
+      // D13: a pinned constitution requires the invitee commitment — an
+      // invite without `ep` would be a bearer invite in pinned clothing.
+      const ep = pl['ep'] as string | undefined;
+      if (state.constitution!.im === 'pinned' && ep === undefined) {
+        throw new PactError('MALFORMED', 'verify', 'INVITE: pinned constitution requires the invitee commitment ep (D13)');
+      }
+      state.invites.set(hash, { w, an: pl['an'] as unknown as Anchor, ep, revoked: false });
       return;
     }
 
@@ -276,6 +296,11 @@ function applyEvent(state: JournalState, event: Event, hash: string): void {
       const inv = state.invites.get(ref);
       if (!inv || inv.revoked || state.usedInvites.has(ref)) {
         throw new PactError('MALFORMED', 'verify', 'ENROLL: invite unknown, revoked or already used (D14)');
+      }
+      // D13: a pinned invite may only be accepted by the committed
+      // invitee — the same "exactly the joiner signs" family (§7.5).
+      if (inv.ep !== undefined && p !== inv.ep) {
+        throw new PactError('INVALID_QUORUM', 'verify', 'ENROLL: pinned invite — signer does not match ep (D13)');
       }
       // B-6: ENROLL repeats the INVITE weight verbatim.
       if ((inv.w === undefined) !== (pl['w'] === undefined) || (inv.w !== undefined && inv.w !== pl['w'])) {
@@ -377,7 +402,7 @@ function applyEvent(state: JournalState, event: Event, hash: string): void {
   }
 }
 
-function replay(events: Event[], clock: Clock): JournalState {
+function replay(events: Event[], clock: Clock, skewCheck: 'all' | 'none' = 'all'): JournalState {
   const state: JournalState = {
     pid: undefined,
     head: ZERO32,
@@ -407,7 +432,7 @@ function replay(events: Event[], clock: Clock): JournalState {
     }
     // (2) envelope + skew + signatures (PACTS §7.7 step 2)
     validateEvent(event, 'verify');
-    if (Math.abs(event.iat - now) > SKEW_SECONDS) {
+    if (skewCheck === 'all' && Math.abs(event.iat - now) > SKEW_SECONDS) {
       throw new PactError('SKEW', 'verify', `iat ${event.iat} is outside ±${SKEW_SECONDS}s of the clock`);
     }
     const tbs = tbsBytes(event);
@@ -435,16 +460,21 @@ function replay(events: Event[], clock: Clock): JournalState {
 /**
  * Full-journal verification — SYNC, Tier 1+2 (Р9): signatures plus the
  * deterministic roster/constitution replay. Tier 3 is never performed
- * here; use {@link verifyAct} for dated revocation checks.
+ * here; use {@link verifyAct} for dated revocation checks; `warnings`
+ * is always `[]` (Р9 — Tier 3 is async-only).
  *
  * @param events - Journal events in order (must start with GENESIS).
  * @param clock - Verification reference time; every event's `iat` must
  *   lie within ±30 s (inclusive). Historical replays pin the clock to
  *   the journal's era. Defaults to the system clock.
+ * @param opts - `{ skewCheck: 'all' | 'none' }` — `'none'` skips the
+ *   skew comparison for structural replays outside the reference era
+ *   (assembly `finalize`, archive replay); everything else verifies
+ *   in full.
  */
-export function verifyJournal(events: Event[], clock?: Clock): VerifyResult {
+export function verifyJournal(events: Event[], clock?: Clock, opts?: VerifyOptions): VerifyResult {
   try {
-    const state = replay(events, clock ?? systemClock());
+    const state = replay(events, clock ?? systemClock(), opts?.skewCheck ?? 'all');
     return successResult(state);
   } catch (e) {
     if (e instanceof PactError) return failResult(e);
@@ -481,15 +511,17 @@ export function verifyPrefix(events: Event[], head: string, clock?: Clock): Veri
 /**
  * Verifies the chain artifact (PACTS §5.4, D12): root-first serialized
  * core attestations; length must match the anchor type; every token
- * verifies against the previous subject (root → `rp`); for founders the
- * last subject must bind to the journal's `pp` commitment; returns the
- * chain's `jti`s for dated revocation lookups.
+ * verifies against the previous subject (root → `rp`); the chain must
+ * be alive at `actIat` (`iat ≤ actIat < exp` for every attestation);
+ * for founders the last subject must bind to the journal's `pp`
+ * commitment; returns the chain's `jti`s for dated revocation lookups.
  */
 async function verifyChain(
   chain: VoucherChain,
   an: Anchor,
   rp: string,
-  pp?: string
+  pp: string | undefined,
+  actIat: number
 ): Promise<string[]> {
   const expectedLen = an === 'identity' ? 1 : an === 'handle' ? 2 : 3;
   if (chain.chain.length !== expectedLen) {
@@ -499,7 +531,7 @@ async function verifyChain(
   let signer = b64urlDecode(rp, 'vc.rp', 32, 'verify');
   let lastSubject = '';
   for (const token of chain.chain) {
-    let payload: { jti: string; subjectId: string };
+    let payload: { jti: string; subjectId: string; iat: number; exp: number };
     try {
       payload = Attestation.decode(token);
     } catch {
@@ -507,6 +539,11 @@ async function verifyChain(
     }
     if (!(await Attestation.verifySignature(token, signer))) {
       throw new PactError('IDP_UNRESOLVABLE', 'verify', 'voucher chain signature does not verify against the issuer');
+    }
+    // §5.4: the chain must be alive at the act — an expired or future
+    // attestation grants no accountable identity at the act's moment.
+    if (!(payload.iat <= actIat && actIat < payload.exp)) {
+      throw new PactError('IDP_UNRESOLVABLE', 'verify', `voucher chain not alive at act.iat (iat ${payload.iat}, exp ${payload.exp})`);
     }
     jtis.push(payload.jti);
     lastSubject = payload.subjectId;
@@ -621,7 +658,7 @@ export async function verifyAct(
       if (rh !== vc.rh) {
         throw new PactError('MALFORMED', 'verify', `vc.rh mismatch for membership ${rec.mid}`);
       }
-      const jtis = await verifyChain(chain, rec.an, vc.rp, rec.pp);
+      const jtis = await verifyChain(chain, rec.an, vc.rp, rec.pp, act.iat);
       for (const jti of jtis) {
         if (await revocations!.isRevokedAt!(jti, act.iat)) {
           return {

@@ -163,7 +163,7 @@ describe('verifyJournal — Tier 1+2 (sync)', () => {
   });
 
   it('B-6: ENROLL weight must repeat the INVITE weight verbatim', () => {
-    const cn: Constitution = { th: {}, im: 'pinned', w: true };
+    const cn: Constitution = { th: {}, im: 'bearer', w: true };
     const a = new Member(1);
     const b = new Member(2);
     const c = new Member(3);
@@ -338,7 +338,7 @@ describe('verifyJournal — Tier 1+2 (sync)', () => {
   });
 
   it('founder weight required when weights enabled; one voucher per membership event', () => {
-    const cn: Constitution = { th: {}, im: 'pinned', w: true };
+    const cn: Constitution = { th: {}, im: 'bearer', w: true };
     const a = new Member(1);
     const b = new Member(2);
     const j = new Journal();
@@ -355,6 +355,57 @@ describe('verifyJournal — Tier 1+2 (sync)', () => {
     ]));
     j2.push('GENESIS', { ch: CH, cn: CN2, ft: ft2 }, [a, b]);
     expectCode(verifyJournal(j2.events, clockAt(T0)), 'MALFORMED');
+  });
+});
+
+describe('invite modes (D13 — pinned/bearer)', () => {
+  const CNP: Constitution = { th: { DISSOLVE: { m: 'any' } }, im: 'pinned', w: false };
+
+  it('pinned constitution: INVITE without ep → MALFORMED', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CNP, ft: foundersOf([a, b], CNP) }, [a, b]);
+    j.push('INVITE', { an: 'identity' }, [a, b]); // pinned, no ep
+    expectCode(verifyJournal(j.events, clockAt(T0)), 'MALFORMED');
+  });
+
+  it('pinned invite: the committed invitee enrolls, a stranger does not', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const c = new Member(3);
+    const stranger = new Member(9);
+
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CNP, ft: foundersOf([a, b], CNP) }, [a, b]);
+    const inv = j.push('INVITE', { an: 'identity', ep: c.pub }, [a, b]);
+    j.push('ENROLL', { ref: j.hash(inv) }, [c]); // p === ep → ok
+    expect(verifyJournal(j.events, clockAt(T0)).ok).toBe(true);
+
+    const j2 = new Journal();
+    j2.push('GENESIS', { ch: CH, cn: CNP, ft: foundersOf([a, b], CNP) }, [a, b]);
+    const inv2 = j2.push('INVITE', { an: 'identity', ep: c.pub }, [a, b]);
+    j2.push('ENROLL', { ref: j2.hash(inv2) }, [stranger]); // p ≠ ep
+    expectCode(verifyJournal(j2.events, clockAt(T0)), 'INVALID_QUORUM');
+  });
+
+  it('bearer invite with ep: per-invite pinning is honored', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const c = new Member(3);
+    const stranger = new Member(9);
+
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([a, b], CN2) }, [a, b]);
+    const inv = j.push('INVITE', { an: 'identity', ep: c.pub }, [a, b]);
+    j.push('ENROLL', { ref: j.hash(inv) }, [stranger]); // p ≠ ep
+    expectCode(verifyJournal(j.events, clockAt(T0)), 'INVALID_QUORUM');
+
+    const j2 = new Journal();
+    j2.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([a, b], CN2) }, [a, b]);
+    const inv2 = j2.push('INVITE', { an: 'identity', ep: c.pub }, [a, b]);
+    j2.push('ENROLL', { ref: j2.hash(inv2) }, [c]); // p === ep → ok
+    expect(verifyJournal(j2.events, clockAt(T0)).ok).toBe(true);
   });
 });
 
@@ -547,7 +598,7 @@ describe('defensive branches (coverage)', () => {
   });
 
   it('INVITE without weight under a weight-constitution rejects', () => {
-    const cn: Constitution = { th: {}, im: 'pinned', w: true };
+    const cn: Constitution = { th: {}, im: 'bearer', w: true };
     const a = new Member(1);
     const b = new Member(2);
     const j = new Journal();
@@ -645,6 +696,59 @@ describe('defensive branches (coverage)', () => {
       clockAt(T0)
     );
     expectCode(result, 'ANCHOR_MISMATCH');
+  });
+
+  it('§5.4 chain not alive at act.iat: expired (exp < act.iat) → IDP_UNRESOLVABLE', async () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    // exp = (T0 − 7200) + 3600 = T0 − 3600 — dead long before the act.
+    const { chain, vc } = await a.voucherChain('identity', ['jti-expired'], { now: T0 - 7200, ttlSeconds: 3600 });
+    const vcs = new Map([[a, vc]]);
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([a, b], CN2, vcs) }, [a, b]);
+    const act = j.push('ACT', { no: 'act-1' }, [a, b]);
+    const result = await verifyAct(j.events, j.hash(act), new DatedChecker(), new Map([[j.hash(j.events[0]), chain]]), clockAt(T0));
+    expectCode(result, 'IDP_UNRESOLVABLE');
+  });
+
+  it('§5.4 chain issued after the act (iat > act.iat) → IDP_UNRESOLVABLE', async () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const { chain, vc } = await a.voucherChain('identity', ['jti-future'], { now: T0 + 100, ttlSeconds: 3600 });
+    const vcs = new Map([[a, vc]]);
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([a, b], CN2, vcs) }, [a, b]);
+    const act = j.push('ACT', { no: 'act-1' }, [a, b]);
+    const result = await verifyAct(j.events, j.hash(act), new DatedChecker(), new Map([[j.hash(j.events[0]), chain]]), clockAt(T0));
+    expectCode(result, 'IDP_UNRESOLVABLE');
+  });
+
+  it('§5.4 chain alive at act.iat (boundary: exp = act.iat + 1) → ok', async () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const { chain, vc } = await a.voucherChain('identity', ['jti-alive'], { now: T0, ttlSeconds: 1 });
+    const vcs = new Map([[a, vc]]);
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([a, b], CN2, vcs) }, [a, b]);
+    const act = j.push('ACT', { no: 'act-1' }, [a, b]);
+    const result = await verifyAct(j.events, j.hash(act), new DatedChecker(), new Map([[j.hash(j.events[0]), chain]]), clockAt(T0));
+    expect(result.ok).toBe(true);
+    expect(result.tier3).toBe('supported');
+  });
+
+  it('handle-anchored founder: real root→handle chain binds to pp (D2/D12)', async () => {
+    const ha = Member.handle(1);
+    const b = new Member(2);
+    const { chain, vc } = await ha.voucherChain('handle', ['jti-h-root', 'jti-h-handle']);
+    const vcs = new Map([[ha, vc]]);
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([ha, b], CN2, vcs) }, [ha, b]);
+    const act = j.push('ACT', { no: 'act-1' }, [ha, b]);
+    const result = await verifyAct(j.events, j.hash(act), new DatedChecker(), new Map([[j.hash(j.events[0]), chain]]), clockAt(T0));
+    expect(result.ok).toBe(true);
+    // The chain resolves founder A; founder B shares the GENESIS
+    // membership without its own voucher (D6 — dial is off):
+    expect(result.warnings).toEqual([{ code: 'NO_VOUCHER', evHash: j.hash(j.events[0]) }]);
   });
 });
 });

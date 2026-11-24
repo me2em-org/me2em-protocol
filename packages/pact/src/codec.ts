@@ -145,6 +145,7 @@ const PAYLOAD_SPECS: Record<EventType, readonly FieldSpec[]> = {
     { name: 'dn', required: false, kind: 'str', maxChars: STR_LIMITS.dn },
     { name: 'w', required: false, kind: 'int', min: 1 },
     { name: 'an', required: true, kind: 'anchor' },
+    { name: 'ep', required: false, kind: 'b64', bytes: 32 },
   ],
   REVOKE_INVITE: [
     { name: 'ref', required: true, kind: 'b64', bytes: 32 },
