@@ -5,6 +5,7 @@ import {
   generateSeedPhrase,
   get64ByteSeedFromMnemonic,
   validateSeedPhrase,
+  type Handle,
 } from '../src/index.js';
 import { DERIVATION_PATHS } from '../src/crypto/derivation-paths.js';
 import { TEST_SEED, createTestHandle, expectAttestationError } from './test-utils.js';
@@ -222,9 +223,11 @@ describe('Me2eM Core Functionality', () => {
       const identity = await Identity.fromSeed(TEST_SEED);
       const sub = await identity.deriveSubHandle('station-001', 'connector-1');
 
-      // SubHandle is a leaf (depth = 2), so derivation must be blocked
+      // SubHandle is a leaf (depth = 2), so derivation must be blocked.
+      // The override is declared with zero parameters — call it through
+      // the base `Handle` signature to prove the runtime block.
       await expectAttestationError(
-        sub.deriveSubHandle('invalid-child'),
+        (sub as Handle).deriveSubHandle('invalid-child'),
         'MAX_DEPTH_EXCEEDED', 'FORMAT'
       );
     });

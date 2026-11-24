@@ -378,19 +378,27 @@ class Session {
                         revocationChecker?: RevocationChecker): Promise<Session>;
   isExpired(): boolean;
   readonly handleId, handleName, audience, scopes, expiresAt, token, path, sessionId;
+  readonly sid;   // lineage id (rc.10) — undefined on legacy tokens
 }
 
 interface SessionOptions {
   audience: string; scopes: string[]; ttl: number; sessionId?: string;
+  sid?: string;   // lineage id: random by default; pass the previous
+                  // session's sid to keep a renewal in the same lineage
 }
 
 interface SessionPayload {            // signed token contents
   hId: string; hNm: string; hPath?: string[];
   aud: string; scp: string[]; exp: number; iat: number; jti: string;
+  sid?: string;                       // lineage id (rc.10): random at
+                                      // creation, stable across renewals
 }
 
 interface RevocationChecker {
   isRevoked(jti: string): Promise<boolean>;
+  // consulted with BOTH the session jti and the lineage sid (when
+  // present): revoking the sid disables the whole renewal lineage,
+  // revoking a jti disables exactly one token.
 }
 ```
 
@@ -682,8 +690,13 @@ GC/JIT may retain copies (see `THREAT_MODEL.md` §5.2 in the repository).
 - Store seeds encrypted (PIN/biometric + AES-GCM); keep the root offline
   except for issuance ceremonies.
 - Use short session TTLs (≤ 1 hour recommended).
-- Implement a `RevocationChecker` (e.g., Redis SET) — it is consulted for
-  attestation **and** session `jti` in `verifyAttested`.
+- Implement a `RevocationChecker` (e.g., Redis SET) — in `verifyAttested`
+  it is consulted for attestation `jti` values, and for the session
+  `jti` **and** lineage `sid` (rc.10): revoking a session's `sid`
+  disables every token of that renewal lineage in one move.
+- Thread the `sid` through renewals (the `@me2em/react` `useSession`
+  hook does this automatically) — a renewal with a fresh random `sid`
+  starts a lineage the old id cannot revoke.
 - Prefer `verifyAttested` for any external audience; reserve
   `verifyStateless` for infrastructure you fully control.
 - Scope `subNamePatterns` as narrowly as possible — a holder can do
@@ -702,10 +715,12 @@ GC/JIT may retain copies (see `THREAT_MODEL.md` §5.2 in the repository).
 cd packages/core && pnpm test
 ```
 
-The test suite (447 tests) covers: deterministic derivation and
+The test suite (502 tests) covers: deterministic derivation and
 cross-entry-point key consistency, name canonicalization, derivation
 revisions (r1 byte-parity, r2 independence, NFKC contexts), session
-lifecycle (create, verify, tamper, expiry, iat), revocation, SubHandle
+lifecycle (create, verify, tamper, expiry, iat), session lineage
+revocation (`sid`: renewal threading, wholesale lineage revocation,
+legacy tokens, malformed values), revocation, SubHandle
 constraint enforcement, MAX_DEPTH leaf enforcement, attestation
 issue/decode/signature determinism and validation, the full
 `verifyAttested` chain (28 cases including nesting, wildcard permitting,
@@ -724,7 +739,9 @@ payment-layer surface landed additively in rc.3–rc.7 (contracts +
 registry + wallet binding in rc.3, x402 wire types in rc.5, the `pay`
 `opts` parameter in rc.6, the settle-response guard fix in rc.7) under
 the payment-layer specification (`specs/tz-x402.md` in the repository).
-Remaining recommendations — session lineage (`sid`), zeroization
+Session lineage revocation (`sid`) shipped in rc.10: `Session.create`
+stamps a random lineage id, renewals thread it, and revocation checks
+both `jti` and `sid`. Remaining recommendations — zeroization
 hardening, attestation reference compression, and the vertical
 packages (`@me2em/messenger`, `@me2em/iot`) — are tracked in the
 repository backlog, which is advisory and not part of the shipped API

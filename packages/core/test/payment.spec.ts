@@ -12,6 +12,7 @@ import {
   verifyWalletBinding,
   type PaymentAdapter,
   type PaymentRequest,
+  type PaymentResult,
   type WalletAdapter,
   type WalletDescriptor,
   type WalletEntityRef,
@@ -327,6 +328,9 @@ describe('PaymentAdapter.pay opts (rc.6 — additive third parameter)', () => {
     async pay(_from: WalletDescriptor, _request: PaymentRequest): Promise<string> {
       return 'two-arg-ref';
     }
+    async verifyPayment(): Promise<PaymentResult> {
+      throw new TypeError('not exercised here');
+    }
   }
 
   class ThreeArgAdapter implements PaymentAdapter {
@@ -343,6 +347,9 @@ describe('PaymentAdapter.pay opts (rc.6 — additive third parameter)', () => {
       opts?: { seed?: Uint8Array; memo?: string }
     ): Promise<string> {
       return opts?.seed?.length === 64 ? 'seed-ok' : 'no-seed';
+    }
+    async verifyPayment(): Promise<PaymentResult> {
+      throw new TypeError('not exercised here');
     }
   }
 

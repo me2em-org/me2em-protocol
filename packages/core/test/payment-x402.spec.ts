@@ -21,7 +21,11 @@ import {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeRequirements(overrides: Partial<X402PaymentRequirements> = {}): X402PaymentRequirements {
+// Deliberately loose overrides: negative tests feed wrong-typed values
+// (e.g. `maxTimeoutSeconds: '60'`, `extra: 'nope'`) — the runtime guards
+// must reject them; typing the parameter strictly would move that
+// rejection into the compiler and empty the test.
+function makeRequirements(overrides: Record<string, unknown> = {}): X402PaymentRequirements {
   return {
     scheme: 'exact',
     network: 'solana:mainnet-beta',
@@ -30,7 +34,7 @@ function makeRequirements(overrides: Partial<X402PaymentRequirements> = {}): X40
     payTo: '11111111111111111111111111111111',
     maxTimeoutSeconds: 60,
     ...overrides,
-  };
+  } as X402PaymentRequirements;
 }
 
 function makeResource(overrides: Record<string, unknown> = {}): Record<string, unknown> {

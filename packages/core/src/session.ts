@@ -29,6 +29,15 @@ export interface SessionOptions {
    * If not provided, a random UUID is generated.
    */
   sessionId?: string;
+  /**
+   * Optional session **lineage** id (BL-06, since 1.0.0-rc.10).
+   * Random by default, stable across renewals: pass the previous
+   * session's `sid` to keep a renewal in the same revocation lineage.
+   * Revoking a `sid` disables every token of that lineage; revoking a
+   * `jti` still disables exactly one token. Must be random (never
+   * derived from the handle) to avoid cross-audience linkability.
+   */
+  sid?: string;
 }
 
 /**
@@ -60,6 +69,14 @@ export interface SessionPayload {
    * Always present (generated automatically if not provided).
    */
   jti: string;
+  /**
+   * Session **lineage** id (BL-06, since 1.0.0-rc.10): random at
+   * creation, stable across renewals. Present on all tokens created
+   * since rc.10; legacy tokens (pre-rc.10) verify unchanged without it.
+   * Revocation consults both `jti` and `sid` — revoking the `sid`
+   * disables the whole lineage.
+   */
+  sid?: string;
 }
 
 /**
@@ -98,7 +115,16 @@ export interface RevocationChecker {
   /**
    * Checks whether a session has been revoked.
    *
-   * @param sessionId - The `jti` field from the session payload.
+   * Since 1.0.0-rc.10 (BL-06) the verifier consults this method **twice**
+   * per session token when a lineage `sid` is present: once with the
+   * token's `jti` and once with the lineage `sid`. Revoking the `sid`
+   * disables every token of the renewal lineage; revoking a `jti`
+   * disables exactly one token. Existing implementations compile and
+   * behave unchanged — a store that only ever receives `jti` values
+   * simply never matches a `sid` lookup.
+   *
+   * @param sessionId - The `jti` field from the session payload, or the
+   *   lineage `sid` (BL-06). Both are opaque ids in the same namespace.
    * @returns A Promise resolving to `true` if revoked, `false` otherwise.
    */
   isRevoked(sessionId: string): Promise<boolean>;
@@ -153,6 +179,11 @@ export class Session {
   public readonly path?: string[];
   /** Unique session identifier, used for revocation. */
   public readonly sessionId: string;
+  /**
+   * Session lineage id (BL-06, since rc.10) — stable across renewals.
+   * `undefined` for legacy tokens created before rc.10.
+   */
+  public readonly sid: string | undefined;
 
   /**
    * Creates a new Session instance.
@@ -172,7 +203,8 @@ export class Session {
     expiresAt: number,
     token: string,
     path?: string[],
-    sessionId?: string
+    sessionId?: string,
+    sid?: string
   ) {
     this.handleId = handleId;
     this.handleName = handleName;
@@ -182,6 +214,7 @@ export class Session {
     this.token = token;
     this.path = path;
     this.sessionId = sessionId ?? '';
+    this.sid = sid;
   }
 
   /**
@@ -204,6 +237,7 @@ export class Session {
    * @param token - The full session token.
    * @param path - Derivation path (SubHandle sessions only).
    * @param sessionId - Session `jti` (revocation id).
+   * @param sid - Session lineage id (BL-06, since rc.10).
    */
   static fromVerified(
     handleId: string,
@@ -213,7 +247,8 @@ export class Session {
     expiresAt: number,
     token: string,
     path?: string[],
-    sessionId?: string
+    sessionId?: string,
+    sid?: string
   ): Session {
     return new Session(
       handleId,
@@ -223,7 +258,8 @@ export class Session {
       expiresAt,
       token,
       path,
-      sessionId
+      sessionId,
+      sid
     );
   }
 
@@ -277,6 +313,7 @@ export class Session {
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = now + options.ttl;
     const sessionId = options.sessionId ?? randomUUID();
+    const sid = options.sid ?? randomUUID();
 
     const payload: SessionPayload = {
       hId: handle.getId(),
@@ -286,6 +323,7 @@ export class Session {
       exp: expiresAt,
       iat: now,
       jti: sessionId,
+      sid,
     };
 
     // Include derivation path for SubHandle sessions
@@ -308,7 +346,8 @@ export class Session {
       payload.exp,
       token,
       payload.hPath,
-      sessionId
+      sessionId,
+      sid
     );
   }
 
@@ -376,6 +415,19 @@ export class Session {
         'MALFORMED',
         'FORMAT',
         'Invalid token format: missing required fields (hId, hNm, aud, scp, exp, iat, jti)'
+      );
+    }
+
+    // sid is optional (legacy pre-rc.10 tokens have none) but must be
+    // well-formed when present — fail-closed on a tampered value.
+    if (
+      payload.sid !== undefined &&
+      (typeof payload.sid !== 'string' || payload.sid.length === 0)
+    ) {
+      throw new AttestationError(
+        'MALFORMED',
+        'FORMAT',
+        'Invalid token format: sid must be a non-empty string when present'
       );
     }
 
@@ -498,10 +550,17 @@ export class Session {
       throw new AttestationError('SUBJECT_MISMATCH', 'SESSION', 'hId mismatch');
     }
 
-    // Revocation check — last, after signature is verified
+    // Revocation check — last, after signature is verified. BL-06
+    // (rc.10): both revocation ids are consulted — the token `jti` and
+    // the lineage `sid` (absent on legacy tokens). Revoking the sid
+    // disables the whole renewal lineage; revoking the jti, one token.
     if (revocationChecker) {
       const isRevoked = await revocationChecker.isRevoked(payload.jti);
-      if (isRevoked) {
+      const lineageRevoked =
+        payload.sid !== undefined
+          ? await revocationChecker.isRevoked(payload.sid)
+          : false;
+      if (isRevoked || lineageRevoked) {
         throw new AttestationError('REVOKED', 'SESSION', 'Session has been revoked');
       }
     }
@@ -514,7 +573,8 @@ export class Session {
       payload.exp,
       token,
       payload.hPath,
-      payload.jti
+      payload.jti,
+      payload.sid
     );
   }
 
@@ -548,7 +608,8 @@ export class Session {
    * @param attestationChain - Attestation tokens, root first; length
    *   must match the session kind (1 for Handle, 2 for SubHandle).
    * @param revocationChecker - Optional; consulted for attestation
-   *   `jti` values (each chain level) and the session `jti`.
+   *   `jti` values (each chain level) and for the session `jti` and
+   *   lineage `sid` (BL-06, since rc.10).
    * @returns The verified session.
    * @throws {AttestationError} With `code` and `level` identifying the
    *   failed layer — integrate on these fields, not on message text.
@@ -641,10 +702,15 @@ export class Session {
     // Step 12: Session signature
     await Session.#verifySessionSignature(signatureBytes, payloadBytes, payload);
 
-    // Step 13: Session revocation — last, after everything else
+    // Step 13: Session revocation — last, after everything else.
+    // BL-06 (rc.10): the lineage `sid` is consulted alongside `jti`.
     if (revocationChecker) {
       const isRevoked = await revocationChecker.isRevoked(payload.jti);
-      if (isRevoked) {
+      const lineageRevoked =
+        payload.sid !== undefined
+          ? await revocationChecker.isRevoked(payload.sid)
+          : false;
+      if (isRevoked || lineageRevoked) {
         throw new AttestationError('REVOKED', 'SESSION', 'Session has been revoked');
       }
     }
@@ -658,7 +724,8 @@ export class Session {
       payload.exp,
       token,
       payload.hPath,
-      payload.jti
+      payload.jti,
+      payload.sid
     );
   }
 

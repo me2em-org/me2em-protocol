@@ -1,6 +1,6 @@
 {
   "name": "@me2em/core",
-  "version": "1.0.0-rc.9",
+  "version": "1.0.0-rc.10",
   "description": "Core primitives for the Me2eM authorization protocol: Identity, Handle, and Session",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,7 +26,9 @@
     "bench:baseline": "vitest bench --run --outputJson bench/baseline.json && node scripts/normalize-baseline.mjs",
     "vectors": "tsc -p tsconfig.json && node --experimental-strip-types scripts/generate-vectors.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json && tsc -p tsconfig.test.json",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
+    "typecheck:tests": "tsc -p tsconfig.test.json",
     "build-docs": "pnpm --filter \"@me2em/core^...\" run build && typedoc"
   },
   "license": "Apache-2.0",

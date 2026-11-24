@@ -23,7 +23,7 @@
 //   corepack pnpm --filter @me2em/core vectors
 //   (equivalent to: tsc -p tsconfig.json && node scripts/generate-vectors.ts)
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { base58 } from '@scure/base';
 import { Attestation, Identity, get64ByteSeedFromMnemonic } from '../dist/index.js';
@@ -38,6 +38,10 @@ const MNEMONIC_24 = `${'abandon '.repeat(23)}art`;
 /** 2026-01-01T00:00:00Z — fixed clock for all token vectors. */
 const NOW = 1767225600;
 const SESSION_TTL = 1800;
+
+/** Canonical resource id in the examples: sha256-hex of the empty content. */
+const RESOURCE_ID_HASH =
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
 const hex = (b: Uint8Array): string => Buffer.from(b).toString('hex');
 
@@ -122,10 +126,12 @@ const handleSession = await buildSessionToken({
   exp: NOW + SESSION_TTL,
   iat: NOW,
   jti: 'vector-session-handle-0001',
+  sid: 'vector-sid-handle-0001',
 }, (data) => work.sign(data));
 
-// Field order mirrors Session.create: hPath is appended after the base
-// fields (see session.ts SessionPayload construction).
+// Field order mirrors Session.create: sid follows jti as a base field,
+// hPath is appended after the base fields (see session.ts SessionPayload
+// construction).
 const subSession = await buildSessionToken({
   hId: connector.getId(),
   hNm: 'connector-1',
@@ -134,6 +140,7 @@ const subSession = await buildSessionToken({
   exp: NOW + SESSION_TTL,
   iat: NOW,
   jti: 'vector-session-subhandle-0001',
+  sid: 'vector-sid-subhandle-0001',
   hPath: ['work', 'connector-1'],
 }, (data) => connector.sign(data));
 
@@ -247,6 +254,77 @@ const vectors = {
       expected_key_hex: hex(work.deriveChannelKey('telemetry-v1', { revision: 2 })),
     },
   ],
+  derive_resource_key: [
+    {
+      description: 'Resource key, unlocked static state: salt="me2em/resource/chat-msg/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", info="me2em/resource/v1" (epoch=1 omitted, revision=1 omitted)',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'chat-msg',
+      resource_id: RESOURCE_ID_HASH,
+      expected_key_hex: hex(work.deriveResourceKey('chat-msg', RESOURCE_ID_HASH)),
+    },
+    {
+      description: 'Resource key, locked state revision=0: info="me2em/resource/v1/r0" — independent of revision 1 (blur/stub key)',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'chat-msg',
+      resource_id: RESOURCE_ID_HASH,
+      revision: 0,
+      expected_key_hex: hex(work.deriveResourceKey('chat-msg', RESOURCE_ID_HASH, { revision: 0 })),
+    },
+    {
+      description: 'Resource key, incremental subscription revision=2: info="me2em/resource/v1/r2" — independent of revisions 0/1',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'stream',
+      resource_id: 'ch-42',
+      revision: 2,
+      expected_key_hex: hex(work.deriveResourceKey('stream', 'ch-42', { revision: 2 })),
+    },
+    {
+      description: 'Resource key, day epoch: info="me2em/resource/v1/e20261105" — temporal anchor as monotonic integer',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'chat-msg',
+      resource_id: RESOURCE_ID_HASH,
+      epoch: 20261105,
+      expected_key_hex: hex(work.deriveResourceKey('chat-msg', RESOURCE_ID_HASH, { epoch: 20261105 })),
+    },
+    {
+      description: 'Resource key, epoch+lock combo: info="me2em/resource/v1/e20261105/r0" — epoch precedes revision in the info path',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'chat-msg',
+      resource_id: RESOURCE_ID_HASH,
+      epoch: 20261105,
+      revision: 0,
+      expected_key_hex: hex(work.deriveResourceKey('chat-msg', RESOURCE_ID_HASH, { epoch: 20261105, revision: 0 })),
+    },
+    {
+      description: 'Canonicalization: raw inputs "Ｃhat-Msg " (U+FF2C fullwidth C, uppercase M, trailing space) and "e3b0…" → NFKC→lowercase→trim → same key as vector #1',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'Ｃhat-Msg ',
+      resource_id: RESOURCE_ID_HASH,
+      expected_key_hex: hex(work.deriveResourceKey('Ｃhat-Msg ', RESOURCE_ID_HASH)),
+    },
+    {
+      description: 'Domain separation: same resource_id, different resource_type ("file") → different key',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'file',
+      resource_id: RESOURCE_ID_HASH,
+      expected_key_hex: hex(work.deriveResourceKey('file', RESOURCE_ID_HASH)),
+    },
+    {
+      description: 'Domain separation: same resource_type, different resource_id ("msg-105") → different key',
+      seed_hex: seed12Hex,
+      handle_name: 'work',
+      resource_type: 'chat-msg',
+      resource_id: 'msg-105',
+      expected_key_hex: hex(work.deriveResourceKey('chat-msg', 'msg-105')),
+    },
+  ],
   derive_shared_secret: [
     {
       description: 'X25519 (Ed25519→Montgomery) + HKDF-SHA256(ikm=rawECDH, salt=sorted(64B both public keys), info="me2em/p2p-channel/v2", L=32)',
@@ -301,7 +379,7 @@ const vectors = {
   ],
   session_handle: [
     {
-      description: 'Handle session token; payload pinned (Session.create stamps iat from the wall clock). Ed25519 over the exact payload bytes',
+      description: 'Handle session token; payload pinned incl. the lineage sid (Session.create stamps iat from the wall clock). Ed25519 over the exact payload bytes',
       seed_hex: seed12Hex,
       handle_name: 'work',
       audience: 'ev-app.com',
@@ -309,13 +387,14 @@ const vectors = {
       ttl: SESSION_TTL,
       iat: NOW,
       jti: 'vector-session-handle-0001',
+      sid: 'vector-sid-handle-0001',
       expected_payload_json: handleSession.payloadJson,
       expected_token: handleSession.token,
     },
   ],
   session_subhandle: [
     {
-      description: 'SubHandle session token; hPath appended after base fields (normative key order)',
+      description: 'SubHandle session token; sid after jti, hPath appended last (normative key order)',
       seed_hex: seed12Hex,
       handle_name: 'work',
       sub_name: 'connector-1',
@@ -324,6 +403,7 @@ const vectors = {
       ttl: SESSION_TTL,
       iat: NOW,
       jti: 'vector-session-subhandle-0001',
+      sid: 'vector-sid-subhandle-0001',
       expected_payload_json: subSession.payloadJson,
       expected_token: subSession.token,
     },
@@ -333,7 +413,7 @@ const vectors = {
 const output = {
   spec: 'Me2eM core protocol',
   spec_version: '1.0',
-  vector_file_version: 2,
+  vector_file_version: 5,
   algorithm: 'BIP39 (seed) + HKDF-SHA256 (RFC 5869, derivation) + Ed25519 (RFC 8032, signatures) + X25519 (RFC 7748, ECDH)',
   notes: [
     'All derived keys are 32 bytes and used directly as Ed25519 seeds (RFC 8032).',
@@ -345,7 +425,32 @@ const output = {
   vectors,
 };
 
+// ---------------------------------------------------------------------------
+// Merge-write (rc.10): this generator owns the top-level core fields and the
+// `vectors` map. Sections owned by other generators — `jcs` (core rc.9, P0.8)
+// and `pact` (@me2em/pact) — and every non-base note are preserved verbatim.
+// Before rc.10 this script rewrote the whole file, silently dropping those
+// sections and resetting vector_file_version (caught during the BL-06
+// regeneration; mirrors the merge pattern of the pact generator).
+// ---------------------------------------------------------------------------
 const target = fileURLToPath(new URL('../../../specs/test-vectors.json', import.meta.url));
-writeFileSync(target, JSON.stringify(output, null, 2) + '\n');
+const current = JSON.parse(readFileSync(target, 'utf8')) as {
+  vector_file_version?: number;
+  notes?: string[];
+  [key: string]: unknown;
+};
+const baseNotes = output.notes;
+const sidNote =
+  'Group session (rc.10, BL-06): session payloads carry the lineage id `sid` — random at creation, stable across renewals, consulted by revocation alongside `jti`. Vectors pin `sid` explicitly; the field order is hId…jti, sid, then hPath last (mirrors Session.create).';
+const preservedNotes = (current.notes ?? []).filter(
+  (n) => !baseNotes.includes(n) && n !== sidNote
+);
+const merged = {
+  ...current,
+  ...output,
+  vector_file_version: Math.max(current.vector_file_version ?? 0, output.vector_file_version),
+  notes: [...baseNotes, ...preservedNotes, sidNote],
+};
+writeFileSync(target, JSON.stringify(merged, null, 2) + '\n');
 console.log(`Wrote ${target}`);
 console.log(`Categories: ${Object.keys(vectors).join(', ')}`);
