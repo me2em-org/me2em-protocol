@@ -250,7 +250,7 @@ describe('2-party assembly (M1.4)', () => {
     expect(verifyJournal([...events, ok], clockAt(T0)).ok).toBe(true);
   });
 
-  it('F-rc3-1 review (Б-rc3-2): the finalize cache is isolated by pid and clock', () => {
+  it('F-rc3-1 review (Б-rc3-2): interleaved journals with diverging clocks never couple through the finalize cache', () => {
     const a = new Member(1);
     const b = new Member(2);
     const x = new Member(4);
@@ -259,9 +259,16 @@ describe('2-party assembly (M1.4)', () => {
     const genesisB = assembleGenesis({ pid: PID, ch: CH, cn: CN2, ft: founderEntries([x, y], CN2), founderKeys: [x.key, y.key], clock: clockAt(T0) });
     let eventsA = [genesisA];
     let eventsB = [genesisB];
-    // Interleave two journals with diverging clocks: every assemble must
-    // behave as a fresh full replay of its own journal — no cross-talk,
-    // no foreign caller's clock leaking into a verdict (review Б-rc3-2).
+    // The cache key is (tail object, height, clock.now()) — the pid has
+    // no key component of its own because it is implied by the tail
+    // object (pid === tail.pid by construction), so both journals
+    // deliberately share the same pid STRING: isolation comes from the
+    // distinct tail objects and clock values, not from pid equality
+    // (review Б-rc3-2). Interleaved, every assemble misses (foreign
+    // tail or a new `now`; journal B's clock even advances each step —
+    // the always-miss path) and must behave as a fresh full replay of
+    // its own journal — no cross-talk, no foreign caller's clock
+    // leaking into a verdict.
     for (let i = 0; i < 5; i++) {
       eventsA = [...eventsA, assembleAct(eventsA, { no: `a-${i}` }, [a.key, b.key], clockAt(T0))];
       eventsB = [...eventsB, assembleAct(eventsB, { no: `b-${i}` }, [x.key, y.key], clockAt(T0 + 1800 * (i + 1)))];

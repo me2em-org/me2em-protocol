@@ -185,7 +185,12 @@ for (const lc of LIVENESS_CASES) {
   const j = new Journal();
   j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([m, other], CN2, vcs) }, [m, other]);
   const act = j.push('ACT', { no: 'act-1' }, [m, other]);
-  const checker: RevocationChecker = { async isRevokedAt(): Promise<boolean> { return false; } };
+  // RevocationChecker.isRevoked is the required present-tense method
+  // (core rc.9 A4); verifyAct probes only the dated isRevokedAt:
+  const checker: RevocationChecker = {
+    async isRevoked(): Promise<boolean> { return false; },
+    async isRevokedAt(): Promise<boolean> { return false; },
+  };
   const result = await verifyAct(j.events, j.hash(act), checker, new Map([[j.hash(j.events[0]), chain]]), clockAt(T0));
   if (result.ok !== lc.ok || (!result.ok && result.error?.code !== lc.code)) {
     throw new Error(`liveness case ${lc.id}: got ${JSON.stringify({ ok: result.ok, code: result.error?.code })}`);
