@@ -1,4 +1,4 @@
-// packages/pact/src/assemble/invite.ts — INVITE (PACTS §7.5).
+// packages/pact/src/assemble/invite.ts — INVITE (PACTS §7.5, D13).
 
 import { buildEvent } from './common.js';
 import type { Clock, Event, Anchor } from '../types.js';
@@ -10,6 +10,12 @@ export interface InviteInput {
   w?: number;
   /** Anchor type of the invitee (D12). */
   an: Anchor;
+  /**
+   * The invited member's pactPub — the invitee commitment (D13).
+   * Required under `im: 'pinned'`; optional per-invite pinning under
+   * `bearer` (the ENROLL signer must then match).
+   */
+  ep?: string;
 }
 
 /** Assembles INVITE against the verified prefix `events`. */
@@ -17,6 +23,7 @@ export function assembleInvite(events: Event[], input: InviteInput, signerKeys: 
   return buildEvent(events, 'INVITE', {
     ...(input.dn !== undefined ? { dn: input.dn } : {}),
     ...(input.w !== undefined ? { w: input.w } : {}),
+    ...(input.ep !== undefined ? { ep: input.ep } : {}),
     an: input.an,
   }, signerKeys, clock);
 }

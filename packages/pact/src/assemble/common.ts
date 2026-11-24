@@ -40,14 +40,20 @@ export function signaturesFor(raw: Omit<Event, 'sig'>, keys: Uint8Array[]): Sign
 
 /**
  * Fail-closed assembly (B-7): the extended journal must verify. Any
- * verification failure (quorum, skew, fork, semantics) throws the
- * underlying {@link PactError} — the caller receives a usable event
- * only when the whole journal replays clean.
+ * verification failure (chain, signatures, quorum, semantics) throws
+ * the underlying {@link PactError} — the caller receives a usable
+ * event only when the whole journal replays clean. Skew of the
+ * historical prefix is intentionally out of scope (ТЗ §3.4: assembly
+ * does not defend against skew — verify does, C3): the assembly clock
+ * may legitimately be far from the prefix's era (a fresh event
+ * appended to history).
  */
 export function finalize(events: Event[], event: Event, clock: Clock): Event {
   validateEvent(event, 'assemble');
-  const result = verifyJournal([...events, event], clock);
-  if (!result.ok) throw result.error!;
+  const result = verifyJournal([...events, event], clock, { skewCheck: 'none' });
+  if (!result.ok) {
+    throw result.error ?? new PactError('MALFORMED', 'assemble', 'verification failed without an error');
+  }
   return event;
 }
 

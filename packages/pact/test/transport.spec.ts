@@ -115,4 +115,23 @@ describe('ReferenceX3DH — authenticated channel (M1.6)', () => {
     await expect(channel.genesis({ ...g, pid: b64urlEncode(new Uint8Array(16).fill(2)) })).rejects.toMatchObject({ code: 'MALFORMED' });
     await expect(channel.genesis({ ...g, ty: 'ACT' })).rejects.toMatchObject({ code: 'MALFORMED' });
   });
+
+  it('genesis: non-canonical base64url signature → MALFORMED (strict codec, Б7)', async () => {
+    const { channel, authority, initiator } = makeChannel();
+    await channel.offer({ typ: 'me2em/pact-offer/v1', pid: PID, ch: CH, cx: CONTEXT });
+    const g = halfSignedGenesis(authority, initiator);
+    // The final sextet of a canonical 64-byte value carries 4 zero padding
+    // bits — a canonical signature never ends in 'B'; setting it keeps the
+    // alphabet valid but re-encodes differently (strict decode rejects).
+    g.sig[0].s = `${g.sig[0].s.slice(0, -1)}B`;
+    await expect(channel.genesis(g)).rejects.toMatchObject({ code: 'MALFORMED' });
+  });
+
+  it('genesis: pre-co-signed GENESIS (two signatures) → MALFORMED (В12)', async () => {
+    const { channel, authority, initiator } = makeChannel();
+    await channel.offer({ typ: 'me2em/pact-offer/v1', pid: PID, ch: CH, cx: CONTEXT });
+    const g = halfSignedGenesis(authority, initiator);
+    g.sig.push({ p: initiator.pub, s: b64urlEncode(crypto.sign(tbsBytes(g), initiator.key)) });
+    await expect(channel.genesis(g)).rejects.toMatchObject({ code: 'MALFORMED' });
+  });
 });

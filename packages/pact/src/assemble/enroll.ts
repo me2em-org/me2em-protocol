@@ -1,6 +1,7 @@
 // packages/pact/src/assemble/enroll.ts — ENROLL — self-event, the joiner signs (PACTS §7.5).
 
 import { buildEvent } from './common.js';
+import { PactError } from '../errors.js';
 import type { Clock, Event, Voucher } from '../types.js';
 
 export interface EnrollInput {
@@ -16,6 +17,10 @@ export interface EnrollInput {
 
 /** Assembles ENROLL — self-event, the joiner signs against the verified prefix `events`. */
 export function assembleEnroll(events: Event[], input: EnrollInput, signerKeys: Uint8Array[], clock?: Clock): Event {
+  // §7.5: exactly the joiner signs.
+  if (signerKeys.length !== 1) {
+    throw new PactError('MALFORMED', 'assemble', 'ENROLL: exactly the joiner signs');
+  }
   return buildEvent(events, 'ENROLL', {
     ref: input.ref,
     ...(input.dn !== undefined ? { dn: input.dn } : {}),

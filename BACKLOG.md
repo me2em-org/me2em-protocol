@@ -615,6 +615,7 @@ quotes in this entry are intentional).
 | 0 — primitives | `@me2em/core` | ✅ rc (1.0.0-rc.1) — published as npm `latest` (DR-6) |
 | 1 — react bindings | `@me2em/react` | ✅ alpha (0.1.0-alpha.2) |
 | 2 — protocol mechanisms | `@me2em/crypto` | ✅ rc (1.0.0-rc.1) — published as npm `latest` |
+| 2 — protocol mechanisms | `@me2em/pact` | ✅ rc (1.0.0-rc.2) — BL-58, audit-hardening pass |
 | 3 — verticals | `@me2em/messenger` | planned (BL-29, pilot: BeSafeChat) |
 | 3 — verticals | `@me2em/iot` | deferred (BL-30) |
 | — | `@me2em/server` | planned (reference NestJS, with BL-22) |
@@ -622,3 +623,31 @@ quotes in this entry are intentional).
 Dependency rule: strictly upward (verticals → crypto → core); verticals
 never depend on each other. Every vertical keeps UI logic in
 `src/react/`, domain logic in `src/headless/`.
+
+## Pact (BL-58) — rc.2 follow-ups
+
+Audit verdicts and the fix rationale: `specs/plan-pact-rc2.md`;
+closed findings: `packages/pact/CHANGELOG.md` `[1.0.0-rc.2]`.
+
+- **Pact · incremental `verifyPrefix` · open · P2 (rc.3).** Assembly
+  re-verifies the whole prefix per event — O(N) each, O(N²) over a full
+  lifecycle (audit Б2). Fine for 2-party v0.1 journals; We2eM/AS with
+  thousands of events needs an incremental replay (hash-committed
+  intermediate state).
+- **Pact · roster fingerprint for transparency (BL-12/F8) · open · P3.**
+  `pactRoot` is evHash(GENESIS) per PACTS §2 — the deterministic pact
+  name, not a roster digest (audit Б3 claimed otherwise and was
+  rejected). If the transparency feed needs a roster fingerprint, ship
+  a separate field (`rosterDigest = SHA-256(JCS(roster))`) — never a
+  redefinition of `pactRoot`.
+- **Pact · pinned-`ep` golden vectors · open · P3.** `specs/test-vectors.json`
+  section `pact` predates rc.2; add pinned `ep` (accept/reject) and
+  chain-liveness (expired/future/alive) vectors alongside the existing
+  groups.
+- **Pact · zeroize helper for derived keys · declined.** JS gives no
+  reliable zeroization (GC copies, string interning); best-effort
+  wiping is security theater — the derivation module documents the
+  policy instead (audit F-rc3-4).
+- **Pact · N-party assembly, FROST/BLS, nested pacts, binary transport,
+  roles, zombie expiry, `@me2em/server` profile** — tracked as F1–F9 in
+  PACTS.md §8 / specs/tz-pact.md §7 (v0.2–v1.0; unchanged by rc.2).

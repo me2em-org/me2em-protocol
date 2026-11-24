@@ -37,49 +37,74 @@ const GRANT = { scopes: ['pact'], maxSessionTtl: 300 };
 export class Member {
   readonly seed: number;
   readonly gen: number;
+  /** Anchor mode: identity (default) or handle (via {@link Member.handle}). */
+  readonly anchor: 'identity' | 'handle';
+  /** Raw anchor node key — the IKM of the pact key derivation (D2/D3). */
+  readonly anchorKey: Uint8Array;
+  /** Pub of the root Identity — `vc.rp` for voucher chains (§5.4). */
+  readonly rootPub: string;
   readonly key: Uint8Array;
   readonly pub: string;
   /** Weight carried in founder entries when the constitution enables weights. */
   w = 1;
 
-  constructor(seed: number, gen = 0) {
+  constructor(seed: number, gen = 0, anchor: 'identity' | 'handle' = 'identity', handleName = 'pact-handle') {
     this.seed = seed;
     this.gen = gen;
-    this.key = derivePactKey(bytes(32, seed), PID, CH, gen);
+    this.anchor = anchor;
+    const rootKey = bytes(32, seed);
+    this.rootPub = b64urlEncode(crypto.getPublicKey(rootKey));
+    this.anchorKey = anchor === 'identity' ? rootKey : crypto.deriveHandleKey(rootKey, handleName);
+    this.key = derivePactKey(this.anchorKey, PID, CH, gen);
     this.pub = b64urlEncode(crypto.getPublicKey(this.key));
   }
 
-  /** The anchor node pub (pp): the pact key derives from this key. */
-  anchorPub(): string {
-    return b64urlEncode(crypto.getPublicKey(bytes(32, this.seed)));
+  /** A handle-anchored member: pact key from the real handle key (D2). */
+  static handle(seed: number, name = 'pact-handle', gen = 0): Member {
+    return new Member(seed, gen, 'handle', name);
   }
 
+  /** The anchor node pub (pp): root pub for identity, handle pub for handle. */
+  anchorPub(): string {
+    return b64urlEncode(crypto.getPublicKey(this.anchorKey));
+  }
+
+  /** Signs the TBS with the pact key of `gen` — `p` always matches `gen`. */
   signEvent(raw: Omit<Event, 'sig'>, gen = this.gen): Signature {
-    return { p: this.pub, s: b64urlEncode(crypto.sign(tbsBytes(raw as Event), derivePactKey(bytes(32, this.seed), PID, CH, gen))) };
+    const key = gen === this.gen ? this.key : derivePactKey(this.anchorKey, PID, CH, gen);
+    return { p: b64urlEncode(crypto.getPublicKey(key)), s: b64urlEncode(crypto.sign(tbsBytes(raw as Event), key)) };
   }
 
   /**
-   * Real core attestation chain issued over the anchor key: `[A]`
-   * (identity — self-attestation) or `[A, B]` (handle attested by the
-   * root). `pp` — the anchor node pub; `vc.rp` — the root pub.
+   * Real core attestation chain: `[A]` (identity — self-attestation by
+   * the root) or `[A, B]` (handle — the root attests the handle pub,
+   * then the handle self-attests: issuers differ, §5.4/D2). `pp` — the
+   * anchor node pub; `vc.rp` — the root Identity pub. `timing` —
+   * optional lifetime override (now/ttlSeconds) for alive-at-`act.iat`
+   * tests.
    */
-  async voucherChain(an: 'identity' | 'handle', jtis: string[]): Promise<{ chain: VoucherChain; vc: Voucher; pp: string }> {
-    const anchorKey = bytes(32, this.seed);
-    const anchorPubBytes = crypto.getPublicKey(anchorKey); // the anchor node's PUBLIC key
+  async voucherChain(
+    an: 'identity' | 'handle',
+    jtis: string[],
+    timing?: { now?: number; ttlSeconds?: number }
+  ): Promise<{ chain: VoucherChain; vc: Voucher; pp: string }> {
+    const anchorPubBytes = crypto.getPublicKey(this.anchorKey);
     const anchorPub = b64urlEncode(anchorPubBytes);
-    const signer = { sign: async (data: Uint8Array) => crypto.sign(data, anchorKey) };
+    const at = { now: T0, ...timing };
+    const rootSigner = { sign: async (data: Uint8Array) => crypto.sign(data, bytes(32, this.seed)) };
     const chain: string[] = [];
     if (an === 'identity') {
-      const root = await Attestation.issue(signer, anchorPubBytes, 'pact-root', GRANT, { jti: jtis[0], now: T0 });
+      const root = await Attestation.issue(rootSigner, anchorPubBytes, 'pact-root', GRANT, { jti: jtis[0], ...at });
       chain.push(root.token);
     } else {
-      const root = await Attestation.issue(signer, anchorPubBytes, 'pact-root', GRANT, { jti: jtis[0], now: T0 });
-      const handle = await Attestation.issue(signer, anchorPubBytes, 'pact-handle', GRANT, { jti: jtis[1], now: T0 });
+      const handleSigner = { sign: async (data: Uint8Array) => crypto.sign(data, this.anchorKey) };
+      const root = await Attestation.issue(rootSigner, anchorPubBytes, 'pact-root', GRANT, { jti: jtis[0], ...at });
+      const handle = await Attestation.issue(handleSigner, anchorPubBytes, 'pact-handle', GRANT, { jti: jtis[1], ...at });
       chain.push(root.token, handle.token);
     }
     const vc: Voucher = {
       rh: b64urlEncode(crypto.sha256(canonicalize(chain as unknown as JsonValue))),
-      rp: anchorPub,
+      rp: this.rootPub,
     };
     return { chain: { chain }, vc, pp: anchorPub };
   }
@@ -90,7 +115,7 @@ export function foundersOf(members: Member[], cn: Constitution, vcs?: Map<Member
   const list = members.map((m) => ({
     p: m.pub,
     pp: m.anchorPub(),
-    an: 'identity' as const,
+    an: m.anchor,
     ...(cn.w ? { w: m.w } : {}),
     ...(vcs?.has(m) ? { vc: vcs.get(m) } : {}),
   }));
@@ -125,5 +150,5 @@ export class Journal {
   }
 }
 
-/** The 2-party constitution used across lifecycle tests. */
-export const CN2: Constitution = { th: { DISSOLVE: { m: 'any' } }, im: 'pinned', w: false };
+/** The 2-party constitution used across lifecycle tests (bearer: invites are open; pinned flows use their own constitution). */
+export const CN2: Constitution = { th: { DISSOLVE: { m: 'any' } }, im: 'bearer', w: false };

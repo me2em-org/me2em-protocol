@@ -116,10 +116,11 @@ export interface VerifyResult {
   tier3?: 'supported' | 'unsupported';                    // только в verifyAct (Р10)
   warnings?: Array<{ code: WarningCode; evHash?: string }>; // пустой массив = предупреждений нет; evHash — id события или membership id
 }
-export function verifyJournal(events: Event[], clock?: Clock): VerifyResult;          // sync: Tier 1+2
+export function verifyJournal(events: Event[], clock?: Clock,
+                              opts?: { skewCheck?: 'all' | 'none' }): VerifyResult; // sync: Tier 1+2; skewCheck 'none' — структурная сверка вне окна ±30 с (finalize, архивы)
 export function verifyAct(events: Event[], evHash: string, revocations?: RevocationChecker,
-                          chains?: Map<string, VoucherChain>): Promise<VerifyResult>; // async: Tier 1+2+3
-export function verifyPrefix(events: Event[], head: string): VerifyResult;            // sync: Tier 1+2 на префиксе (B-7)
+                          chains?: Map<string, VoucherChain>, clock?: Clock): Promise<VerifyResult>; // async: Tier 1+2+3
+export function verifyPrefix(events: Event[], head: string, clock?: Clock): VerifyResult;            // sync: Tier 1+2 на префиксе (B-7)
 ```
 
 Порядок проверки — нормативный (§7.7 PACTS): (1) цепочка `sq`/`ph`, `ph[0] = ZERO32`; (2) strict parse, skew ±30 с, известный `ty`, лимиты, различность pub, Ed25519 по TBS; (3) кворум по конституции, действующей на seq события; самособытия (ENROLL/EXIT/ROTATE) освобождены от правила ACTIVE-подписантов.
@@ -129,7 +130,7 @@ export function verifyPrefix(events: Event[], head: string): VerifyResult;      
 **Tier 3 — нормативный поток (Р3; D6, D17, D34, §5.4 PACTS):**
 
 1. `chains` — out-of-band артефакты voucher-цепочек, ключ — membership id (`evHash(ENROLL)`); журнал хранит только hash-commit (D34).
-2. Для каждого подписанта с `vc`: артефакт отсутствует в `chains` ⇒ предупреждение `VOUCHER_UNRESOLVED` (не ошибка); `SHA-256(JCS(chain)) ≠ vc.rh` ⇒ `MALFORMED`; подписи цепочки не верифицируются против `vc.rp` ⇒ `IDP_UNRESOLVABLE` (fail-closed: dial включён — это проверяемое обещание ответственности).
+2. Для каждого подписанта с `vc`: артефакт отсутствует в `chains` ⇒ предупреждение `VOUCHER_UNRESOLVED` (не ошибка); `SHA-256(JCS(chain)) ≠ vc.rh` ⇒ `MALFORMED`; подписи цепочки не верифицируются против `vc.rp` ⇒ `IDP_UNRESOLVABLE` (fail-closed: dial включён — это проверяемое обещание ответственности); цепочка не жива на `act.iat` (`iat ≤ act.iat < exp` для каждой аттестации, §5.4) ⇒ `IDP_UNRESOLVABLE`.
 3. Каждый `jti` валидной цепочки: `revocations.isRevokedAt(jti, act.iat)` — идентификатор **сырой `jti`** (конвенция core `isRevoked`, `session.ts:101`; namespace-нотация BL-15 — для журнальных отзывов пакта, не для параметра checker'а); `true` ⇒ `ok: false`, `REVOKED @ SUB_ATTESTATION`.
 4. Подписант без `vc` при включённом Tier 3 ⇒ предупреждение `NO_VOUCHER` (D6: dial осознанно выключен — не ошибка, Р7).
 5. `revocations` не передан или без `isRevokedAt` ⇒ `tier3: 'unsupported'`, предупреждение `TIER3_UNSUPPORTED`, `ok: true` (Tier 1+2 пройдены — деградация, не ошибка).
@@ -150,7 +151,7 @@ export function assembleInvite(...): Event;
 export function assembleEvict(...): Event;     // 2-party недостижим ≡ DISSOLVE (D26′)
 ```
 
-Каждый сборщик: строит TBS = JCS(событие без `sig`), собирает подписи, возвращает Event. Время `iat` — из инъектированного `Clock` (Р4): каждый `assemble*` принимает опциональный `clock` (по умолчанию — системный); при выходе за skew сборка не защищает — skew контролирует verify (C3). Сборщик НЕ пишет в store — запись делает вызывающий через `JournalStore.append` (оптимистичный append, конкурентность = модель FORK_DETECTED, C2). N-party сборка в v0.1 не реализуется; verifier generic — N-party replay тестируется вручную собранными событиями.
+Каждый сборщик: строит TBS = JCS(событие без `sig`), собирает подписи, возвращает Event. Время `iat` — из инъектированного `Clock` (Р4): каждый `assemble*` принимает опциональный `clock` (по умолчанию — системный); при выходе за skew сборка не защищает — skew контролирует verify (C3; `finalize` ре-верифицирует префикс в режиме `skewCheck: 'none'`, так что сборка поверх исторического журнала с системным clock работает). Сборщик НЕ пишет в store — запись делает вызывающий через `JournalStore.append` (оптимистичный append, конкурентность = модель FORK_DETECTED, C2). N-party сборка в v0.1 не реализуется; verifier generic — N-party replay тестируется вручную собранными событиями. Сложность сборки — O(N) на событие (полный lifecycle — O(N²)): приемлемо для 2-party v0.1; инкрементальный replay — кандидат rc.3 (Б2).
 
 ### 3.5. Хранилище и экспорт (C1, D47)
 
