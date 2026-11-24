@@ -385,15 +385,17 @@ development, not part of the shipped API contract.
   receipts, @me2em/server integration. Pilot consumer: BeSafeChat.
   Depends on BL-28 (done). Verticals keep UI logic in src/react/,
   domain logic in src/headless/.
-- **BL-35 · open · Publish automation via CI.**
-  Publishing is manual (`pnpm publish` per package). Add a
-  release workflow: npm trusted publishing (or NPM_TOKEN secret),
-  changesets-driven version bumps, per-package publish jobs with
-  `--tag alpha`. Natural next step now that CI exists.
-  Verified 2026-11-24: not yet implemented — `.github/workflows/`
-  holds only `ci-security.yml`; no changesets, no release workflow.
-  Needs repo-level decisions (trusted publishing vs NPM_TOKEN secret)
-  before implementation.
+- **BL-35 · annulled · Publish automation via CI.**
+  Annulled 2026-11-24 (architect decision): releases stay **manual** —
+  the owner runs them per `RELEASE.md`. Rationale: a past automation
+  attempt ended in an npm account block, and releases are infrequent,
+  so a documented manual procedure beats a CI workflow. Release policy
+  (same decision): rc-line versions publish to the **`latest`**
+  dist-tag (never `--tag`; DR-6 разминка stance). History: the
+  2026-11-24 verification found no release workflow
+  (`.github/workflows/` holds only `ci-security.yml`) — recorded here,
+  no work planned. Do not re-open publish automation without a new
+  architect decision.
 - **BL-06 · done · `sid` (session lineage id) — landed (core rc.10,
   2026-11-24).**
   Renewal rotates `jti`, so a renewed session's lineage could not be
@@ -708,7 +710,33 @@ baseline normalized, `pnpm vectors` made explicit/idempotent).
   k-signature constitutions at scale. Driver: We2eM federation (M5) —
   2 notaries run on the current rc; ≥3 notaries is the trigger
   (`specs/plan-pact-rc3.md` §8). Per house convention the ТЗ (plan +
-  tz) comes first — do not improvise (P-4).
+  tz) comes first — do not improvise (P-4). 2026-11-24: architect
+  declined to confirm the M5 horizon now — the trigger stays in the
+  backlog; revisit when federation actually reaches ≥3 notaries.
+- **Pact · real-delivery decisions · deferred to the first product.**
+  2026-11-24 (architect decision): items from the pre-publish question
+  list are solved **during We2eM implementation**, not now. Recorded
+  scope: (a) first production `Channel` = **HTTP(S) relay** — chosen
+  for the We2eM messenger profile (real-time-ish delivery, NAT/mobile
+  reality, push-like notifications); built as product code on the
+  `@me2em/pact/transport` contract, not a protocol package (BL-22
+  logic); (b) prekey-bundle hosting/rotation for the X3DH
+  first-contact — product infra, needed for (a) to go live;
+  (c) MITM default on `ch` finalization — `im: 'pinned'` vs `bearer`
+  + blind PactRoot/JournalHead comparison in UX (mechanism shipped in
+  rc.4; product picks the default); (d) transparency feed (BL-12/13) —
+  hosting and operator, interface points shipped; (e) session adapter
+  (D9 `pact:sign` / D10 dual-signature) — whether MVP acts are signed
+  by pact keys only (as now) or over core sessions (unimplemented,
+  README §14 q7); (f) 1.0.0 stable freeze — open the PLAN-LTS §9–10
+  audit gate when the разминка settles.
+- **We2eM · product ТЗ tracking · here.** 2026-11-24 (architect
+  decision): the We2eM product ТЗ — IdP flow (BL-59 aftermath),
+  server profile (BL-22 aftermath), the deferred real-delivery items
+  above, and any revisit of the closed-as-moot `confirmKey` variant —
+  is tracked **in BACKLOG.md itself** (this file); owner: architect
+  (manual releases, product calls), no fixed dates — the work opens
+  with the first product implementation.
 - **Pact · F1–F9 deferred by design** — FROST/BLS, nested pacts, binary
   transport, roles, zombie expiry, replication profile (product scope;
   BL-22/`@me2em/server` annulled 2026-11-24), Session.create-adapter,
