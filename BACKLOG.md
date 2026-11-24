@@ -693,6 +693,12 @@ baseline normalized, `pnpm vectors` made explicit/idempotent).
   verify/snapshot; `pactRoot` stays evHash(GENESIS) per PACTS §2 (the
   audit Б3 redefinition was rejected). Replica-safe (B-8): the
   canonical roster carries no signature sets.
+- **Pact · fixtures/transport subpath exports · done (rc.5, 2026-11-24).**
+  Decision: export now — real delivery plugs its Channel from day one.
+  `@me2em/pact/transport` (Channel contract + OFFER/ACCEPT wire types +
+  ReferenceX3DH, lazy @me2em/crypto load) and `@me2em/pact/testing`
+  (deterministic fixtures) added to the exports map; integration
+  material, not protocol surface — may evolve within the rc line.
 - **Pact · zeroize helper for derived keys · declined.** JS gives no
   reliable zeroization (GC copies, string interning); best-effort
   wiping is security theater — the derivation module documents the

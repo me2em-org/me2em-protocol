@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.0-rc.5] — 2026-11-24
+
+Subpath exports for real delivery (BL-58 follow-up decision, 2026-11-24):
+the transport contract and the test fixtures become importable, so
+We2eM/AS integrations can start from the reference adapter and swap the
+transport without touching the journal.
+
+### Added
+- **`@me2em/pact/transport`** — the `Channel` contract, the OFFER/ACCEPT
+  wire types and the reference `ReferenceX3DH` adapter. The adapter
+  loads `@me2em/crypto` lazily (B2 — clear `PactError` when the optional
+  peer is absent), so the subpath stays core-only at import time.
+- **`@me2em/pact/testing`** — deterministic fixtures (`Member`,
+  journal builder, voucher chains) for downstream suites.
+
+Both subpaths are integration material, not protocol surface — they may
+evolve within the rc line without a major bump (documented in README
+§Installation). Verified by build self-reference smoke
+(`import('@me2em/pact/transport' | '@me2em/pact/testing')`).
+
 ## [1.0.0-rc.4] — 2026-11-24
 
 Roster fingerprint for the transparency feed — the last open P3 follow-up

@@ -62,14 +62,19 @@ pnpm add @me2em/crypto      # optional — only for the reference X3DH adapter
 
 > 💡 The package depends on nothing but `@me2em/core` (peer
 > `>=1.0.0-rc.9`); `@me2em/crypto >=1.1.0-rc.2` is an optional peer, needed
-> only for the reference X3DH transport adapter. Real deployments inject
-> their own transport and storage (see
+> only for the reference X3DH transport adapter (loaded lazily — importing
+> the transport subpath never pulls it). Real deployments inject their own
+> transport and storage (see
 > [Storage, sneakernet, transport](#-storage-sneakernet-transport)).
-> Public surface (exported from the package root): `types` · `errors` ·
-> `codec` · `derive` · `verify` · `assemble` · `store`. The reference
-> transport (`src/transport/`) and test fixtures (`src/testing/`) ship in
-> the repo for integration tests but are **not** re-exported from the
-> index — they are reference material, not API.
+> Public surface:
+> - **root** — `types` · `errors` · `codec` · `derive` · `verify` ·
+>   `assemble` · `store`;
+> - **`@me2em/pact/transport`** (since rc.5) — the `Channel` contract,
+>   OFFER/ACCEPT wire types and the reference `ReferenceX3DH` adapter;
+> - **`@me2em/pact/testing`** (since rc.5) — deterministic test fixtures
+>   (members, journal builder, voucher chains). The subpaths are
+>   integration material, not protocol surface: they may evolve within
+>   the rc line without a major bump.
 
 ## 🚀 Quick Start
 
@@ -627,9 +632,12 @@ zero extra protocol. The transport MUST be authenticated: the MITM window on
 
 The reference adapter (`ReferenceX3DH`) is a complete real-crypto loopback —
 X3DH against the authority's prekey bundle, then GENESIS co-signing. It and
-the `Channel` interface live at `src/transport/` and are **not exported from
-the package index**: pact itself depends only on core (B2); wire your own
-Channel (server relay, messenger, sneakernet) for production.
+the `Channel` interface are exported from the **`@me2em/pact/transport`**
+subpath (rc.5); the adapter loads `@me2em/crypto` lazily, so the subpath
+stays core-only at import time (B2). Wire your own `Channel` (server relay,
+messenger, sneakernet) for production — the subpath exists so real delivery
+can start from the reference adapter and swap the transport later without
+touching the journal.
 
 ## 🚨 Errors and warnings
 
