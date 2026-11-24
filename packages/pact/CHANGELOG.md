@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0-rc.4] — 2026-11-24
+
+Roster fingerprint for the transparency feed — the last open P3 follow-up
+of the rc.3 review pass (audit Б2/Б3 aftermath).
+
+### Added
+- **`rosterDigest` in `VerifyResult` (BL-12/F8).** Every successful
+  `verifyJournal` / `verifyPrefix` / `verifyAct` and every
+  `JournalVerifier.snapshot()` now carries
+  `rosterDigest = b64url(SHA-256(JCS(roster)))` — the roster fingerprint
+  the transparency feed publishes alongside `pactRoot`/`journalHead`.
+  Deliberately a separate field: `pactRoot` stays `evHash(GENESIS)`, the
+  deterministic pact name (PACTS §2); redefining it was rejected (audit
+  Б3). Replica-safe by construction (B-8): the canonical roster carries
+  no signature sets, so two replicas with differing `sig[]` share the
+  digest — pinned by test, including the membership-change divergence
+  and the incremental-verifier parity.
+
 ## [1.0.0-rc.3] — 2026-11-24
 
 The scaling release: incremental journal verification (audit Б2 — the

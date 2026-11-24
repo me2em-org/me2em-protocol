@@ -3,6 +3,7 @@
 // pact keys and real Ed25519 signatures over TBS (journal-utils).
 
 import { describe, it, expect } from 'vitest';
+import { canonicalizeToString, crypto } from '@me2em/core';
 import { b64urlEncode, ZERO32 } from '../src/codec.js';
 import { evHash } from '../src/codec.js';
 import { verifyAct, verifyJournal, verifyPrefix, SKEW_SECONDS, createJournalVerifier } from '../src/verify.js';
@@ -73,6 +74,52 @@ describe('verifyJournal — Tier 1+2 (sync)', () => {
     // Chained references resolved:
     expect(j.hash(invite)).not.toBe(j.hash(enroll));
     void rotate; void amend; void reverse; void exit; void genesis; void enroll; void cn2;
+  });
+
+  it('rosterDigest (rc.4, BL-12/F8): JCS-roster fingerprint — replica-safe, membership-sensitive, never pactRoot', () => {
+    const a = new Member(1);
+    const b = new Member(2);
+    const c = new Member(3);
+    const cn: Constitution = { th: { DISSOLVE: { m: 'any' } }, im: 'bearer', w: false };
+    const j = new Journal();
+    j.push('GENESIS', { ch: CH, cn, ft: foundersOf([a, b], cn) }, [a, b]);
+    const before = verifyJournal(j.events, clockAt(T0));
+    expect(before.ok).toBe(true);
+
+    // Independent recomputation over the canonical roster (string face
+    // of JCS + TextEncoder, deliberately not the impl's byte path).
+    const expected = b64urlEncode(
+      crypto.sha256(
+        new TextEncoder().encode(
+          canonicalizeToString(JSON.parse(JSON.stringify(before.roster)))
+        )
+      )
+    );
+    expect(before.rosterDigest).toBe(expected);
+    // Not a redefinition of pactRoot (PACTS §2 — the deterministic name).
+    expect(before.rosterDigest).not.toBe(before.pactRoot);
+
+    // B-8 replica safety: the replica's GENESIS carries an extra tolerated
+    // signature (sig[] differs), but the canonical roster — and therefore
+    // the digest — does not.
+    const j2 = new Journal();
+    j2.push('GENESIS', { ch: CH, cn, ft: foundersOf([a, b], cn) }, [a, b, c]);
+    const replica = verifyJournal(j2.events, clockAt(T0));
+    expect(replica.ok).toBe(true);
+    expect(replica.roster).toEqual(before.roster);
+    expect(replica.rosterDigest).toBe(before.rosterDigest);
+
+    // A membership change produces a new digest.
+    const invite = j.push('INVITE', { an: 'identity' }, [a, b]);
+    j.push('ENROLL', { ref: j.hash(invite) }, [c]);
+    const after = verifyJournal(j.events, clockAt(T0));
+    expect(after.ok).toBe(true);
+    expect(after.rosterDigest).not.toBe(before.rosterDigest);
+
+    // The incremental verifier exposes the same fingerprint.
+    const v = createJournalVerifier(clockAt(T0));
+    v.applySuffix(j.events);
+    expect(v.snapshot().rosterDigest).toBe(after.rosterDigest);
   });
 
   it('§6.4 N-party replay with weights and k-of-active (hand-built)', () => {
@@ -343,7 +390,7 @@ describe('verifyJournal — Tier 1+2 (sync)', () => {
     const b = new Member(2);
     const j = new Journal();
     const ft = foundersOf([a, b], cn);
-    delete (ft[0] as Record<string, unknown>)['w'];
+    delete (ft[0] as unknown as Record<string, unknown>)['w'];
     j.push('GENESIS', { ch: CH, cn, ft }, [a, b]);
     expectCode(verifyJournal(j.events, clockAt(T0)), 'MALFORMED');
 
@@ -901,7 +948,9 @@ describe('JournalVerifier — incremental replay (rc.3, F-rc3-1)', () => {
     // ACTIVE), but the proposed one violates B-5: k(DISSOLVE) = 5 > 2
     // founders ⇒ validateConstitutionQuorum throws INSIDE applyEvent,
     // after requireQuorum, before any state write.
-    const badCn: Constitution = { th: { DISSOLVE: { m: 'k', k: 5 } }, im: 'bearer', w: false };
+    // deliberately invalid mode 'k' — applyEvent's runtime guard must
+    // reject it (the type system never sees this value in real use).
+    const badCn = { th: { DISSOLVE: { m: 'k', k: 5 } }, im: 'bearer', w: false } as unknown as Constitution;
     const raw: Omit<Event, 'sig'> = {
       typ: 'me2em/pact-event/v1',
       pid: j.events[0].pid,

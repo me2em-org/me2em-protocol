@@ -44,6 +44,15 @@ export interface VerifyResult {
   ok: boolean;
   error?: PactError;
   roster?: RosterEntry[];
+  /**
+   * Roster fingerprint (rc.4, BL-12/F8): `b64url(SHA-256(JCS(roster)))`
+   * — the transparency-feed digest. A separate field by design:
+   * `pactRoot` stays `evHash(GENESIS)` (the deterministic pact name,
+   * PACTS §2) and is never redefined. Replica-safe (B-8): the canonical
+   * roster carries no signature sets, so replicas with differing
+   * `sig[]` share the digest.
+   */
+  rosterDigest?: string;
   pactRoot?: string;
   journalHead?: string;
   seq?: number;
@@ -127,10 +136,26 @@ function sortedRoster(roster: Map<string, RosterValue>): RosterEntry[] {
     .map(([p, v]) => ({ p, w: v.w, e: v.e }));
 }
 
+/**
+ * Roster fingerprint for the transparency feed (rc.4, BL-12/F8):
+ * `b64url(SHA-256(JCS(roster)))`. Deliberately a separate field —
+ * `pactRoot` stays `evHash(GENESIS)`, the deterministic pact name
+ * (PACTS §2); redefining it was rejected (audit Б3). Replica-safe by
+ * construction: the canonical roster carries no signature sets (B-8),
+ * so two replicas with differing `sig[]` still share the digest.
+ */
+function rosterDigestOf(roster: RosterEntry[]): string {
+  return b64urlEncode(
+    crypto.sha256(canonicalize(roster as unknown as JsonValue))
+  );
+}
+
 function successResult(state: JournalState, extra?: Partial<VerifyResult>): VerifyResult {
+  const roster = sortedRoster(state.roster);
   return {
     ok: true,
-    roster: sortedRoster(state.roster),
+    roster,
+    rosterDigest: rosterDigestOf(roster),
     pactRoot: state.hashes[0],
     journalHead: state.head,
     seq: state.events.length > 0 ? state.events[state.events.length - 1].sq : undefined,
@@ -780,12 +805,16 @@ export async function verifyAct(
     }
 
     const warnings: NonNullable<VerifyResult['warnings']> = [];
-    const stateFields = (): Partial<VerifyResult> => ({
-      roster: sortedRoster(state.roster),
-      pactRoot: state.hashes[0],
-      journalHead: state.head,
-      seq: act.sq,
-    });
+    const stateFields = (): Partial<VerifyResult> => {
+      const roster = sortedRoster(state.roster);
+      return {
+        roster,
+        rosterDigest: rosterDigestOf(roster),
+        pactRoot: state.hashes[0],
+        journalHead: state.head,
+        seq: act.sq,
+      };
+    };
 
     // D20 compromise windows — journal-deterministic, act-scoped.
     let compromised = false;

@@ -6,7 +6,7 @@
 **База:** `@me2em/core` 1.0.0-rc.8 (реализовано) → rc.9 по P0.8 (JCS + `isRevokedAt`); `@me2em/crypto` 1.1.0-rc.2 (реализовано); спека `specs/v1.0.md`; `specs/test-vectors.json` (структура).
 **Целевые версии:** `@me2em/core 1.0.0-rc.9` (P0.8), `@me2em/pact 1.0.0-rc.1`.
 **Область:** библиотека горизонтального доверия: детерминированные Pact Keys, append-only Pact Journal, верификация журнала и актов (Tier 1+2+3), сборка 2-party, хранилище с CAS-аппендом, побайтовый экспорт/импорт, инъекция транспорта.
-**Вне скоупа (F1–F9):** nested pacts (D30), FROST/BLS (D24), zombie N-party expiry (D37), роли (D29), binary transport (D40), replication profile (`@me2em/server`), Session.create-адаптер, transparency feed (BL-12/13 — только интерфейсные точки), кошелёк/эскроу пакта (отдельное ТЗ поверх D46).
+**Вне скоупа (F1–F9):** nested pacts (D30), FROST/BLS (D24), zombie N-party expiry (D37), роли (D29), binary transport (D40), replication profile (профиль транспорта — продукт, не протокол; BL-22 аннулирован), Session.create-адаптер, transparency feed (BL-12/13 — только интерфейсные точки: PactRoot/JournalHead, с rc.4 — rosterDigest), кошелёк/эскроу пакта (отдельное ТЗ поверх D46).
 
 ---
 
@@ -112,7 +112,9 @@ export function derivePactKey(anchorSecretKey: Uint8Array, pid: string, ch: stri
 ```ts
 export interface VerifyResult {
   ok: boolean; error?: PactError;
-  roster?: RosterEntry[]; pactRoot?: string; journalHead?: string; seq?: number;
+  roster?: RosterEntry[];
+  rosterDigest?: string;   // rc.4 (BL-12/F8): b64url(SHA-256(JCS(roster))) — отпечаток ростера для transparency feed; отдельное поле, pactRoot не переопределяется (Б3)
+  pactRoot?: string; journalHead?: string; seq?: number;
   tier3?: 'supported' | 'unsupported';                    // только в verifyAct (Р10)
   warnings?: Array<{ code: WarningCode; evHash?: string }>; // пустой массив = предупреждений нет; evHash — id события или membership id
 }
@@ -279,7 +281,7 @@ export interface Channel {
 
 ## 10. Отложено (F1–F9)
 
-F1 nested pacts (D30) · F2 FROST/BLS (D24) · F3 zombie N-party expiry (D37 — не импровизировать в деплойменте, P-4) · F4 роли (D29) · F5 binary transport (D40) · F6 replication profile — отдельное ТЗ `@me2em/server` (пары с BL-22) · F7 Session.create-адаптер (`audience: pact:{pid}`) · F8 transparency feed (BL-12/13 — только интерфейсные точки PactRoot/JournalHead) · F9 кошелёк/эскроу пакта — отдельное ТЗ поверх D46 (ротационно-стабильные деривации без `g{gen}`; эскроу `(pid, evHash(ACT))`).
+F1 nested pacts (D30) · F2 FROST/BLS (D24) · F3 zombie N-party expiry (D37 — не импровизировать в деплойменте, P-4) · F4 роли (D29) · F5 binary transport (D40) · F6 replication profile (gossip/relay-конвенции; BL-22 аннулирован 2026-11-24 — серверный профиль это продукт, не протокол) · F7 Session.create-адаптер (`audience: pact:{pid}`) · F8 transparency feed (BL-12/13 — интерфейсные точки PactRoot/JournalHead + rosterDigest, rc.4) · F9 кошелёк/эскроу пакта — отдельное ТЗ поверх D46 (ротационно-стабильные деривации без `g{gen}`; эскроу `(pid, evHash(ACT))`).
 
 ## 11. Бэклог-карточка (к вставке в BACKLOG.md)
 

@@ -148,7 +148,8 @@ function buildPinnedReject(): Journal {
 
 describe('golden vectors — specs/test-vectors.json §pact (rc.3, F-rc3-5)', () => {
   it('file and section versions are current', () => {
-    expect(file.vector_file_version).toBe(4);
+    // File version 5: core rc.10 (BL-06) — session payloads carry `sid`.
+    expect(file.vector_file_version).toBe(5);
     expect(file.pact.vector_file_version).toBe(2);
     // Rows are addressed by id below, so the set may grow (rc.4+)
     // without editing this suite — only catastrophic shrinkage fails:

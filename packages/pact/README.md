@@ -1,13 +1,11 @@
-# @me2em/pact — Pacts: horizontal trust between independent identities
+## 📦 Pact — Horizontal Trust Between Independent Identities
 
 Signed agreements between independent Identities **without merging trust
 roots** — the horizontal primitive of the Me2eM authorization protocol.
 
-```
-@me2em/pact 1.0.0-rc.3 · Apache-2.0 · Node ≥ 22.6 · ESM · TypeScript
-  peer:         @me2em/core   >=1.0.0-rc.9 <2.0.0-0   // hkdf/sha256/ed25519, JCS, Attestation, RevocationChecker
-  peerOptional: @me2em/crypto >=1.1.0-rc.2 <2.0.0-0   // only for the reference X3DH transport adapter
-```
+[![version](https://img.shields.io/badge/version-1.0.0--rc.4-blue)](https://github.com/me2em-org/me2em-protocol/blob/main/packages/pact/CHANGELOG.md)
+[![License](https://img.shields.io/github/license/me2em-org/me2em-protocol)](../../LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A5%2022.6-green)](https://nodejs.org)
 
 Me2eM attestation chains are **vertical**: a parent *has authority over* a
 child and signs its existence. Between two independent Identities no vertical
@@ -38,59 +36,42 @@ obligations.
 
 ---
 
-## Contents
-
-1. [Concepts and terminology](#1-concepts-and-terminology)
-2. [Install](#2-install)
-3. [Quickstart](#3-quickstart)
-4. [Anchors = lifetime policy](#4-anchors--lifetime-policy)
-5. [Key derivation](#5-key-derivation)
-6. [The journal model](#6-the-journal-model)
-7. [Wire format](#7-wire-format)
-8. [Verification](#8-verification)
-9. [Storage, sneakernet, transport](#9-storage-sneakernet-transport)
-10. [Errors and warnings](#10-errors-and-warnings)
-11. [Privacy and security summary](#11-privacy-and-security-summary)
-12. [Limitations (honest blast radius)](#12-limitations-honest-blast-radius)
-13. [Relation to the ecosystem](#13-relation-to-the-ecosystem)
-14. [Open questions](#14-open-questions)
-15. [Design decisions and normative documents](#15-design-decisions-and-normative-documents)
-
----
-
-## 1. Concepts and terminology
+## 📖 Terminology
 
 | Term | Definition |
 |---|---|
 | **Pact** | A signed agreement-context between independent Identities: `pid` + canonical context + journal. Covers pair contracts and cohorts alike ("corporation" = long-lived pact). |
 | **Pact ID (`pid`)** | b64url(16) random bytes; set when GENESIS is assembled, lives until DISSOLVE. Uniqueness even for identical context texts. |
 | **Context (`cx` / `ch`)** | The subject of the agreement. Normative form `ch` = b64url(SHA-256(UTF-8(cx))); inline `cx` (≤ 2048 B) is check-verified against `ch`. The context may travel fully out-of-band — then `ch` is a pure commitment. |
-| **Pact Key** | Deterministic Ed25519 key derived from an anchor node's raw private key, bound to `(pid, ch, gen)` ([§5](#5-key-derivation)). |
-| **Anchor** | The tree node the Pact Key derives from: `identity` / `handle` / `subhandle`. Declares the lifetime policy ([§4](#4-anchors--lifetime-policy)). |
+| **Pact Key** | Deterministic Ed25519 key derived from an anchor node's raw private key, bound to `(pid, ch, gen)` ([§5](#-key-derivation)). |
+| **Anchor** | The tree node the Pact Key derives from: `identity` / `handle` / `subhandle`. Declares the lifetime policy ([§4](#-anchors--lifetime-policy)). |
 | **Enrollment** | Signed journal event binding a Pact Key to the pact. Its evHash is the **membership id** (founders share the evHash of GENESIS). |
 | **Roster** | Canonical set of ACTIVE members at a given seq: `{ p, w, e }[]` sorted by `p` (lexicographic, normative). |
-| **Pact Root** | `evHash(GENESIS)` — the deterministic pact *name* and root of trust (PACTS §2), stable for the whole pact lifetime. Not a roster digest: membership is attested by the roster itself; a transparency-feed digest would be a separate future field (BL-12/F8), never a redefinition of `pactRoot`. |
+| **Pact Root** | `evHash(GENESIS)` — the deterministic pact *name* and root of trust (PACTS §2), stable for the whole pact lifetime. Not a roster digest: the transparency-feed digest is a separate computed field, `rosterDigest` ([§7.4](#-wire-format)) — never a redefinition of `pactRoot`. |
 | **JournalHead** | evHash of the last journal event — the integrity fingerprint of the whole history (`ZERO32` when empty). |
 | **Pact Journal** | Append-only, hash-chained event log; the single source of truth about membership and constitution. |
 | **Act** | A co-signed journal event carrying a document commitment — `ACT` (new), `REVERSE_ACT` (supersede/reversal), `AMEND` (constitution replacement). Acts are never deleted or edited (D19). |
 | **Voucher (`vc`)** | Hash-commit `{ rh, rp }` linking a membership to an attestation chain: `rh` = SHA-256(JCS(chain)), `rp` = the root Identity pub. The privacy/accountability dial (D6). |
 
-## 2. Install
+## 📦 Installation
 
 ```sh
 pnpm add @me2em/pact        # pulls @me2em/core as a peer
 pnpm add @me2em/crypto      # optional — only for the reference X3DH adapter
 ```
 
-The package depends on nothing but `@me2em/core`; real deployments inject
-their own transport and storage (see [§9](#9-storage-sneakernet-transport)).
-Public surface (exported from the package root): `types` · `errors` ·
-`codec` · `derive` · `verify` · `assemble` · `store`. The reference
-transport (`src/transport/`) and test fixtures (`src/testing/`) ship in the
-repo for integration tests but are **not** re-exported from the index — they
-are reference material, not API.
+> 💡 The package depends on nothing but `@me2em/core` (peer
+> `>=1.0.0-rc.9`); `@me2em/crypto >=1.1.0-rc.2` is an optional peer, needed
+> only for the reference X3DH transport adapter. Real deployments inject
+> their own transport and storage (see
+> [Storage, sneakernet, transport](#-storage-sneakernet-transport)).
+> Public surface (exported from the package root): `types` · `errors` ·
+> `codec` · `derive` · `verify` · `assemble` · `store`. The reference
+> transport (`src/transport/`) and test fixtures (`src/testing/`) ship in
+> the repo for integration tests but are **not** re-exported from the
+> index — they are reference material, not API.
 
-## 3. Quickstart
+## 🚀 Quick Start
 
 A two-party pact (A, B founders) that admits C, records an act, supersedes
 it, and dissolves. Every assembly call re-verifies the extended journal
@@ -173,6 +154,7 @@ result.pactRoot;              // evHash(GENESIS) — the deterministic pact name
 result.journalHead;           // evHash of the last event
 result.seq;                   // last event's sq
 result.roster;                // [{ p, w, e }] sorted by p — 3 members, e = membership evHash
+result.rosterDigest;          // b64url(SHA-256(JCS(roster))) — the transparency-feed fingerprint
 result.warnings;              // [] — Tier 3 findings live in verifyAct only
 
 // 9. Exit and dissolve (unilateral EXIT, D18a; DISSOLVE default `any`).
@@ -185,9 +167,10 @@ verifyJournal(events, clockAt(T0)).ok; // true — history stays verifiable fore
 > *return* `{ ok: false, error }` instead of throwing; the assemblers, the
 > codec and the stores *throw* `PactError` (fail-closed — a caller never
 > gets a usable event out of a failed assembly). Match on
-> `error.code` + `error.context`, never on message text ([§10](#10-errors-and-warnings)).
+> `error.code` + `error.context`, never on message text
+> ([Errors and warnings](#-errors-and-warnings)).
 
-## 4. Anchors = lifetime policy
+## 🧭 Anchors = lifetime policy
 
 The parent level of the Pact Key is not an implementation detail — it is a
 declared **death policy** for the pact (PACTS D1–D3, ТЗ §3.2). The anchor
@@ -232,7 +215,7 @@ Identity: Building-Corp (cold)
 Offboarding = revoke `B.jti` (through core's revocation service): the
 officer's authority in the pact terminates — `verifyAct` returns
 `REVOKED @ (SUB_ATTESTATION)`; past acts remain verifiable forever (the audit
-trail is not rewritten; [§8](#8-verification)). Reinstatement = a new
+trail is not rewritten; [Verification](#-verification)). Reinstatement = a new
 attestation `B′` with a fresh `jti` over the **same** subject key — the Pact
 Key derives from the node key, not from `jti`, so roster, seq and pact are
 untouched (D22).
@@ -243,7 +226,7 @@ personal signature of a natural person on acts is a dual-signature, opt-in,
 out-of-chain flow (D10). Cross-principal attestation (attesting a foreign
 personal key) is out of scope — that is federation territory.
 
-## 5. Key derivation
+## 🔑 Key derivation
 
 ```
 pactKey(anchorNode, gen) = Ed25519.from(HKDF-SHA256(
@@ -270,7 +253,7 @@ const pactPub = b64urlEncode(crypto.getPublicKey(pactKey)); // Р1: no separate 
   (`Identity`/`Handle` objects) are deliberately not accepted — pass raw
   private keys obtained through core's namespace exports.
 
-## 6. The journal model
+## 📓 The journal model
 
 Append-only, hash-chained (D11): `sq` strictly monotonic from 0,
 `ph[i] == evHash(prev)`, `ph[0] == ZERO32`, one `pid` per journal. Any
@@ -399,11 +382,12 @@ verifyJournal(events).ok; // true
 Two competing events at the same seq — or any chain divergence — reject with
 `FORK_DETECTED`; history **before** the split point stays valid. Prevention
 is honestly out of scope (no consensus layer). The detection amplifier is
-BL-12: publish `(seq, PactRoot, JournalHead)` to a transparency feed.
-Institutional resolution: consolidate off-protocol, or dissolve and re-form.
-Stores make the race explicit with CAS-append ([§9](#9-storage-sneakernet-transport)).
+BL-12: publish `(seq, PactRoot, JournalHead, rosterDigest)` to a
+transparency feed. Institutional resolution: consolidate off-protocol, or
+dissolve and re-form. Stores make the race explicit with CAS-append
+([Storage, sneakernet, transport](#-storage-sneakernet-transport)).
 
-## 7. Wire format
+## 📡 Wire format
 
 ### 7.1 Encoding and envelope (D31–D33)
 
@@ -450,7 +434,7 @@ voucher chains) travels out-of-band once. Inline fields are optional and
 check-verified: `SHA-256(UTF-8(cx)) == ch`; `doc` requires `dh` and
 `SHA-256(UTF-8(doc)) == dh`. A `vc` commits to a chain by `rh` — the
 artifact must match at verification time or the act fails
-(`MALFORMED`, [§8](#8-verification)).
+(`MALFORMED`, [Verification](#-verification)).
 
 ### 7.4 Fingerprints (D36)
 
@@ -458,16 +442,21 @@ artifact must match at verification time or the act fails
 roster(seq)      = ACTIVE members sorted by pactPub; entry = { p, w, e }
 PactRoot(seq)    = evHash(GENESIS)          // the pact name — constant
 JournalHead(seq) = evHash(last event)       // whole history
+RosterDigest(seq)= b64url(SHA-256(JCS(roster(seq))))   // rc.4, BL-12/F8
 ```
 
 `pactRoot` + `journalHead` are the public anchors for the transparency feed
 (BL-12/BL-13) and for blind comparison UX (group the b64url in 5-char
-blocks, Signal-style). A verifier anchored on a known JournalHead re-checks
-a foreign journal cheaply: the committed prefix costs a hash-integrity pass
-(no signatures), only the suffix is verified in full — the BL-10 pattern
-(loss of the cache degrades performance, not security).
+blocks, Signal-style); `rosterDigest` (rc.4) adds the roster fingerprint —
+a separate field by design (`pactRoot` is never redefined, PACTS §2),
+replica-safe by construction: the canonical roster carries no signature
+sets (B-8), so two replicas with differing `sig[]` share the digest. A
+verifier anchored on a known JournalHead re-checks a foreign journal
+cheaply: the committed prefix costs a hash-integrity pass (no signatures),
+only the suffix is verified in full — the BL-10 pattern (loss of the cache
+degrades performance, not security).
 
-## 8. Verification
+## ✅ Verification
 
 ### 8.1 Tier 1+2 — sync replay
 
@@ -484,11 +473,11 @@ semantics — the constitution in force **at the event's seq** (freeze, D28);
 self-events (`ENROLL`/`EXIT`/`ROTATE_KEY`) are exempt from the
 ACTIVE-signer rule.
 
-`verifyJournal` returns `{ ok, roster, pactRoot, journalHead, seq, warnings:
-[] }` or `{ ok: false, error }` — Tier 3 never runs here (Р9). `opts`:
-`{ skewCheck: 'all' | 'none' }` — `'none'` skips the skew comparison for
-structural replays outside the reference era (assembly `finalize`, archive
-replay); everything else verifies in full.
+`verifyJournal` returns `{ ok, roster, rosterDigest, pactRoot, journalHead,
+seq, warnings: [] }` or `{ ok: false, error }` — Tier 3 never runs here
+(Р9). `opts`: `{ skewCheck: 'all' | 'none' }` — `'none'` skips the skew
+comparison for structural replays outside the reference era (assembly
+`finalize`, archive replay); everything else verifies in full.
 
 `JournalVerifier` is the streaming face of the same replay — there is no
 second "fast" verification path:
@@ -579,10 +568,11 @@ r.ok; r.tier3;         // true; 'supported'
 r.warnings;            // e.g. [{ code: 'NO_VOUCHER', evHash: membershipId }]
 ```
 
-`verifyAct` returns `roster` / `pactRoot` / `journalHead` and `seq` of the
-act — everything needed to attach a Tier-3 verdict to an audit record.
+`verifyAct` returns `roster` / `rosterDigest` / `pactRoot` / `journalHead`
+and `seq` of the act — everything needed to attach a Tier-3 verdict to an
+audit record.
 
-## 9. Storage, sneakernet, transport
+## 💾 Storage, sneakernet, transport
 
 ### 9.1 Storage — CAS-append (C1/C2/D41)
 
@@ -641,7 +631,7 @@ the `Channel` interface live at `src/transport/` and are **not exported from
 the package index**: pact itself depends only on core (B2); wire your own
 Channel (server relay, messenger, sneakernet) for production.
 
-## 10. Errors and warnings
+## 🚨 Errors and warnings
 
 One error type — `PactError { code, context }`, message `CODE @ CONTEXT`
 (D36; the code table is normative, ТЗ §5). Consumers match on `code` +
@@ -679,7 +669,7 @@ try {
 }
 ```
 
-## 11. Privacy and security summary
+## 🛡️ Privacy and security summary
 
 - **Unlinkability by construction** — different pacts, different info
   strings, different keys; even the same counterparty cannot link two of
@@ -700,7 +690,7 @@ try {
   stores, hash-committed verifier state, check-verified inline material;
   nothing is skipped, coerced or repaired on the wire.
 
-## 12. Limitations (honest blast radius)
+## ⚠️ Limitations (honest blast radius)
 
 - **2-party assembly** — the verifier is N-party-generic; assembly ships the
   co-signature flows above (k-signature events are assembled by passing the
@@ -723,14 +713,15 @@ try {
   async `verifyAct`.
 - **Deferred by design** — threshold signatures (FROST/BLS, D24), nested
   pacts (D30), roles (D29), zombie N-party expiry (D37), binary transport
-  (D40), transparency feed (BL-12/13), dual personal signature (D10).
-  Do not improvise these in production (P-4).
+  (D40), the transparency feed itself (BL-12/13 — the interface points
+  shipped: `pactRoot`/`journalHead`/`rosterDigest`), dual personal
+  signature (D10). Do not improvise these in production (P-4).
 
-## 13. Relation to the ecosystem
+## 🌐 Relation to the ecosystem
 
 | Item | Relation |
 |---|---|
-| BL-12 | `pactRoot` + `journalHead` are natural transparency-feed entries; the fork-detection amplifier (D27) |
+| BL-12 | `pactRoot` + `journalHead` + `rosterDigest` (rc.4) are natural transparency-feed entries; the fork-detection amplifier (D27) |
 | BL-13 | the same feed detects re-enrollment/re-attestation patterns |
 | BL-15 | `pact:`-namespace convention (design D21): journal-local revocation keeps the checker load off the hot path |
 | BL-10 | journal-suffix verification against a pinned JournalHead (`JournalVerifier` integrity pass, `verifyPrefix`) |
@@ -744,7 +735,7 @@ same problem by *merging* trust roots — pacts avoid merging entirely.
 Matrix identity servers (central, linkable) are the anti-pattern this design
 avoids.
 
-## 14. Open questions
+## ❓ Open questions
 
 1. **Nested pacts** (holding structures) — verification induction, privacy (D30).
 2. **Threshold signatures** (FROST/BLS) for large cohorts — sacrifices
@@ -753,16 +744,14 @@ avoids.
 4. **Roles / scoped quorums** — treasurer, admin; AMEND extension (D29).
 5. **Binary transport** (CBOR deterministic / protobuf) with a bit-exact
    round-trip invariant, for constrained verticals (D40).
-6. **Journal replication profile** — gossip/relay conventions,
-   hosting-free guarantee; reference `@me2em/server` endpoints (BL-22).
+6. **Journal replication profile** — gossip/relay conventions and the
+   hosting-free guarantee; reference server endpoints are product scope
+   (the former BL-22 / `@me2em/server` reference, annulled 2026-11-24).
 7. **Session adapter** — the PactKey as a Handle-compatible signer for
    `audience: pact:{pid}` sessions, or a dedicated API (pairs with D9's
    `pact:sign` scope — both unimplemented in crypto/core today).
-8. **Roster digest for the transparency feed** — a separate
-   `rosterDigest = SHA-256(JCS(roster))` field, never a redefinition of
-   `pactRoot` (BL-12/F8).
 
-## 15. Design decisions and normative documents
+## 📚 Design decisions and normative documents
 
 The decision log D1–D47 with the full rationale lives in
 [`docs/PACTS.md`](../../docs/PACTS.md) §9 (adopted design; the numbering in
@@ -773,9 +762,15 @@ incremental-verification track is
 Golden vectors: [`specs/test-vectors.json`](../../specs/test-vectors.json),
 section `pact` (derivation, envelope, replay, pinned invites, liveness,
 export) — 11 rows, each pinned to a consumer in the test suite
-(`test/vectors.spec.ts`). 127 tests, coverage 97/92/98/97 (lines/branches/
-functions/statements), `tsc` (src + scripts) and eslint clean.
+(`test/vectors.spec.ts`). 128 tests, coverage 97/92/98/97 (lines/branches/
+functions/statements), `tsc` (src, scripts and tests) and eslint clean.
 
 Package facts: ESM only (`"type": "module"`, exports `.` → `dist/`), ships
 `dist` + `src` + types; peer deps `@me2em/core >=1.0.0-rc.9` and optional
 `@me2em/crypto >=1.1.0-rc.2`; Node ≥ 22.6; Apache-2.0.
+
+## 📜 License
+
+Apache License 2.0.
+
+© 2026 Me2eM Organization. Built for privacy, openness, and user sovereignty.

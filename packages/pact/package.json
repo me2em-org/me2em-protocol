@@ -1,6 +1,6 @@
 {
   "name": "@me2em/pact",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "description": "Horizontal trust primitive for Me2eM: deterministic Pact Keys, append-only Pact Journal, Tier 1+2+3 verification (PACTS BL-58)",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,12 +23,13 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json && tsc -p tsconfig.test.json",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "bench": "vitest bench --run",
     "bench:baseline": "vitest bench --run --outputJson bench/baseline.json && node scripts/normalize-baseline.mjs",
     "vectors": "tsc -p tsconfig.json && node --experimental-strip-types scripts/generate-vectors.ts",
-    "readme:smoke": "tsc -p tsconfig.json && node --experimental-strip-types scripts/readme-smoke.ts"
+    "readme:smoke": "tsc -p tsconfig.json && node --experimental-strip-types scripts/readme-smoke.ts",
+    "typecheck:tests": "tsc -p tsconfig.test.json"
   },
   "license": "Apache-2.0",
   "engines": {
