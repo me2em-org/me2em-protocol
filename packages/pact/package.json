@@ -23,7 +23,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "bench": "vitest bench --run",
     "bench:baseline": "vitest bench --run --outputJson bench/baseline.json && node scripts/normalize-baseline.mjs",
     "vectors": "tsc -p tsconfig.json && node --experimental-strip-types scripts/generate-vectors.ts"

@@ -150,7 +150,23 @@ describe('golden vectors — specs/test-vectors.json §pact (rc.3, F-rc3-5)', ()
   it('file and section versions are current', () => {
     expect(file.vector_file_version).toBe(4);
     expect(file.pact.vector_file_version).toBe(2);
-    expect(file.pact.vectors.length).toBe(11);
+    // Rows are addressed by id below, so the set may grow (rc.4+)
+    // without editing this suite — only catastrophic shrinkage fails:
+    expect(file.pact.vectors.length).toBeGreaterThanOrEqual(11);
+  });
+
+  it('no orphan rows: every vector id has a consumer in this suite (review pass 2, Н2)', () => {
+    // The growth-friendly count pins accept new rows, but a row without
+    // a consumer would silently lose golden coverage. Literal
+    // `rowOf('<id>')` call sites are the contract; liveness rows are
+    // consumed generically via the `pact-chain-liveness-` prefix filter
+    // (each row re-verified against its stored expected outcome) — a new
+    // generically-consumed group must add its own exemption here.
+    const source = readFileSync(fileURLToPath(new URL('./vectors.spec.ts', import.meta.url)), 'utf8');
+    for (const v of file.pact.vectors) {
+      if (v.id.startsWith('pact-chain-liveness-')) continue;
+      expect(source.includes(`'${v.id}'`), `vector ${v.id} has no consumer in vectors.spec.ts`).toBe(true);
+    }
   });
 
   it('pact-derive / pact-derive-negative-ch: HKDF pact keys (D2/D4)', () => {
@@ -218,7 +234,9 @@ describe('golden vectors — specs/test-vectors.json §pact (rc.3, F-rc3-5)', ()
 
   it('pact-chain-liveness-*: aliveness is strict act.iat < exp (Б6)', async () => {
     const liveness = file.pact.vectors.filter((v) => v.id.startsWith('pact-chain-liveness-'));
-    expect(liveness.length).toBe(4);
+    // Same growth-friendly pin as the suite total: new liveness rows
+    // join by id prefix — only catastrophic shrinkage fails:
+    expect(liveness.length).toBeGreaterThanOrEqual(4);
     for (const v of liveness) {
       const row = v as unknown as LivenessRow;
       const m = new Member(1);
@@ -228,7 +246,10 @@ describe('golden vectors — specs/test-vectors.json §pact (rc.3, F-rc3-5)', ()
       const j = new Journal();
       j.push('GENESIS', { ch: CH, cn: CN2, ft: foundersOf([m, other], CN2, vcs) }, [m, other]);
       const act = j.push('ACT', { no: 'act-1' }, [m, other]);
-      const checker: RevocationChecker = { async isRevokedAt(): Promise<boolean> { return false; } };
+      const checker: RevocationChecker = {
+        async isRevoked(): Promise<boolean> { return false; },
+        async isRevokedAt(): Promise<boolean> { return false; },
+      };
       const result = await verifyAct(j.events, j.hash(act), checker, new Map([[j.hash(j.events[0]), chain]]), clockAt(T0));
       if (row.expected.ok) {
         expect(result.ok, row.id).toBe(true);

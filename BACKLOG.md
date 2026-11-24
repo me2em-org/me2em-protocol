@@ -652,6 +652,20 @@ baseline normalized, `pnpm vectors` made explicit/idempotent).
   substance of the finding — the hidden O(N) per append — landed as
   the incremental head cache in `MemoryStore`. Rationale:
   `specs/tz-pact-rc3-incremental.md` §5.
+- **Core · scripts typecheck parity · open · P3.**
+  `packages/core/scripts/generate-vectors.ts` runs via
+  `--experimental-strip-types` but is not typechecked (the core
+  tsconfig includes `src` only — the gap pact closed in rc.3 review
+  pass 2, where the first run caught a real type error). Mirror the
+  pact fix: `tsconfig.scripts.json` (`noEmit`,
+  `include: ["scripts/**/*"]`) chained into `typecheck`.
+- **Workspace · tests are not typechecked · open · P3.**
+  No package typechecks `test/**/*` (every tsconfig includes `src`
+  only — core, crypto, pact, react, solana, x402; vitest transpiles
+  without typechecking), so types in tests can silently drift from
+  src (rc.3 review pass 2 audit, Н1). Mirror the scripts pattern:
+  per-package `tsconfig.test.json` (`noEmit`, include `src` + `test`)
+  chained into `typecheck`.
 - **Pact · roster fingerprint for transparency (BL-12/F8) · open · P3.**
   `pactRoot` is evHash(GENESIS) per PACTS §2 — the deterministic pact
   name, not a roster digest (audit Б3 claimed otherwise and was

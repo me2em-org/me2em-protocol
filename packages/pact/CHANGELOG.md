@@ -77,14 +77,72 @@ plan: `specs/plan-pact-rc3.md`.
   byte-identical (verified: two consecutive runs, zero diff). The
   eslint node-globals scope now covers `packages/pact/scripts/`.
 
+### Fixed (review pass 2)
+- **Б-rc3-1 (full-state pin)** — the pass-1 atomicity test compared
+  only the `snapshot()` view (roster/pactRoot/journalHead/seq), so a
+  regression that mutated `constitution`, member records, invites,
+  used invites, acts or rotated keys before a failing check would have
+  passed it unnoticed. `JournalVerifier` gains `@internal
+  _debugState()` — a deep copy of the whole committed state plus the
+  RC3-D1 commitment (`JournalState` is exported `@internal` for the
+  same purpose) — and the test now asserts the full state. The
+  stronger probe exposed one real violation: `apply` latched
+  `state.pid` BEFORE the envelope/skew/signature checks, so a failed
+  first apply with a foreign pid poisoned the verifier — every honest
+  apply afterwards was refused with `FORK_DETECTED`. The latch moved
+  into the commit phase: "every check precedes every mutation" holds
+  verbatim now, pinned by a new test (failed first apply ⇒ the state
+  stays empty, the honest journal still applies).
+- **Б-rc3-2 (minimal cache key)** — the `finalize` key drops its `pid`
+  component: `pid === tail.pid` by construction, so the comparison was
+  dead weight. The key is `(tail object identity, height, clock.now())`,
+  documented (height guards an in-place mutated array; `now` keeps a
+  future clock-dependent check from leaking one caller's time into
+  another's verdict). The interleave test is renamed to what it
+  actually proves — both journals share the same pid string on
+  purpose; isolation comes from the distinct tail objects, not from
+  pid equality.
+- **В-rc3-2 (residual risk)** — `tsconfig.scripts.json` +
+  `typecheck:scripts`: `scripts/generate-vectors.ts` runs via
+  `--experimental-strip-types` but was never typechecked (the package
+  tsconfig includes `src` only); `pnpm typecheck` chains it — and the
+  very first run caught a real latent error (the script's mock
+  `RevocationChecker` lacked the required `isRevoked`; fixed, and the
+  same one-liner fixed in `test/vectors.spec.ts`). (Core has the same
+  gap — tracked in BACKLOG.)
+- **Vectors** — the golden-suite count pins relaxed to
+  `toBeGreaterThanOrEqual` (11 rows total, 4 chain-liveness): rows are
+  addressed by id, so adding vectors must not require editing the
+  suite; only catastrophic shrinkage fails.
+
+### Fixed (review pass 2 audit)
+- **Н2** — a no-orphan-rows test: every `§pact` row id must have a
+  consumer — a literal `rowOf('<id>')` call site or the
+  generically-consumed `pact-chain-liveness-` prefix — so the
+  growth-friendly count pins cannot admit an unconsumed (uncovered)
+  row; a new generically-consumed group must declare its exemption.
+- **applySuffix atomicity** — a test pins that a suffix failing
+  mid-way (tampered event 5) leaves the committed state exactly at the
+  honest prefix (full-state `_debugState` compare against a reference
+  verifier) and the honest journal completes from there — a suffix is
+  a sequence of atomic applies.
+- **Н1 (recorded)** — BACKLOG gains the workspace-wide item: no
+  package typechecks `test/**/*` (vitest transpiles without
+  typechecking); the proposed fix mirrors the scripts pattern
+  (`tsconfig.test.json` chained into `typecheck`). Н3 (`@internal` as
+  TSDoc convention — sufficient at this scale) and Н4 (`structuredClone`
+  covers the whole `JournalState`) were reviewed and accepted as-is.
+
 ### Tests
-- 124 tests (was 108): incremental/batch equivalence including error
+- 127 tests (was 108): incremental/batch equivalence including error
   codes, the RC3-D2/D3 attack vector (re-chained middle tamper ⇒
   `FORK_DETECTED` on the committed state), the Б-rc3-1 atomicity
-  probe, skew parity, a 40-event assembly lifecycle with tampered
-  prefixes, the Б-rc3-2 cache-isolation interleave, and the
-  golden-vector suite; tsc/eslint clean, coverage thresholds (≥ 90%)
-  kept.
+  probes (the full-state `_debugState` pin, the failed-first-apply
+  no-pid-latch case, the mid-failing-applySuffix state), skew parity,
+  a 40-event assembly lifecycle with tampered prefixes, the Б-rc3-2
+  cache-isolation interleave, and the golden-vector suite (including
+  the no-orphan-rows check); tsc (src + scripts)/eslint clean,
+  coverage thresholds (≥ 90%) kept.
 
 ## [1.0.0-rc.2] — 2026-11-24
 

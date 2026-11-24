@@ -40,22 +40,23 @@ export function signaturesFor(raw: Omit<Event, 'sig'>, keys: Uint8Array[]): Sign
 
 /**
  * Single-slot fast-path cache (F-rc3-1, RC3-D7): the verifier of the
- * last finalized prefix, keyed by `(tail object, height, pid,
+ * last finalized prefix, keyed by `(tail object identity, height,
  * clock.now())`. A sequential lifecycle extends its own tail with a
  * stable clock, so one slot covers it; interleaved journals, diverging
  * clocks or another pact alternate misses — the rc.2 full-replay
- * behavior, no regression. The key makes caller isolation explicit
- * (review Б-rc3-2): no two caller contexts couple through the cache —
- * even though under `skewCheck: 'none'` the cached verifier reads no
- * clock today, a future clock-dependent check could not leak one
- * caller's time into another's verdict. The cache never bypasses
+ * behavior, no regression. The key is minimal, not incidental (review
+ * Б-rc3-2): the tail object already pins the pid — `pid === tail.pid`
+ * by construction, so a separate pid component would be dead weight —
+ * `height` additionally guards an in-place mutated array, and the
+ * clock value keeps a future clock-dependent check from leaking one
+ * caller's time into another's verdict (under `skewCheck: 'none'` the
+ * cached verifier reads no clock today). The cache never bypasses
  * checks: on a hit, `applySuffix` re-derives the chain and the
  * hash-commitment from the caller's actual array (RC3-D2).
  */
 let finalizedPrefix: {
   tail: Event;
   height: number;
-  pid: string;
   now: number;
   verifier: JournalVerifier;
 } | undefined;
@@ -78,14 +79,12 @@ export function finalize(events: Event[], event: Event, clock: Clock): Event {
   validateEvent(event, 'assemble');
   const tail = events.length > 0 ? events[events.length - 1] : undefined;
   const now = clock.now();
-  const pid = tail?.pid;
   let verifier: JournalVerifier;
   if (
     finalizedPrefix !== undefined &&
     tail !== undefined &&
     finalizedPrefix.tail === tail &&
     finalizedPrefix.height === events.length &&
-    finalizedPrefix.pid === pid &&
     finalizedPrefix.now === now
   ) {
     verifier = finalizedPrefix.verifier;
@@ -94,7 +93,7 @@ export function finalize(events: Event[], event: Event, clock: Clock): Event {
   }
   verifier.applySuffix(events);
   verifier.apply(event);
-  finalizedPrefix = { tail: event, height: events.length + 1, pid: event.pid, now, verifier };
+  finalizedPrefix = { tail: event, height: events.length + 1, now, verifier };
   return event;
 }
 

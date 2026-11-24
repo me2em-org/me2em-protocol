@@ -90,8 +90,12 @@ interface MemberRecord {
   vc?: { rh: string; rp: string };
 }
 
-/** Replay state — append-only views over the verified prefix. */
-interface JournalState {
+/**
+ * @internal The opaque replay state (RC3-D6), exposed only for the
+ * full-state atomicity pin (`_debugState`, test/verify.spec.ts) and
+ * tooling introspection — never a wire format, never stored.
+ */
+export interface JournalState {
   pid: string | undefined;
   head: string;
   hashes: string[];
@@ -465,13 +469,15 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
  * contract. Failed `apply*` calls leave the state unchanged — this is
  * the atomicity invariant of the verifier, and it is normative, not
  * incidental: every check precedes every mutation, both in `apply`
- * itself (chain → envelope → skew → signatures) and inside
- * {@link applyEvent} (each event type validates its semantics —
- * quorum, grammar, membership — before its first `state.*` write;
- * PACTS §7.7 order). The review test (`test/verify.spec.ts`,
- * "atomicity") pins this by simulating a failure *inside*
- * {@link applyEvent} and asserting the untouched committed state —
- * a future event type that mutates before it validates will fail it.
+ * itself (chain → envelope → skew → signatures; even the pid latch
+ * commits with the event) and inside {@link applyEvent} (each event
+ * type validates its semantics — quorum, grammar, membership — before
+ * its first `state.*` write; PACTS §7.7 order). The review tests
+ * (`test/verify.spec.ts`, "atomicity") pin this by simulating a
+ * failure *inside* {@link applyEvent} and a failed *first* apply,
+ * asserting the whole committed state via
+ * {@link JournalVerifier._debugState} — a future event type that
+ * mutates before it validates will fail them.
  *
  * Skew (RC3-D5): the Clock is read per applied event; pin the clock
  * (or set `skewCheck: 'none'`) for era-consistent streaming replays.
@@ -505,9 +511,10 @@ export class JournalVerifier {
    */
   apply(event: Event): void {
     const state = states.get(this)!;
-    // (1) chain (PACTS §7.7 step 1)
-    if (state.pid === undefined) state.pid = event.pid;
-    else if (state.pid !== event.pid) {
+    // (1) chain (PACTS §7.7 step 1) — pure checks: the pid latch is a
+    // state write, so it belongs to the commit phase below; a failed
+    // apply must not latch a foreign pid into an empty verifier.
+    if (state.pid !== undefined && state.pid !== event.pid) {
       throw new PactError('FORK_DETECTED', 'verify', 'pid changed mid-journal');
     }
     if (event.sq !== state.events.length) {
@@ -536,6 +543,9 @@ export class JournalVerifier {
     const hBytes = crypto.sha256(tbs);
     const hash = b64urlEncode(hBytes);
     applyEvent(state, event, hash);
+    // Atomicity: every state write happens only after every check —
+    // the pid latch commits with the event, not before it.
+    if (state.pid === undefined) state.pid = event.pid;
     state.head = hash;
     state.events.push(event);
     state.hashes.push(hash);
@@ -595,6 +605,18 @@ export class JournalVerifier {
   /** Success view of the committed state (same fields as a clean verifyJournal). */
   snapshot(): VerifyResult {
     return successResult(states.get(this)!);
+  }
+
+  /**
+   * @internal Deep copy of the whole committed state — everything
+   * {@link snapshot} deliberately omits (constitution, founder pubs,
+   * member records, invites, used invites, acts, rotated keys, event
+   * hashes, pid) plus the RC3-D1 commitment. Exists for the full-state
+   * atomicity pin and tooling introspection; the public face of the
+   * state is {@link snapshot}.
+   */
+  _debugState(): JournalState & { commitment: Uint8Array } {
+    return { ...structuredClone(states.get(this)!), commitment: new Uint8Array(this.commitment) };
   }
 }
 
