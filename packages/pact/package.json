@@ -27,7 +27,8 @@
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "bench": "vitest bench --run",
     "bench:baseline": "vitest bench --run --outputJson bench/baseline.json && node scripts/normalize-baseline.mjs",
-    "vectors": "tsc -p tsconfig.json && node --experimental-strip-types scripts/generate-vectors.ts"
+    "vectors": "tsc -p tsconfig.json && node --experimental-strip-types scripts/generate-vectors.ts",
+    "readme:smoke": "tsc -p tsconfig.json && node --experimental-strip-types scripts/readme-smoke.ts"
   },
   "license": "Apache-2.0",
   "engines": {
