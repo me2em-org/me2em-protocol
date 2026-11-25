@@ -3,8 +3,10 @@
 // Public test fixtures (ТЗ §2 testing/): deterministic members with real
 // pact keys, a chained journal builder, real voucher chains (core
 // attestations) — suitable for We2eM/AS integrations and downstream
-// package test suites. Not part of the protocol surface; exported from
-// the package root for convenience.
+// package test suites. Exported via the `@me2em/pact/testing` subpath
+// since rc.5 (BL-58 follow-up decision, 2026-11-24). Not part of the
+// protocol surface — deterministic reference material that may evolve
+// within the rc line without a major bump.
 
 import { Attestation, crypto } from '@me2em/core';
 import { canonicalize, type JsonValue } from '@me2em/core';

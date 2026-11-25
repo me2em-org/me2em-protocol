@@ -37,7 +37,7 @@ export async function createTestHandle(
  */
 export function signerFromKey(privateKey: Uint8Array): Signer {
   return {
-    sign: (data: Uint8Array): Promise<Uint8Array> =>
+    sign: async (data: Uint8Array): Promise<Uint8Array> =>
       ed25519.sign(data, privateKey),
   };
 }

@@ -1,6 +1,7 @@
 // packages/x402/test/facilitator-b402.spec.ts
 import { describe, expect, it, vi } from 'vitest';
-import type { FacilitatorClient, X402PaymentPayload, X402PaymentRequirements, X402SettleResponse, X402Supported, X402VerifyResponse } from '@me2em/core';
+import type { X402PaymentPayload, X402PaymentRequirements, X402SettleResponse, X402Supported, X402VerifyResponse } from '@me2em/core';
+import type { FacilitatorClient } from '../src/facilitator.js';
 import { B402Facilitator } from '../src/b402.js';
 import { X402Error } from '../src/errors.js';
 import * as mainEntry from '../src/index.js';

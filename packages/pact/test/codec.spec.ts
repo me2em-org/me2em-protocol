@@ -161,7 +161,8 @@ describe('pact codec — M1.1', () => {
 
     it('rejects wrong typ (version fail-closed, P4)', () => {
       expectPactError(
-        () => decodeEvent(encodeEvent({ ...event, typ: 'me2em/pact-event/v2' })),
+        // deliberately wrong-typed — the runtime check must catch it
+        () => decodeEvent(encodeEvent({ ...event, typ: 'me2em/pact-event/v2' } as unknown as Event)),
         'MALFORMED'
       );
     });
@@ -188,15 +189,18 @@ describe('pact codec — M1.1', () => {
       expectPactError(() => decodeEvent(encodeEvent({ ...event, sq: -1 })), 'MALFORMED');
       expectPactError(() => decodeEvent(encodeEvent({ ...event, sq: 1.5 })), 'MALFORMED');
       expectPactError(() => decodeEvent(encodeEvent({ ...event, iat: -5 })), 'MALFORMED');
-      expectPactError(() => decodeEvent(encodeEvent({ ...event, ty: 'SIDE_DEAL' })), 'UNKNOWN_EVENT_TYPE');
+      expectPactError(
+        () => decodeEvent(encodeEvent({ ...event, ty: 'SIDE_DEAL' } as unknown as Event)),
+        'UNKNOWN_EVENT_TYPE'
+      );
     });
 
     it('rejects wrong field types before decoding (pid/ph/pl/iat/sig)', () => {
-      expectPactError(() => decodeEvent(encodeEvent({ ...event, pid: 42 })), 'MALFORMED');
-      expectPactError(() => decodeEvent(encodeEvent({ ...event, ph: 7 })), 'MALFORMED');
-      expectPactError(() => decodeEvent(encodeEvent({ ...event, pl: [] })), 'MALFORMED');
-      expectPactError(() => decodeEvent(encodeEvent({ ...event, iat: 1.5 })), 'MALFORMED');
-      expectPactError(() => decodeEvent(encodeEvent({ ...event, sig: 'n/a' })), 'MALFORMED');
+      expectPactError(() => decodeEvent(encodeEvent({ ...event, pid: 42 } as unknown as Event)), 'MALFORMED');
+      expectPactError(() => decodeEvent(encodeEvent({ ...event, ph: 7 } as unknown as Event)), 'MALFORMED');
+      expectPactError(() => decodeEvent(encodeEvent({ ...event, pl: [] } as unknown as Event)), 'MALFORMED');
+      expectPactError(() => decodeEvent(encodeEvent({ ...event, iat: 1.5 } as unknown as Event)), 'MALFORMED');
+      expectPactError(() => decodeEvent(encodeEvent({ ...event, sig: 'n/a' } as unknown as Event)), 'MALFORMED');
       const entry = { ...event, sig: ['x'] } as unknown as Event;
       expectPactError(() => decodeEvent(encodeEvent(entry)), 'MALFORMED');
     });
@@ -211,7 +215,7 @@ describe('pact codec — M1.1', () => {
     it('rejects malformed signature entries', () => {
       const bad = { ...event, sig: [{ p: PUB_A, s: SIG64, extra: 1 }] } as unknown as Event;
       expectPactError(() => decodeEvent(encodeEvent(bad)), 'MALFORMED');
-      const short = { ...event, sig: [{ p: PUB_A, s: b64urlEncode(bytes(63)) }] } as unknown as Event;
+      const short = { ...event, sig: [{ p: PUB_A, s: b64urlEncode(bytes(63, 0)) }] } as unknown as Event;
       expectPactError(() => decodeEvent(encodeEvent(short)), 'MALFORMED');
     });
   });
@@ -307,7 +311,7 @@ describe('pact codec — M1.1', () => {
       expectPactError(() => decodePl('INVITE', { w: 0, an: 'handle' }), 'MALFORMED');
       expectPactError(() => decodePl('INVITE', { an: 'identity', w: 1.5 }), 'MALFORMED');
       expectPactError(() => decodePl('ROTATE_KEY', { np: PUB_B, ca: 1.5 }), 'MALFORMED');
-      expectPactError(() => decodePl('ROTATE_KEY', { np: b64urlEncode(bytes(31)) }), 'MALFORMED');
+      expectPactError(() => decodePl('ROTATE_KEY', { np: b64urlEncode(bytes(31, 0)) }), 'MALFORMED');
       expectPactError(() => decodePl('REVERSE_ACT', { ref: H32, k: 'cancel' }), 'MALFORMED');
       expectOk('REVERSE_ACT', { ref: H32, k: 'reversal' });
     });

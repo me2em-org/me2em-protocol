@@ -11,7 +11,7 @@
 // the HTTP layer is a mock `fetch` — same philosophy as pay.spec.ts.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { base58 } from '@scure/base';
-import { DisposedError } from '@me2em/core';
+import { DisposedError, type X402PaymentRequired } from '@me2em/core';
 import { fromBase64, fromHex, toHex, verifyRaw } from '@me2em/crypto';
 import {
   createPaymentFetch,
@@ -20,7 +20,6 @@ import {
   encodeSettleResponse,
   readSettlement,
   X402Error,
-  type X402PaymentRequired,
 } from '@me2em/x402';
 import {
   SolanaWalletTree,

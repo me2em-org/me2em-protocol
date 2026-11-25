@@ -385,18 +385,27 @@ development, not part of the shipped API contract.
   receipts, @me2em/server integration. Pilot consumer: BeSafeChat.
   Depends on BL-28 (done). Verticals keep UI logic in src/react/,
   domain logic in src/headless/.
-- **BL-35 · open · Publish automation via CI.**
-  Publishing is manual (`pnpm publish` per package). Add a
-  release workflow: npm trusted publishing (or NPM_TOKEN secret),
-  changesets-driven version bumps, per-package publish jobs with
-  `--tag alpha`. Natural next step now that CI exists.
-- **BL-06 · open · `sid` (session lineage id).**
-  Renewal rotates `jti`, so a renewed session's lineage cannot be
-  revoked wholesale. Add optional `sid` in the payload (random at
-  creation, stable across renewals); `RevocationChecker` checks both.
-  `sid` must be random (not derived from the handle) to avoid
-  cross-audience linkability. Auto-renewal has shipped in @me2em/react
-  — practically relevant now.
+- **BL-35 · annulled · Publish automation via CI.**
+  Annulled 2026-11-24 (architect decision): releases stay **manual** —
+  the owner runs them per `RELEASE.md`. Rationale: a past automation
+  attempt ended in an npm account block, and releases are infrequent,
+  so a documented manual procedure beats a CI workflow. Release policy
+  (same decision): rc-line versions publish to the **`latest`**
+  dist-tag (never `--tag`; DR-6 разминка stance). History: the
+  2026-11-24 verification found no release workflow
+  (`.github/workflows/` holds only `ci-security.yml`) — recorded here,
+  no work planned. Do not re-open publish automation without a new
+  architect decision.
+- **BL-06 · done · `sid` (session lineage id) — landed (core rc.10,
+  2026-11-24).**
+  Renewal rotates `jti`, so a renewed session's lineage could not be
+  revoked wholesale. Shipped: `Session.create` stamps a random `sid`
+  (never derived from the handle — cross-audience linkability),
+  `SessionOptions.sid` threads renewals, `RevocationChecker.isRevoked`
+  is consulted with both the `jti` and the lineage `sid` (revoking the
+  sid disables the whole lineage). `@me2em/react` rc.5 threads the sid
+  across manual/timer/visibility renewals. Golden vectors v5; additive
+  under spec §12.1.
 - **BL-07 · open · `destroy()` for Identity/Handle/SubHandle.**
   `fill(0)` private key bytes + `destroyed` flag; key operations throw
   afterwards. TSDoc must honestly state GC/JIT limits. Partially
@@ -447,10 +456,14 @@ development, not part of the shipped API contract.
   schemas, both verification modes with error levels, limits
   2048/4096/±30s, issuance/Signer contract). Draft archived to
   `specs/archive/draft-core.md` with a deprecation pointer.
-- **BL-22 · open · OpenAPI reference server spec.**
-  Real flow: POST /auth/challenge, /auth/verify, /attestations,
-  /backup/envelope, /prekeys/* (X3DH), revocation endpoints. Do
-  together with `@me2em/server`.
+- **BL-22 · annulled · OpenAPI reference server spec.**
+  Annulled 2026-11-24 together with the `@me2em/server` package: the
+  reference backend is a **product** (We2eM), not a protocol artifact —
+  it creates no new entities, it only orchestrates the existing ones
+  (sessions, attestations, revocation). The OpenAPI spec would document
+  the product, not the protocol; it moves with the product. The DR-7
+  draft disposition stays as history; the protocol contract remains
+  `specs/v1.0.md` + golden vectors.
 - **BL-30 · open · `@me2em/iot` — device-management vertical.**
   Deferred until a real enterprise pilot exists (YAGNI). Merges the
   EV-station and drone-fleet patterns. Splitting later is easy; merging
@@ -468,6 +481,15 @@ development, not part of the shipped API contract.
   optional @me2em/crypto peer. Depends on: BL-15 (namespace
   convention); amplified by BL-12. Target: pact 1.0.0-rc.1
   (M1.0–M1.7, ~6–7 нед.).
+- **BL-59 · annulled · `@me2em/idp` as a protocol package.**
+  Annulled 2026-11-24 (architect decision, resolving the open question
+  in `specs/plan-pact-rc3.md` §9.1): the identity-provider flow is a
+  **product** (We2eM), not a protocol artifact — it creates no new
+  entities; sessions/attestations/revocation come from `@me2em/core`,
+  and the `confirmKey` variant question is closed as moot. The
+  attestation-chain resolution inside pacts (error `IDP_UNRESOLVABLE`,
+  voucher chains) is unaffected — "idp" there names the verifier's
+  resolution step, not a package.
 
 ## P4 — Cosmetics
 
@@ -589,7 +611,9 @@ quotes in this entry are intentional).
   normative in it is captured by `specs/v1.0.md` and
   `derivation-paths.ts`. The 9-line OpenAPI stub under
   `specs/draft/openapi/` was not a spec — BL-22 will be written
-  fresh with `@me2em/server`. Git history, not the tree, retains
+  fresh with `@me2em/server`. (2026-11-24: BL-22 annulled — see the
+  BL-22 card; the server flows moved to product scope.) Git history,
+  not the tree, retains
   the drafts (retrievable at `e0f4dc5`). This supersedes the
   archive disposition of D9/PLAN-LTS as the final one; those
   records remain untouched as history.
@@ -615,10 +639,9 @@ quotes in this entry are intentional).
 | 0 — primitives | `@me2em/core` | ✅ rc (1.0.0-rc.1) — published as npm `latest` (DR-6) |
 | 1 — react bindings | `@me2em/react` | ✅ alpha (0.1.0-alpha.2) |
 | 2 — protocol mechanisms | `@me2em/crypto` | ✅ rc (1.0.0-rc.1) — published as npm `latest` |
-| 2 — protocol mechanisms | `@me2em/pact` | ✅ rc (1.0.0-rc.3) — BL-58: incremental verification (Б2 closed), golden vectors |
+| 2 — protocol mechanisms | `@me2em/pact` | ✅ rc (1.0.0-rc.4) — BL-58: incremental verification (Б2 closed), golden vectors, rosterDigest |
 | 3 — verticals | `@me2em/messenger` | planned (BL-29, pilot: BeSafeChat) |
 | 3 — verticals | `@me2em/iot` | deferred (BL-30) |
-| — | `@me2em/server` | planned (reference NestJS, with BL-22) |
 
 Dependency rule: strictly upward (verticals → crypto → core); verticals
 never depend on each other. Every vertical keeps UI logic in
@@ -666,16 +689,57 @@ baseline normalized, `pnpm vectors` made explicit/idempotent).
   src (rc.3 review pass 2 audit, Н1). Mirror the scripts pattern:
   per-package `tsconfig.test.json` (`noEmit`, include `src` + `test`)
   chained into `typecheck`.
-- **Pact · roster fingerprint for transparency (BL-12/F8) · open · P3.**
-  `pactRoot` is evHash(GENESIS) per PACTS §2 — the deterministic pact
-  name, not a roster digest (audit Б3 claimed otherwise and was
-  rejected). If the transparency feed needs a roster fingerprint, ship
-  a separate field (`rosterDigest = SHA-256(JCS(roster))`) — never a
-  redefinition of `pactRoot`.
+- **Pact · roster fingerprint for transparency (BL-12/F8) · done
+  (rc.4, 2026-11-24).** `VerifyResult.rosterDigest =
+  b64url(SHA-256(JCS(roster)))` — a separate field on every successful
+  verify/snapshot; `pactRoot` stays evHash(GENESIS) per PACTS §2 (the
+  audit Б3 redefinition was rejected). Replica-safe (B-8): the
+  canonical roster carries no signature sets.
+- **Pact · fixtures/transport subpath exports · done (rc.5, 2026-11-24).**
+  Decision: export now — real delivery plugs its Channel from day one.
+  `@me2em/pact/transport` (Channel contract + OFFER/ACCEPT wire types +
+  ReferenceX3DH, lazy @me2em/crypto load) and `@me2em/pact/testing`
+  (deterministic fixtures) added to the exports map; integration
+  material, not protocol surface — may evolve within the rc line.
 - **Pact · zeroize helper for derived keys · declined.** JS gives no
   reliable zeroization (GC copies, string interning); best-effort
   wiping is security theater — the derivation module documents the
   policy instead (audit F-rc3-4).
-- **Pact · N-party assembly, FROST/BLS, nested pacts, binary transport,
-  roles, zombie expiry, `@me2em/server` profile** — tracked as F1–F9 in
-  PACTS.md §8 / specs/tz-pact.md §7 (v0.2–v1.0; unchanged by rc.2).
+- **Pact · v0.2 — N-party assembly · deferred.** The verifier is
+  N-party-generic since rc.1; v0.2 ships the assembly layer for
+  k-signature constitutions at scale. Driver: We2eM federation (M5) —
+  2 notaries run on the current rc; ≥3 notaries is the trigger
+  (`specs/plan-pact-rc3.md` §8). Per house convention the ТЗ (plan +
+  tz) comes first — do not improvise (P-4). 2026-11-24: architect
+  declined to confirm the M5 horizon now — the trigger stays in the
+  backlog; revisit when federation actually reaches ≥3 notaries.
+- **Pact · real-delivery decisions · deferred to the first product.**
+  2026-11-24 (architect decision): items from the pre-publish question
+  list are solved **during We2eM implementation**, not now. Recorded
+  scope: (a) first production `Channel` = **HTTP(S) relay** — chosen
+  for the We2eM messenger profile (real-time-ish delivery, NAT/mobile
+  reality, push-like notifications); built as product code on the
+  `@me2em/pact/transport` contract, not a protocol package (BL-22
+  logic); (b) prekey-bundle hosting/rotation for the X3DH
+  first-contact — product infra, needed for (a) to go live;
+  (c) MITM default on `ch` finalization — `im: 'pinned'` vs `bearer`
+  + blind PactRoot/JournalHead comparison in UX (mechanism shipped in
+  rc.4; product picks the default); (d) transparency feed (BL-12/13) —
+  hosting and operator, interface points shipped; (e) session adapter
+  (D9 `pact:sign` / D10 dual-signature) — whether MVP acts are signed
+  by pact keys only (as now) or over core sessions (unimplemented,
+  README §14 q7); (f) 1.0.0 stable freeze — open the PLAN-LTS §9–10
+  audit gate when the разминка settles.
+- **We2eM · product ТЗ tracking · here.** 2026-11-24 (architect
+  decision): the We2eM product ТЗ — IdP flow (BL-59 aftermath),
+  server profile (BL-22 aftermath), the deferred real-delivery items
+  above, and any revisit of the closed-as-moot `confirmKey` variant —
+  is tracked **in BACKLOG.md itself** (this file); owner: architect
+  (manual releases, product calls), no fixed dates — the work opens
+  with the first product implementation.
+- **Pact · F1–F9 deferred by design** — FROST/BLS, nested pacts, binary
+  transport, roles, zombie expiry, replication profile (product scope;
+  BL-22/`@me2em/server` annulled 2026-11-24), Session.create-adapter,
+  transparency feed (interface points shipped: `pactRoot`/`journalHead`
+  + `rosterDigest`), wallet/escrow — tracked in specs/tz-pact.md §10
+  (v0.2–v1.0; unchanged by rc.4).

@@ -22,7 +22,7 @@ export function renderHookCapturingError(
   type MockedConsoleError = {
     mockImplementation: (impl: (...args: unknown[]) => void) => void;
   };
-  const spy = (globalThis as { console?: { error?: MockedConsoleError } })
+  const spy = (globalThis as unknown as { console?: { error?: MockedConsoleError } })
     .console?.error;
   if (spy) {
     spy.mockImplementation((...args: unknown[]) => {

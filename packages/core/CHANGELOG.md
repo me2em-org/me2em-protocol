@@ -1,5 +1,56 @@
 # Changelog
 
+## [1.0.0-rc.10] — 2026-11-24
+
+Session lineage (`sid`, BL-06) — the additive core change that makes a
+renewed session revocable **wholesale**: renewal rotates `jti`, so a
+lineage could previously only be revoked token-by-token. Additive under
+§12.1 — no existing field, key or derivation changes; the token type
+stays `me2em/session/v1`; pre-rc.10 tokens verify unchanged.
+
+### Added
+- **`sid` — session lineage id (BL-06).** `Session.create` stamps a
+  random `sid` (UUID v4) into every new payload; `SessionOptions.sid`
+  pins or threads it — a renewal passes the previous session's `sid`,
+  keeping the lineage stable while `jti` rotates. `sid` is **never
+  derived from the handle** (cross-audience unlinkability: the same
+  lineage id leaks nothing about the principal or the audience).
+  Payload field order: `…, jti, sid`, then `hPath` last (mirrors the
+  rc.1 construction contract). `Session.sid` exposes the lineage id
+  (`undefined` on legacy tokens).
+- **Lineage revocation.** `verifyStateless` / `verifyAttested` consult
+  `RevocationChecker.isRevoked` **twice** when `sid` is present — once
+  with the token `jti`, once with the lineage `sid`; either hit throws
+  `REVOKED @ SESSION`. Revoking the `sid` disables the whole lineage
+  (current and future renewals); revoking a `jti` disables exactly one
+  token. Existing checker implementations compile and behave unchanged —
+  a store that only ever receives `jti` values never matches a `sid`
+  lookup. A present-but-malformed `sid` (non-string/empty) fails closed
+  with `MALFORMED @ FORMAT` at parse time.
+- **Golden vectors v5.** Session rows pin `sid` explicitly
+  (`vector-sid-{handle,subhandle}-0001`); key order and the live-smoke
+  contract (payload key parity, end-to-end verification) re-pinned in
+  `test/vectors.spec.ts`. New `sid` unit tests: default randomness,
+  renewal threading, lineage vs per-token revocation, legacy-token
+  verification (single `isRevoked` probe), malformed-`sid` rejection,
+  attested-path lineage revocation.
+
+### Fixed
+- **`generate-vectors.ts` no longer clobbers foreign sections.** The
+  script rewrote `specs/test-vectors.json` wholesale — running it
+  silently dropped the `jcs` section (rc.9, P0.8) and the `pact` section
+  (rc.3) and reset `vector_file_version` to 2. It now merge-writes like
+  the pact generator: core-owned fields are refreshed, foreign sections
+  and non-base notes are preserved verbatim, the version is a floor
+  (`max(current, 5)`). The rc.9 `derive_resource_key` group (8 rows) —
+  present in the file but never reproduced by the script, hence lost on
+  regeneration — is now generated through the public API
+  (`deriveResourceKey`); the regenerated rows are byte-identical to the
+  rc.9 file.
+- **`no-useless-assignment`** in `attestation.ts` subjectId parsing
+  (from the 0bfd889 hardening pass; caught by the lint gate on this
+  branch).
+
 ## [1.0.0-rc.9] — 2026-11-22
 
 P0.8 (decisions B1 + A4): the two additive core changes the pact ТЗ

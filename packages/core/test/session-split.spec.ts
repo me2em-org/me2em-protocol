@@ -20,7 +20,7 @@
 //           from earlier PRs; pinned here against regression.
 
 import { describe, it, expect } from 'vitest';
-import { Identity, Session } from '../src/index.js';
+import { Identity, Session, type Handle } from '../src/index.js';
 import {
   TEST_SEED,
   createTestHandle,
@@ -86,8 +86,10 @@ describe('PR-11 — Session construction surface (D6/3.5)', () => {
   it('MAX_DEPTH_EXCEEDED: a SubHandle remains a leaf (override preserved)', async () => {
     const { handle } = await createTestHandle('station-001');
     const sub = await handle.deriveSubHandle('connector-1');
+    // The leaf override declares zero parameters — call through the
+    // base `Handle` signature to reach the runtime block.
     await expectAttestationError(
-      sub.deriveSubHandle('deeper'),
+      (sub as Handle).deriveSubHandle('deeper'),
       'MAX_DEPTH_EXCEEDED',
       'FORMAT'
     );

@@ -1,7 +1,7 @@
 {
   "spec": "Me2eM core protocol",
   "spec_version": "1.0",
-  "vector_file_version": 4,
+  "vector_file_version": 5,
   "algorithm": "BIP39 (seed) + HKDF-SHA256 (RFC 5869, derivation) + Ed25519 (RFC 8032, signatures) + X25519 (RFC 7748, ECDH)",
   "notes": [
     "All derived keys are 32 bytes and used directly as Ed25519 seeds (RFC 8032).",
@@ -10,7 +10,8 @@
     "Session tokens: iat/exp come from the issuer clock at creation time; vectors pin the payload bytes and reproduce the signature via Ed25519 over those bytes.",
     "Fixed clock NOW = 1767225600 = 2026-01-01T00:00:00Z.",
     "Group derive_resource_key (rc.9): Handle.deriveResourceKey — HKDF-SHA256(handlePriv, salt=\"me2em/resource/{resourceType}/{resourceId}\", info=\"me2em/resource/v1[/e{epoch}][/r{revision}]\", L=32). Components are canonicalized NFKC → lowercase → trim and charset-validated; revision 0 is the valid locked state (unlike derivePassword/deriveChannelKey, where revision must be ≥ 1). Vector 6 (raw type 'Ｃhat-Msg ') must equal vector 1 after canonicalization.",
-    "Group pact (rc.3, F-rc3-5): pinned-ep accept/reject (D13) and chain-liveness (strict act.iat < exp) vectors; the pact section is a golden snapshot of @me2em/pact 1.0.0-rc.3, re-verified by packages/pact/test/vectors.spec.ts."
+    "Group pact (rc.3, F-rc3-5): pinned-ep accept/reject (D13) and chain-liveness (strict act.iat < exp) vectors; the pact section is a golden snapshot of @me2em/pact 1.0.0-rc.3, re-verified by packages/pact/test/vectors.spec.ts.",
+    "Group session (rc.10, BL-06): session payloads carry the lineage id `sid` — random at creation, stable across renewals, consulted by revocation alongside `jti`. Vectors pin `sid` explicitly; the field order is hId…jti, sid, then hPath last (mirrors Session.create)."
   ],
   "vectors": {
     "seed": [
@@ -119,6 +120,77 @@
         "expected_key_hex": "ad48c8b62b7b2ef701ebfdb3f9732e6d90bc75ca237ab47d3e3dfdafd020e254"
       }
     ],
+    "derive_resource_key": [
+      {
+        "description": "Resource key, unlocked static state: salt=\"me2em/resource/chat-msg/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\", info=\"me2em/resource/v1\" (epoch=1 omitted, revision=1 omitted)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
+      },
+      {
+        "description": "Resource key, locked state revision=0: info=\"me2em/resource/v1/r0\" — independent of revision 1 (blur/stub key)",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "revision": 0,
+        "expected_key_hex": "f98e2ff6cd5b5c9df4ba06aa199c2e4502cf8c57b8130e36fd51e7753926da7e"
+      },
+      {
+        "description": "Resource key, incremental subscription revision=2: info=\"me2em/resource/v1/r2\" — independent of revisions 0/1",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "stream",
+        "resource_id": "ch-42",
+        "revision": 2,
+        "expected_key_hex": "b5e71d16ee077e2c038c07fcc80603331903587b2160e6869afa2fb6e2931522"
+      },
+      {
+        "description": "Resource key, day epoch: info=\"me2em/resource/v1/e20261105\" — temporal anchor as monotonic integer",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "epoch": 20261105,
+        "expected_key_hex": "cf3da5dc836f559761d289a060274650f21f4508c49e3f9f7f5ab5a5f3190ca9"
+      },
+      {
+        "description": "Resource key, epoch+lock combo: info=\"me2em/resource/v1/e20261105/r0\" — epoch precedes revision in the info path",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "epoch": 20261105,
+        "revision": 0,
+        "expected_key_hex": "348c38f53837ae576912431a8aba3e17d625a042097bbfb1f29d5df08e3889f9"
+      },
+      {
+        "description": "Canonicalization: raw inputs \"Ｃhat-Msg \" (U+FF2C fullwidth C, uppercase M, trailing space) and \"e3b0…\" → NFKC→lowercase→trim → same key as vector #1",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "Ｃhat-Msg ",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
+      },
+      {
+        "description": "Domain separation: same resource_id, different resource_type (\"file\") → different key",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "file",
+        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_key_hex": "81ef293ad96856d4e31c27585b89b16ee6c6a3d320a1334f330920b96796a170"
+      },
+      {
+        "description": "Domain separation: same resource_type, different resource_id (\"msg-105\") → different key",
+        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "handle_name": "work",
+        "resource_type": "chat-msg",
+        "resource_id": "msg-105",
+        "expected_key_hex": "69678806810556e7018f9f7814e11fb4a0c9f4cb86aaf6af25da37697a9fe311"
+      }
+    ],
     "derive_shared_secret": [
       {
         "description": "X25519 (Ed25519→Montgomery) + HKDF-SHA256(ikm=rawECDH, salt=sorted(64B both public keys), info=\"me2em/p2p-channel/v2\", L=32)",
@@ -205,7 +277,7 @@
     ],
     "session_handle": [
       {
-        "description": "Handle session token; payload pinned (Session.create stamps iat from the wall clock). Ed25519 over the exact payload bytes",
+        "description": "Handle session token; payload pinned incl. the lineage sid (Session.create stamps iat from the wall clock). Ed25519 over the exact payload bytes",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "audience": "ev-app.com",
@@ -215,13 +287,14 @@
         "ttl": 1800,
         "iat": 1767225600,
         "jti": "vector-session-handle-0001",
-        "expected_payload_json": "{\"hId\":\"HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M\",\"hNm\":\"work\",\"aud\":\"ev-app.com\",\"scp\":[\"charge:start\"],\"exp\":1767227400,\"iat\":1767225600,\"jti\":\"vector-session-handle-0001\"}",
-        "expected_token": "eyJoSWQiOiJIR2wwbUdRc1dnaVhzR1NTRW53bUdselU1bG9JOEl4NUxvcE5vZW1pSC1NIiwiaE5tIjoid29yayIsImF1ZCI6ImV2LWFwcC5jb20iLCJzY3AiOlsiY2hhcmdlOnN0YXJ0Il0sImV4cCI6MTc2NzIyNzQwMCwiaWF0IjoxNzY3MjI1NjAwLCJqdGkiOiJ2ZWN0b3Itc2Vzc2lvbi1oYW5kbGUtMDAwMSJ9.kNzVjPg5Vg5bV80sYQRJG3d5mN0VqMgE03nMzIvCwSo2X7wreomjvUdHVpzJUW_TwGhldq8Vgfi5P1ZzOrCxCw"
+        "sid": "vector-sid-handle-0001",
+        "expected_payload_json": "{\"hId\":\"HGl0mGQsWgiXsGSSEnwmGlzU5loI8Ix5LopNoemiH-M\",\"hNm\":\"work\",\"aud\":\"ev-app.com\",\"scp\":[\"charge:start\"],\"exp\":1767227400,\"iat\":1767225600,\"jti\":\"vector-session-handle-0001\",\"sid\":\"vector-sid-handle-0001\"}",
+        "expected_token": "eyJoSWQiOiJIR2wwbUdRc1dnaVhzR1NTRW53bUdselU1bG9JOEl4NUxvcE5vZW1pSC1NIiwiaE5tIjoid29yayIsImF1ZCI6ImV2LWFwcC5jb20iLCJzY3AiOlsiY2hhcmdlOnN0YXJ0Il0sImV4cCI6MTc2NzIyNzQwMCwiaWF0IjoxNzY3MjI1NjAwLCJqdGkiOiJ2ZWN0b3Itc2Vzc2lvbi1oYW5kbGUtMDAwMSIsInNpZCI6InZlY3Rvci1zaWQtaGFuZGxlLTAwMDEifQ.vw1HsLTPX6ayI-gnh0EO4wSpnoCtwhLFzUD9sn3O44nlK0uu0ItuH3SWtz6w6D-zHfDFH2l4HEVoiHZvAzKFCw"
       }
     ],
     "session_subhandle": [
       {
-        "description": "SubHandle session token; hPath appended after base fields (normative key order)",
+        "description": "SubHandle session token; sid after jti, hPath appended last (normative key order)",
         "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
         "handle_name": "work",
         "sub_name": "connector-1",
@@ -232,79 +305,9 @@
         "ttl": 1800,
         "iat": 1767225600,
         "jti": "vector-session-subhandle-0001",
-        "expected_payload_json": "{\"hId\":\"IDPFLxBkwKhiALdyWnmKYxa-bueojoFK9R1B6lfTvpg\",\"hNm\":\"connector-1\",\"aud\":\"ev-app.com\",\"scp\":[\"charge:start\"],\"exp\":1767227400,\"iat\":1767225600,\"jti\":\"vector-session-subhandle-0001\",\"hPath\":[\"work\",\"connector-1\"]}",
-        "expected_token": "eyJoSWQiOiJJRFBGTHhCa3dLaGlBTGR5V25tS1l4YS1idWVvam9GSzlSMUI2bGZUdnBnIiwiaE5tIjoiY29ubmVjdG9yLTEiLCJhdWQiOiJldi1hcHAuY29tIiwic2NwIjpbImNoYXJnZTpzdGFydCJdLCJleHAiOjE3NjcyMjc0MDAsImlhdCI6MTc2NzIyNTYwMCwianRpIjoidmVjdG9yLXNlc3Npb24tc3ViaGFuZGxlLTAwMDEiLCJoUGF0aCI6WyJ3b3JrIiwiY29ubmVjdG9yLTEiXX0.ZULFAFrH3MvBZ6exkOFcijPlvODlEM_E-UxYzwPJaqfG7ML8USb755zmkdPe1l47A_d3DsRRiaULg9mmMrRRCQ"
-      }
-    ],
-    "derive_resource_key": [
-      {
-        "description": "Resource key, unlocked static state: salt=\"me2em/resource/chat-msg/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\", info=\"me2em/resource/v1\" (epoch=1 omitted, revision=1 omitted)",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "chat-msg",
-        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
-      },
-      {
-        "description": "Resource key, locked state revision=0: info=\"me2em/resource/v1/r0\" — independent of revision 1 (blur/stub key)",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "chat-msg",
-        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "revision": 0,
-        "expected_key_hex": "f98e2ff6cd5b5c9df4ba06aa199c2e4502cf8c57b8130e36fd51e7753926da7e"
-      },
-      {
-        "description": "Resource key, incremental subscription revision=2: info=\"me2em/resource/v1/r2\" — independent of revisions 0/1",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "stream",
-        "resource_id": "ch-42",
-        "revision": 2,
-        "expected_key_hex": "b5e71d16ee077e2c038c07fcc80603331903587b2160e6869afa2fb6e2931522"
-      },
-      {
-        "description": "Resource key, day epoch: info=\"me2em/resource/v1/e20261105\" — temporal anchor as monotonic integer",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "chat-msg",
-        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "epoch": 20261105,
-        "expected_key_hex": "cf3da5dc836f559761d289a060274650f21f4508c49e3f9f7f5ab5a5f3190ca9"
-      },
-      {
-        "description": "Resource key, epoch+lock combo: info=\"me2em/resource/v1/e20261105/r0\" — epoch precedes revision in the info path",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "chat-msg",
-        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "epoch": 20261105,
-        "revision": 0,
-        "expected_key_hex": "348c38f53837ae576912431a8aba3e17d625a042097bbfb1f29d5df08e3889f9"
-      },
-      {
-        "description": "Canonicalization: raw inputs \"Ｃhat-Msg \" (U+FF2C fullwidth C, uppercase M, trailing space) and \"e3b0…\" → NFKC→lowercase→trim → same key as vector #1",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "Ｃhat-Msg ",
-        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "expected_key_hex": "d6e1ef252e8ebb086a6288ae90e2395293528a85020e8f411aa6f582dd7c1d03"
-      },
-      {
-        "description": "Domain separation: same resource_id, different resource_type (\"file\") → different key",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "file",
-        "resource_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "expected_key_hex": "81ef293ad96856d4e31c27585b89b16ee6c6a3d320a1334f330920b96796a170"
-      },
-      {
-        "description": "Domain separation: same resource_type, different resource_id (\"msg-105\") → different key",
-        "seed_hex": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
-        "handle_name": "work",
-        "resource_type": "chat-msg",
-        "resource_id": "msg-105",
-        "expected_key_hex": "69678806810556e7018f9f7814e11fb4a0c9f4cb86aaf6af25da37697a9fe311"
+        "sid": "vector-sid-subhandle-0001",
+        "expected_payload_json": "{\"hId\":\"IDPFLxBkwKhiALdyWnmKYxa-bueojoFK9R1B6lfTvpg\",\"hNm\":\"connector-1\",\"aud\":\"ev-app.com\",\"scp\":[\"charge:start\"],\"exp\":1767227400,\"iat\":1767225600,\"jti\":\"vector-session-subhandle-0001\",\"sid\":\"vector-sid-subhandle-0001\",\"hPath\":[\"work\",\"connector-1\"]}",
+        "expected_token": "eyJoSWQiOiJJRFBGTHhCa3dLaGlBTGR5V25tS1l4YS1idWVvam9GSzlSMUI2bGZUdnBnIiwiaE5tIjoiY29ubmVjdG9yLTEiLCJhdWQiOiJldi1hcHAuY29tIiwic2NwIjpbImNoYXJnZTpzdGFydCJdLCJleHAiOjE3NjcyMjc0MDAsImlhdCI6MTc2NzIyNTYwMCwianRpIjoidmVjdG9yLXNlc3Npb24tc3ViaGFuZGxlLTAwMDEiLCJzaWQiOiJ2ZWN0b3Itc2lkLXN1YmhhbmRsZS0wMDAxIiwiaFBhdGgiOlsid29yayIsImNvbm5lY3Rvci0xIl19.hE0rUh_1YrWDTwxSUHWSLQd3YYYzKKgP7vnBOUiR4UlER7k9AZv7h4_ce6ZcJxp6IDiK_QnRx64YmFGqJM26DA"
       }
     ]
   },

@@ -78,7 +78,7 @@ describe('encryptChannelMessage → decryptChannelMessage', () => {
   it('encrypt seq=0,1,2 → decrypt in order works', async () => {
     const secret = randomSecret();
     const channel = await establishChannel(secret, 'seq-test');
-    const msgs: Awaited<typeof encryptChannelMessage>[] = [];
+    const msgs: Awaited<ReturnType<typeof encryptChannelMessage>>[] = [];
 
     for (let i = 0; i < 3; i++) {
       msgs.push(await encryptChannelMessage(channel, i, new Uint8Array([i])));
@@ -163,7 +163,7 @@ describe('encryptChannelMessage → decryptChannelMessage', () => {
   it('replay window eviction: after 1001 messages the oldest sequence can replay (documented trade-off)', async () => {
     const secret = randomSecret();
     const channel = await establishChannel(secret, 'evict-test');
-    const msgs: Awaited<typeof encryptChannelMessage>[] = [];
+    const msgs: Awaited<ReturnType<typeof encryptChannelMessage>>[] = [];
     for (let i = 0; i <= 1000; i++) {
       msgs.push(
         await encryptChannelMessage(channel, i, new Uint8Array([i % 256]))

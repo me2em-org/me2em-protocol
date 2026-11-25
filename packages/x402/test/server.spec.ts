@@ -1,6 +1,7 @@
 // packages/x402/test/server.spec.ts
 import { describe, expect, it } from 'vitest';
-import type { FacilitatorClient, X402PaymentPayload, X402PaymentRequired, X402SettleResponse } from '@me2em/core';
+import type { X402PaymentPayload, X402PaymentRequired, X402SettleResponse } from '@me2em/core';
+import type { FacilitatorClient } from '../src/facilitator.js';
 import { decodePaymentRequired, decodeSettleResponse } from '../src/codec.js';
 import { X402ConfigError, X402Error } from '../src/errors.js';
 import {

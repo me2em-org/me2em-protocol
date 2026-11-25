@@ -4,11 +4,20 @@
 // LUT fallback, blockTime fallback, chain mismatch, SPL → WRONG_ASSET,
 // idempotency, v0/v1 fixtures.
 import { describe, it, expect, vi } from 'vitest';
-import type { PaymentRequest } from '@me2em/core';
+import type { PaymentRequest, PaymentResult } from '@me2em/core';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { base58, base64 } from '@scure/base';
 import { SolanaPaymentAdapter } from '../src/verify.js';
 import { GOLDEN_ADDRESSES } from './goldens.js';
+
+/** Narrows a PaymentResult to the failure branch for `.reason` asserts —
+ * TS cannot narrow through expect(); the runtime throw doubles as the guard. */
+function failureOf(result: PaymentResult): Extract<PaymentResult, { status: 'failure' }> {
+  if (result.status !== 'failure') {
+    throw new Error(`expected a failure result, got status=${String(result.status)}`);
+  }
+  return result;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers — build minimal ParsedTransactionWithInstructions fixtures
@@ -334,7 +343,7 @@ describe('SolanaPaymentVerifier — 7 steps', () => {
         fetch: mockFetch,
       });
       const result = await adapter.verifyPayment('sig123', makeRequest({ amount: '1.0', asset: 'usdc' }));
-      expect(result.reason).toBe('WRONG_ASSET');
+      expect(failureOf(result).reason).toBe('WRONG_ASSET');
     });
 
     it('accepts SOL (asset: sol) — status success', async () => {
@@ -388,7 +397,7 @@ describe('SolanaPaymentVerifier — 7 steps', () => {
         fetch: mockFetch,
       });
       const result = await adapter.verifyPayment('sig123', makeRequest({ asset: 'usdc' }));
-      expect(result.reason).toBe('WRONG_ASSET');
+      expect(failureOf(result).reason).toBe('WRONG_ASSET');
     });
   });
 
@@ -610,7 +619,7 @@ describe('verifyPayment — LUT containment (loadedAddresses + manual fallback)'
     });
     const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
     const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
-    expect(result.reason).toBe('REFERENCE_MISMATCH');
+    expect(failureOf(result).reason).toBe('REFERENCE_MISMATCH');
     expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(0);
   });
 
@@ -673,7 +682,7 @@ describe('verifyPayment — LUT containment (loadedAddresses + manual fallback)'
     });
     const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
     const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
-    expect(result.reason).toBe('REFERENCE_MISMATCH');
+    expect(failureOf(result).reason).toBe('REFERENCE_MISMATCH');
     expect(countRpcMethod(mockFetch, 'getAccountInfo')).toBe(1);
   });
 
@@ -698,7 +707,7 @@ describe('verifyPayment — LUT containment (loadedAddresses + manual fallback)'
     });
     const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
     const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
-    expect(result.reason).toBe('REFERENCE_MISMATCH');
+    expect(failureOf(result).reason).toBe('REFERENCE_MISMATCH');
   });
 
   it('manual fallback: corrupted LUT data → fail-closed mismatch', async () => {
@@ -722,7 +731,7 @@ describe('verifyPayment — LUT containment (loadedAddresses + manual fallback)'
     });
     const adapter = new SolanaPaymentAdapter({ network: 'devnet', endpoint: 'http://localhost:8899', fetch: mockFetch });
     const result = await adapter.verifyPayment('sig123', makeRequest({ reference: REFERENCE_B58 }));
-    expect(result.reason).toBe('REFERENCE_MISMATCH');
+    expect(failureOf(result).reason).toBe('REFERENCE_MISMATCH');
   });
 
   it('caches resolved LUTs: a second verification does not re-fetch the account', async () => {

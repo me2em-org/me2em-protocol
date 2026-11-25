@@ -26,9 +26,10 @@
     "prepublishOnly": "pnpm run build",
     "test": "vitest run",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "build-docs": "pnpm --filter \"@me2em/x402^...\" run build && typedoc",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "typecheck:tests": "tsc -p tsconfig.test.json"
   },
   "license": "Apache-2.0",
   "engines": {

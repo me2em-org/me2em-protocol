@@ -91,7 +91,7 @@ describe('rotateChannel', () => {
     const ch0 = await establishChannel(secret, 'fs-complete');
 
     // Encrypt several messages in epoch 0
-    const messages: Awaited<typeof encryptChannelMessage>[] = [];
+    const messages: Awaited<ReturnType<typeof encryptChannelMessage>>[] = [];
     for (let i = 0; i < 5; i++) {
       messages.push(await encryptChannelMessage(ch0, i, new Uint8Array([i])));
     }

@@ -12,7 +12,7 @@ import { base58, base64 } from '@scure/base';
 import { getTransactionDecoder, getCompiledTransactionMessageDecoder, type Address } from '@solana/kit';
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { MEMO_PROGRAM_ADDRESS } from '@solana-program/memo';
-import type { PaymentRequest, WalletDescriptor } from '@me2em/core';
+import type { PaymentRequest, PaymentResult, WalletDescriptor } from '@me2em/core';
 import { pay, solToLamports } from '../src/pay.js';
 import { RpcClient } from '../src/rpc.js';
 import { SolanaPaymentAdapter } from '../src/verify.js';
@@ -20,6 +20,14 @@ import { SolanaWalletTree } from '../src/wallet-tree.js';
 import { createPaymentReference } from '../src/reference.js';
 import { SOLANA_NATIVE_ASSET } from '../src/url.js';
 import { GOLDEN_ADDRESSES, TV2_SEED } from './goldens.js';
+
+/** Narrows a PaymentResult to the failure branch for `.reason` asserts. */
+function failureOf(result: PaymentResult): Extract<PaymentResult, { status: 'failure' }> {
+  if (result.status !== 'failure') {
+    throw new Error(`expected a failure result, got status=${String(result.status)}`);
+  }
+  return result;
+}
 
 const CHAIN = 'solana:devnet';
 const FROM_ADDRESS = GOLDEN_ADDRESSES[0];
@@ -64,9 +72,23 @@ interface ResponderResult {
  * (kit 8.6: transaction = { messageBytes, signatures }; the message
  * decoder exposes staticAccounts / accountIndices / header counts).
  */
-function decodeWire(wire: string) {
+/** Structural face of the decoded legacy message these asserts use —
+ * kit's CompiledTransactionMessage union hides `instructions` behind
+ * version discriminants the tests never branch on (the wire here is
+ * always the legacy v0 shape produced by sendTransaction). */
+interface WireMessage {
+  staticAccounts: readonly Address[];
+  header: { numRequiredSignatures: number; numReadonlySignerAccounts: number; numReadonlyNonSignerAccounts: number };
+  instructions: readonly {
+    programAddressIndex: number;
+    accountIndices: readonly number[];   // always present on the legacy compiled shape
+    data: Uint8Array;
+  }[];
+}
+
+function decodeWire(wire: string): WireMessage {
   const tx = getTransactionDecoder().decode(base64.decode(wire));
-  return getCompiledTransactionMessageDecoder().decode(tx.messageBytes);
+  return getCompiledTransactionMessageDecoder().decode(tx.messageBytes) as unknown as WireMessage;
 }
 
 /** Method-routing mock transport — fetch injection, no module mocks (В-6). */
@@ -424,8 +446,7 @@ describe.skipIf(!process.env.ME2EM_DEVNET_PAY_SEED)(
 
       const txRef2 = await adapter.pay(from, request, { seed });
       const replay = await adapter.verifyPayment(txRef2, request);
-      expect(replay.status).toBe('failure');
-      expect(replay.reason).toBe('REPLAYED');
+      expect(failureOf(replay).reason).toBe('REPLAYED');
     }, 120_000);
   }
 );

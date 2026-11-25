@@ -294,6 +294,7 @@ describe('specs/test-vectors.json golden test', () => {
             scopes: v.scopes as string[],
             ttl: v.ttl as number,
             sessionId: v.jti as string,
+            sid: v.sid as string,
           });
           const livePayloadB64 = live.token.split('.')[0];
           const livePayload = JSON.parse(
@@ -302,12 +303,14 @@ describe('specs/test-vectors.json golden test', () => {
           expect(Object.keys(livePayload)).toEqual(Object.keys(payload));
           expect(livePayload.hId).toBe(payload.hId);
           expect(livePayload.jti).toBe(payload.jti);
+          expect(livePayload.sid).toBe(payload.sid);
           expect((livePayload.exp as number) - (livePayload.iat as number))
             .toBe(v.ttl);
           const verified = await Session.verifyStateless(
             live.token, identity, v.audience as string
           );
           expect(verified.sessionId).toBe(v.jti);
+          expect(verified.sid).toBe(payload.sid);
         });
       }
     });

@@ -258,14 +258,18 @@ describe('1.8.x — getSubMetadata deep copy', () => {
 
     const m1 = sub.getSubMetadata();
     (m1.allowedScopes as string[]).push('evil');
-    m1.nested.arr[0] = 999;
-    (m1.nested.arr[1] as { deep: unknown }).deep = 'tampered';
+    // `nested` is caller-defined metadata (opaque to the type system) —
+    // the deep-copy contract is asserted through local casts.
+    const nested1 = m1.nested as { arr: unknown[] };
+    nested1.arr[0] = 999;
+    (nested1.arr[1] as { deep: unknown }).deep = 'tampered';
 
     const m2 = sub.getSubMetadata();
     expect(m2.allowedScopes).toEqual(['a']);
     expect(m2.allowedAudiences).toEqual(['app.com']);
-    expect(m2.nested.arr[0]).toBe(1);
-    expect(m2.nested.arr[1]).toEqual({ deep: true });
+    const nested2 = m2.nested as { arr: unknown[] };
+    expect(nested2.arr[0]).toBe(1);
+    expect(nested2.arr[1]).toEqual({ deep: true });
   });
 
   it('non-plain values (Date) are shared by reference and documented as such', async () => {

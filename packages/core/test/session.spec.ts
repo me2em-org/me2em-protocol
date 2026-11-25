@@ -1,7 +1,7 @@
 // Session unit tests
 import { describe, it, expect } from 'vitest';
-import { Identity, Session, type RevocationChecker } from '../src/index.js';
-import { base64urlDecode } from '../src/util.js';
+import { Identity, Session, type Handle, type RevocationChecker } from '../src/index.js';
+import { base64urlDecode, base64urlEncode } from '../src/util.js';
 import { expectAttestationError, sessionFromVerified, tamperPayload, tamperPayloadJson } from './test-utils.js';
 
 const testSeed = new Uint8Array(64).fill(42);
@@ -629,6 +629,129 @@ describe('Handle.deriveSharedSecret', () => {
 
     expect(ab).not.toEqual(ac);   // different peer → different secret
     expect(ab).toEqual(ba);       // symmetric: order-independent
+  });
+});
+
+describe('Session lineage sid (BL-06, since rc.10)', () => {
+  const utf8 = (s: string) => new TextEncoder().encode(s);
+
+  /** Signs an arbitrary payload object through the handle — builds legacy/malformed tokens. */
+  async function signedToken(
+    handle: Handle, payload: Record<string, unknown>
+  ): Promise<string> {
+    const bytes = utf8(JSON.stringify(payload));
+    const sig = await handle.sign(bytes);
+    return `${base64urlEncode(bytes)}.${base64urlEncode(sig)}`;
+  }
+
+  async function makeHandle(name: string) {
+    const identity = await Identity.fromSeed(testSeed);
+    return { identity, handle: await identity.deriveHandle(name) };
+  }
+
+  it('create stamps a random sid; two sessions of the same handle differ (not derived from the handle)', async () => {
+    const { handle } = await makeHandle('sid-random');
+    const a = await Session.create(handle, { audience: 'app', scopes: ['read'], ttl: 600 });
+    const b = await Session.create(handle, { audience: 'app', scopes: ['read'], ttl: 600 });
+
+    expect(a.sid).toMatch(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/);
+    expect(b.sid).toMatch(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/);
+    expect(a.sid).not.toBe(b.sid);
+    expect(a.sid).not.toBe(a.sessionId);
+  });
+
+  it('options.sid pins the lineage id (renewal threading)', async () => {
+    const { handle } = await makeHandle('sid-pinned');
+    // renewal: same sid, fresh jti
+    const first = await Session.create(handle, {
+      audience: 'app', scopes: ['read'], ttl: 600, sessionId: 'jti-r1', sid: 'lineage-1',
+    });
+    const renewed = await Session.create(handle, {
+      audience: 'app', scopes: ['read'], ttl: 600, sessionId: 'jti-r2', sid: 'lineage-1',
+    });
+    expect(first.sid).toBe('lineage-1');
+    expect(renewed.sid).toBe('lineage-1');
+    expect(renewed.sessionId).toBe('jti-r2');
+  });
+
+  it('payload key order: sid follows jti; hPath (SubHandle) is still the last key', async () => {
+    const handle = (await makeHandle('sid-order')).handle;
+    const session = await Session.create(handle, { audience: 'app', scopes: ['read'], ttl: 600 });
+    const payload = JSON.parse(
+      new TextDecoder().decode(base64urlDecode(session.token.split('.')[0]))
+    ) as Record<string, unknown>;
+    expect(Object.keys(payload)).toEqual(['hId', 'hNm', 'aud', 'scp', 'exp', 'iat', 'jti', 'sid']);
+
+    const sub = await handle.deriveSubHandle('connector-1');
+    const subSession = await Session.create(sub, { audience: 'app', scopes: ['read'], ttl: 600 });
+    const subPayload = JSON.parse(
+      new TextDecoder().decode(base64urlDecode(subSession.token.split('.')[0]))
+    ) as Record<string, unknown>;
+    expect(Object.keys(subPayload)).toEqual(['hId', 'hNm', 'aud', 'scp', 'exp', 'iat', 'jti', 'sid', 'hPath']);
+  });
+
+  it('revoking the sid disables the whole lineage; revoking a jti disables one token', async () => {
+    const { identity, handle } = await makeHandle('sid-revoke');
+    const checker = new MockRevocationChecker();
+    const s1 = await Session.create(handle, {
+      audience: 'app', scopes: ['read'], ttl: 600, sessionId: 'jti-r1', sid: 'lineage-1',
+    });
+    const s2 = await Session.create(handle, {
+      audience: 'app', scopes: ['read'], ttl: 600, sessionId: 'jti-r2', sid: 'lineage-1',
+    });
+
+    await Session.verifyStateless(s1.token, identity, 'app', checker);
+    await Session.verifyStateless(s2.token, identity, 'app', checker);
+
+    checker.revoke('jti-r1'); // one token
+    await expectAttestationError(
+      Session.verifyStateless(s1.token, identity, 'app', checker), 'REVOKED', 'SESSION'
+    );
+    await Session.verifyStateless(s2.token, identity, 'app', checker);
+
+    checker.revoke('lineage-1'); // the whole lineage
+    await expectAttestationError(
+      Session.verifyStateless(s2.token, identity, 'app', checker), 'REVOKED', 'SESSION'
+    );
+  });
+
+  it('legacy token without sid verifies; the checker is probed with the jti only', async () => {
+    const { identity, handle } = await makeHandle('sid-legacy');
+    const now = Math.floor(Date.now() / 1000);
+    const token = await signedToken(handle, {
+      hId: handle.getId(), hNm: 'sid-legacy', aud: 'app', scp: ['read'],
+      exp: now + 600, iat: now, jti: 'legacy-jti-1',
+    });
+
+    const calls: string[] = [];
+    const checker: RevocationChecker = {
+      isRevoked: async (id) => { calls.push(id); return false; },
+    };
+    const s = await Session.verifyStateless(token, identity, 'app', checker);
+    expect(s.sid).toBeUndefined();
+    expect(s.sessionId).toBe('legacy-jti-1');
+    expect(calls).toEqual(['legacy-jti-1']);
+  });
+
+  it('malformed sid (non-string / empty) fails closed with MALFORMED', async () => {
+    const { identity, handle } = await makeHandle('sid-malformed');
+    const now = Math.floor(Date.now() / 1000);
+    const base = {
+      hId: handle.getId(), hNm: 'sid-malformed', aud: 'app', scp: ['read'],
+      exp: now + 600, iat: now, jti: 'jti-m',
+    };
+    await expectAttestationError(
+      Session.verifyStateless(
+        await signedToken(handle, { ...base, sid: 42 }), identity, 'app'
+      ),
+      'MALFORMED', 'FORMAT'
+    );
+    await expectAttestationError(
+      Session.verifyStateless(
+        await signedToken(handle, { ...base, sid: '' }), identity, 'app'
+      ),
+      'MALFORMED', 'FORMAT'
+    );
   });
 });
 

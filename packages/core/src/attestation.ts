@@ -308,7 +308,7 @@ export class Attestation {
     // the FORMAT gate here instead of drifting into SUBJECT_MISMATCH
     // comparisons downstream (all core consumers compare subjectId, so
     // this is defense in depth, not a security fix).
-    let subjectIdBytes: Uint8Array | null = null;
+    let subjectIdBytes: Uint8Array | null;
     try {
       subjectIdBytes = base64urlDecode(payload.subjectId);
     } catch {

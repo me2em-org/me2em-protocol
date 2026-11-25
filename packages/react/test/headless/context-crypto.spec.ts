@@ -56,12 +56,13 @@ describe('context-crypto', () => {
     const salt = new Uint8Array(32);
     const key = await deriveCacheKey(material, salt);
 
-    const badEnvelope: ContextEnvelope = {
+    // deliberately wrong-typed (v: 2) — the runtime guard must reject it
+    const badEnvelope = {
       v: 2,
       salt: 'dGVzdA==',
       iv: 'dGVzdA==',
       ct: 'dGVzdA==',
-    };
+    } as unknown as ContextEnvelope;
 
     await expect(decryptContext(key, badEnvelope)).rejects.toThrow('Unsupported envelope version');
   });

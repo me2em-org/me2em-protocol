@@ -290,6 +290,17 @@ describe('verifyAttested: negative cases', () => {
     );
   });
 
+  it('13b. Ревокация lineage `sid` (BL-06, rc.10) — гасит весь lineage', async () => {
+    const { A, B, session } = await makeSubSession();
+
+    const mockS = new MockRevocationChecker();
+    mockS.revoke(session.sid!); // revoking the lineage id, not the jti
+    await expectCode(
+      Session.verifyAttested(session.token, rootPub, [A.token, B.token], 'app.com', mockS),
+      'REVOKED', 'SESSION'
+    );
+  });
+
   it('14. SUBJECT_MISMATCH: B от другого субхэндла', async () => {
     const handle = await identity.deriveHandle('station-001');
     const A = await identity.attestHandle('station-001', grantA);

@@ -70,9 +70,9 @@ describe('pact key derivation — M1.2', () => {
 
   it('rejects invalid arguments with MALFORMED @ derive', () => {
     expect(() => derivePactKey(new Uint8Array(0), PID, CH, 0)).toThrow(PactError);
-    expect(() => derivePactKey(bytes(32, 1), b64urlEncode(bytes(15)), CH, 0)).toThrow(PactError);
+    expect(() => derivePactKey(bytes(32, 1), b64urlEncode(bytes(15, 0)), CH, 0)).toThrow(PactError);
     expect(() => derivePactKey(bytes(32, 1), 'not!b64!!', CH, 0)).toThrow(PactError);
-    expect(() => derivePactKey(bytes(32, 1), PID, b64urlEncode(bytes(31)), 0)).toThrow(PactError);
+    expect(() => derivePactKey(bytes(32, 1), PID, b64urlEncode(bytes(31, 0)), 0)).toThrow(PactError);
     expect(() => derivePactKey(bytes(32, 1), PID, ZERO32.slice(0, -1) + 'B', 0)).toThrow(PactError);
     expect(() => derivePactKey(ANCHOR, 42 as never, CH, 0)).toThrow(PactError); // pid non-string
     expect(() => derivePactKey(ANCHOR, PID, 42 as never, 0)).toThrow(PactError); // ch non-string
