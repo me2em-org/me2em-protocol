@@ -31,6 +31,12 @@ grep -H '"version"' packages/{core,crypto,pact,react,solana,x402}/package.json
 # ↑ these MUST match the release batch — the npm publish banner prints
 # the SAME version, so a stale tree is visible right there (publishing
 # a stale rc.x ships the wrong code to `latest`)
+grep -rn "workspace:" packages/*/package.json package.json
+# ↑ MUST print nothing: pnpm publish rewrote `workspace:^` at pack time,
+# npm publish does NOT — the pnpm-only protocol in a published manifest
+# is un-installable by npm consumers (EUNSUPPORTEDPROTOCOL; the react
+# rc.5 blocker). Cross-package refs carry real semver ranges, and
+# pnpm-workspace.yaml `linkWorkspacePackages: true` keeps local linking.
 corepack pnpm install
 corepack pnpm -r typecheck && corepack pnpm -r test && corepack pnpm -r lint
 corepack pnpm -r build                     # dist/ fresh everywhere
@@ -50,6 +56,36 @@ tests/benches — `files` in each package.json):
 ```sh
 cd packages/pact && npm pack --dry-run
 ```
+
+## Pack smoke (offline, before every publish)
+
+Full consumer simulation without the registry — pack tarballs, install
+them into a clean scratch project, import the public surface:
+
+```sh
+rm -rf /tmp/pack-stage /tmp/pack-smoke && mkdir -p /tmp/pack-stage /tmp/pack-smoke
+for p in core pact react; do (cd packages/$p && npm pack --ignore-scripts --pack-destination /tmp/pack-stage); done
+
+cd /tmp/pack-smoke && npm init -y >/dev/null
+# one tarball at a time, in peer order — a combined install can mask
+# per-package manifest errors
+npm install /tmp/pack-stage/me2em-core-*.tgz
+npm install /tmp/pack-stage/me2em-pact-*.tgz
+npm install /tmp/pack-stage/me2em-react-*.tgz
+npm ls --depth=0
+
+node --input-type=module -e "
+import { canonicalizeToString } from '@me2em/core';
+console.log('core JCS:', canonicalizeToString({ b: 1, a: [true, null, 'x'] }));
+console.log('transport:', Object.keys(await import('@me2em/pact/transport')));
+console.log('testing:', Object.keys(await import('@me2em/pact/testing')).length, 'exports');
+console.log('react:', Object.keys(await import('@me2em/react')).length, 'exports');"
+```
+
+Expect: JCS `{"a":[true,null,"x"],"b":1}`; transport lists
+`ReferenceX3DH` and `channelClock`; testing ~11 fixtures; react ~13
+exports. `npm ls` shows `@me2em/crypto` as UNMET OPTIONAL (by design —
+lazy load) and `react` as an auto-installed peer.
 
 ## Publish
 
