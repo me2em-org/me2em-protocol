@@ -1,9 +1,10 @@
 packages:
   - 'packages/*'
-# workspace members satisfy plain semver ranges too (manifests carry real
-# ranges since the npm-publish fix — npm publish does not rewrite
-# `workspace:^`, so deps use real versions and pnpm links them locally)
-linkWorkspacePackages: true
+# cross-package refs keep the workspace: protocol — dev always links the
+# CURRENT workspace member, even when packages version at different
+# rates. pnpm pack/publish rewrite it to real semver at pack time;
+# npm publish cannot ship the protocol — the release flow packs with
+# pnpm and publishes the stamped tarballs (see RELEASE.md).
 overrides:
   brace-expansion: ^5.0.13
   markdown-it: ^14.3.3

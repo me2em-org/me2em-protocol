@@ -35,7 +35,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@me2em/core": "^1.0.0-rc.4",
+    "@me2em/core": "workspace:^",
     "@noble/curves": "^1.8.1",
     "@noble/hashes": "^1.8.0",
     "@scure/base": "^2.4.0",

@@ -79,7 +79,7 @@ importers:
   packages/crypto:
     dependencies:
       '@me2em/core':
-        specifier: ^1.0.0-rc.4
+        specifier: workspace:^
         version: link:../core
       '@noble/curves':
         specifier: ^1.8.1
@@ -121,10 +121,10 @@ importers:
   packages/pact:
     devDependencies:
       '@me2em/core':
-        specifier: ^1.0.0-rc.10
+        specifier: workspace:^
         version: link:../core
       '@me2em/crypto':
-        specifier: ^1.1.0-rc.2
+        specifier: workspace:^
         version: link:../crypto
       '@types/node':
         specifier: ^25.9.1
@@ -145,7 +145,7 @@ importers:
   packages/react:
     dependencies:
       '@me2em/core':
-        specifier: ^1.0.0-rc.10
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@testing-library/dom':
@@ -200,7 +200,7 @@ importers:
   packages/solana:
     dependencies:
       '@me2em/crypto':
-        specifier: ^1.1.0-rc.2
+        specifier: workspace:^
         version: link:../crypto
       '@noble/curves':
         specifier: ^1.8.1
@@ -222,10 +222,10 @@ importers:
         version: 8.6.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)
     devDependencies:
       '@me2em/core':
-        specifier: ^1.0.0-rc.10
+        specifier: workspace:^
         version: link:../core
       '@me2em/x402':
-        specifier: ^1.0.0-rc.1
+        specifier: workspace:^
         version: link:../x402
       '@types/node':
         specifier: ^25.9.1
@@ -249,7 +249,7 @@ importers:
   packages/x402:
     devDependencies:
       '@me2em/core':
-        specifier: ^1.0.0-rc.10
+        specifier: workspace:^
         version: link:../core
       '@types/node':
         specifier: ^25.9.1

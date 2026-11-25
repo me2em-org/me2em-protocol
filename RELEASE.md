@@ -31,12 +31,14 @@ grep -H '"version"' packages/{core,crypto,pact,react,solana,x402}/package.json
 # ↑ these MUST match the release batch — the npm publish banner prints
 # the SAME version, so a stale tree is visible right there (publishing
 # a stale rc.x ships the wrong code to `latest`)
-grep -rn "workspace:" packages/*/package.json package.json
-# ↑ MUST print nothing: pnpm publish rewrote `workspace:^` at pack time,
-# npm publish does NOT — the pnpm-only protocol in a published manifest
-# is un-installable by npm consumers (EUNSUPPORTEDPROTOCOL; the react
-# rc.5 blocker). Cross-package refs carry real semver ranges, and
-# pnpm-workspace.yaml `linkWorkspacePackages: true` keeps local linking.
+grep -l "workspace:" packages/*/package.json
+# ↑ MUST list crypto, pact, react, solana, x402 (core has no @me2em
+# deps): cross-package refs keep the pnpm workspace protocol — dev
+# always links the CURRENT workspace member, even when packages version
+# at different rates. npm publish cannot ship that protocol
+# (EUNSUPPORTEDPROTOCOL; the react rc.5 blocker), so releases pack with
+# pnpm — which rewrites workspace:^ to real semver at pack time — and
+# publish the stamped tarballs; the guard lives in the Pack smoke below.
 corepack pnpm install
 corepack pnpm -r typecheck && corepack pnpm -r test && corepack pnpm -r lint
 corepack pnpm -r build                     # dist/ fresh everywhere
@@ -59,12 +61,19 @@ cd packages/pact && npm pack --dry-run
 
 ## Pack smoke (offline, before every publish)
 
-Full consumer simulation without the registry — pack tarballs, install
-them into a clean scratch project, import the public surface:
+`corepack pnpm pack` rewrites `workspace:^` to real semver ranges in
+the packed manifest (what `pnpm publish` used to do — the release
+publishes with npm instead, see below). Pack the release set, verify
+the stamp, then simulate a consumer without the registry:
 
 ```sh
 rm -rf /tmp/pack-stage /tmp/pack-smoke && mkdir -p /tmp/pack-stage /tmp/pack-smoke
-for p in core pact react; do (cd packages/$p && npm pack --ignore-scripts --pack-destination /tmp/pack-stage); done
+for p in core pact react; do (cd packages/$p && corepack pnpm pack --pack-destination /tmp/pack-stage); done
+
+# stamp check — MUST print nothing: a workspace: protocol in a tarball
+# is un-installable by npm consumers (EUNSUPPORTEDPROTOCOL)
+for t in /tmp/pack-stage/*.tgz
+  do tar -xOzf "$t" package/package.json | grep -q "workspace:" && echo "BLOCKER in $t"; done
 
 cd /tmp/pack-smoke && npm init -y >/dev/null
 # one tarball at a time, in peer order — a combined install can mask
@@ -89,13 +98,16 @@ lazy load) and `react` as an auto-installed peer.
 
 ## Publish
 
-One package at a time, in order; `prepublishOnly` re-runs the build
-(`npm publish` executes it — do not skip):
+Publish the STAGED tarballs from the Pack smoke above — their manifests
+carry the stamped real ranges, and npm's CLI performs the WebAuthn
+browser flow on publish (which pnpm publish lacks). Note
+`npm publish <tarball>` does NOT run `prepublishOnly` — the pre-flight
+build must have run:
 
 ```sh
-cd packages/core && npm publish --access public --tag latest
-cd packages/pact && npm publish --access public --tag latest
-cd packages/react && npm publish --access public --tag latest
+npm publish /tmp/pack-stage/me2em-core-*.tgz  --access public --tag latest
+npm publish /tmp/pack-stage/me2em-pact-*.tgz  --access public --tag latest
+npm publish /tmp/pack-stage/me2em-react-*.tgz --access public --tag latest
 # …crypto / solana / x402 only when their versions moved
 ```
 
