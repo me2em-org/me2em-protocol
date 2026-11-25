@@ -9,8 +9,10 @@ publish automation without an architect decision.
 ## Policy
 
 - **Dist-tag:** rc-line versions publish to **`latest`** (the DR-6
-  разминка stance). Never pass `--tag` — npm's default tag for a plain
-  `npm publish` is `latest`, which is exactly what we want for rc.
+  разминка stance). Pass **`--tag latest` explicitly**: npm ≥ 7.20
+  refuses to publish a prerelease without an explicit tag
+  ("You must specify a tag using --tag when publishing a prerelease
+  version") — the historical default-to-latest no longer applies.
 - **Order:** publish in peer-dependency order — `core` → `crypto` →
   `pact` → `react` → `solana` → `x402`. Bump and publish only the
   packages whose version is ahead of the registry.
@@ -25,6 +27,10 @@ publish automation without an architect decision.
 ```sh
 cd /path/to/me2em-protocol
 git pull && git status                     # clean tree, main or release branch
+grep -H '"version"' packages/{core,crypto,pact,react,solana,x402}/package.json
+# ↑ these MUST match the release batch — the npm publish banner prints
+# the SAME version, so a stale tree is visible right there (publishing
+# a stale rc.x ships the wrong code to `latest`)
 corepack pnpm install
 corepack pnpm -r typecheck && corepack pnpm -r test && corepack pnpm -r lint
 corepack pnpm -r build                     # dist/ fresh everywhere
@@ -51,9 +57,9 @@ One package at a time, in order; `prepublishOnly` re-runs the build
 (`npm publish` executes it — do not skip):
 
 ```sh
-cd packages/core && npm publish --access public
-cd packages/pact && npm publish --access public
-cd packages/react && npm publish --access public
+cd packages/core && npm publish --access public --tag latest
+cd packages/pact && npm publish --access public --tag latest
+cd packages/react && npm publish --access public --tag latest
 # …crypto / solana / x402 only when their versions moved
 ```
 
