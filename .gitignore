@@ -144,5 +144,8 @@ vite.config.ts.timestamp-*
 
 docs/*
 !docs/PACTS.md
+# generated TypeDoc output (per-package `build-docs`); `docs/*` above is
+# anchored to the repo root and does not cover packages/*/docs
+packages/*/docs/
 done/
 plan/
