@@ -291,6 +291,16 @@ export class Session {
    *   ttl: 3600,
    *   sessionId: 'unique-session-id' // optional
    * });
+   *
+   * // Renewal (since rc.10, BL-06): pass the previous sid so the fresh
+   * // token stays in the same revocation lineage — revoking the sid
+   * // disables every token of the lineage, revoking a jti, exactly one.
+   * const renewed = await Session.create(handle, {
+   *   audience: 'app.example.com',
+   *   scopes: ['read', 'write'],
+   *   ttl: 3600,
+   *   sid: session.sid,
+   * });
    * ```
    */
   static async create(

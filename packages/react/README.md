@@ -174,6 +174,8 @@ function ChatScreen() {
 
 The hook auto-renews at half the session TTL by default. Set `autoRenew: false` to disable.
 
+Since rc.5 the renewal lineage is explicit (core rc.10, BL-06): the hook threads the session's `sid` across renewals, so every token it creates stays in the same revocation lineage — revoking the `sid` disables the whole lineage at once, revoking a `jti` a single token. The lineage resets only when the signing `handle` changes or is cleared.
+
 ## Identity Context Cache
 
 The Identity Context Cache provides per-identity encrypted storage for Handle context data using IndexedDB with WebCrypto AES-GCM encryption.

@@ -22,15 +22,21 @@ import type {
   VoucherChain,
 } from '../types.js';
 
+/** Deterministic byte filler — the seed material behind every fixture key. */
 export const bytes = (n: number, fill: number) => new Uint8Array(n).fill(fill);
+/** UTF-8 encode, for building canonical context strings in tests. */
 export const utf8 = (s: string) => new TextEncoder().encode(s);
 
 /** Fixed reference time for all test journals (clock injection, C3). */
 export const T0 = 1700000000;
+/** Frozen {@link Clock} pinned to an absolute instant (C3 determinism). */
 export const clockAt = (t: number) => ({ now: () => t });
 
+/** Reference pact id — b64url of 16 bytes filled with 0x21. */
 export const PID = b64urlEncode(bytes(16, 0x21));
+/** Reference pact context string (the GK derivation input). */
 export const CONTEXT = 'joint charging agreement';
+/** `b64url(sha256(CONTEXT))` — the channel hash paired with {@link PID}. */
 export const CH = b64urlEncode(crypto.sha256(utf8(CONTEXT)));
 
 const GRANT = { scopes: ['pact'], maxSessionTtl: 300 };

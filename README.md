@@ -554,9 +554,10 @@ We welcome contributions! Please read:
 | **Shipped** | `1.0.0-rc.1` — release-candidate line adopted (specs/v1.0.md §12), threat model, LTS security policy |
 | **Shipped** | `@me2em/pact` 1.0.0-rc.3 — the horizontal trust primitive (BL-58): Pact Journal, 2-party co-sign assembly, incremental journal verification (rc.3)
 | **Shipped** | Payment layer M0–M2 — `@me2em/core` rc.5–rc.7 (contracts + x402 v2 wire), `@me2em/x402` 1.0.0-rc.1 (transport), `@me2em/solana` 1.1.0-rc.1 (chain adapter: wallet tree, verification, pay, x402 signer), `@me2em/crypto` 1.1.0-rc.1 (SLIP-0010) |
+| **Shipped** | rc-line hardening — `@me2em/core` rc.8–rc.10 (JCS revocation P0.8, session lineage `sid` BL-06), `@me2em/react` rc.4–rc.5 (sid threading across renewals), `@me2em/pact` rc.4–rc.5 (`rosterDigest` BL-12/F8, subpath exports `@me2em/pact/transport` + `/testing`) |
 | **Next** | DevSecOps hardening — branch protection, coverage thresholds (CI pipeline live) |
-| **Next** | `@me2em/facilitator` — self-hosted x402 verify/settle service; SPL (token) transfers in `@me2em/solana` |
-| **Next** | `@me2em/messenger` (0.9) — first vertical; `@me2em/pact` 1.0.0 (N-party assembly for the We2eM federation, v0.2 track) |
+| **Next** | SPL (token) transfers in `@me2em/solana` |
+| **Next** | `@me2em/pact` 1.0.0 — N-party assembly for the federation (v0.2 track, ≥3 notaries) |
 | **Next** | `@me2em/core` v1.0.0 GA — opens the 24-month LTS support window (7-day critical SLA) |
 | **Later** | ZK-proof integration (anonymous attribute verification) |
 
@@ -600,6 +601,7 @@ Me2eM builds on the shoulders of giants:
 - [`@solana/kit`](https://github.com/anza-xyz/kit) — Solana RPC client and transaction submission (`pay` path)
 - [`@solana-program/system`](https://github.com/solana-program/system) / [`@solana-program/memo`](https://github.com/solana-program/memo) — program clients for transfer and memo instructions
 - [`hash-wasm`](https://github.com/Daninet/hash-wasm) — Argon2id (WASM)
+- [RFC 8785 — JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785) — the canonical JSON form behind every deterministic serialization: derivation info strings, token payload hashing, Pact Journal `evHash` and roster digests
 - [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) — IndexedDB test double
 - [`tsup`](https://tsup.egoist.dev/) / [`typedoc`](https://typedoc.org/) / [`vitest`](https://vitest.dev/) — Build, docs, and test tooling
 
